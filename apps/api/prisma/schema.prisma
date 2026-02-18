@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         Role     @default(TECHNICIAN)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  assignedJobs Job[]
+  notes        Note[]
+  activities   ActivityLog[]
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  TECHNICIAN
+}
+
+model Customer {
+  id          String     @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String?    @unique
+  phone       String?
+  companyName String?
+  notes       String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  properties  Property[]
+  leads       Lead[]
+  quotes      Quote[]
+  jobs        Job[]
+  invoices    Invoice[]
+  notesList   Note[]
+  activities  ActivityLog[]
+  @@map("customers")
+}
+
+model Property {
+  id         String   @id @default(cuid())
+  customerId String
+  address    String
+  city       String
+  state      String
+  zip        String
+  country    String   @default("US")
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  customer   Customer @relation(fields: [customerId], references: [id])
+  jobs       Job[]
+  quotes     Quote[]
+  @@map("properties")
+}
+
+model Lead {
+  id          String     @id @default(cuid())
+  customerId  String
+  title       String
+  description String?
+  status      LeadStatus @default(NEW)
+  source      String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  customer    Customer   @relation(fields: [customerId], references: [id])
+  quotes      Quote[]
+  activities  ActivityLog[]
+  @@map("leads")
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+model Quote {
+  id          String      @id @default(cuid())
+  customerId  String
+  propertyId  String?
+  leadId      String?
+  quoteNumber String      @unique
+  title       String
+  status      QuoteStatus @default(DRAFT)
+  subtotal    Decimal     @default(0) @db.Decimal(10, 2)
+  tax         Decimal     @default(0) @db.Decimal(10, 2)
+  total       Decimal     @default(0) @db.Decimal(10, 2)
+  notes       String?
+  validUntil  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  property    Property?   @relation(fields: [propertyId], references: [id])
+  lead        Lead?       @relation(fields: [leadId], references: [id])
+  lineItems   QuoteLineItem[]
+  jobs        Job[]
+  activities  ActivityLog[]
+  @@map("quotes")
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  APPROVED
+  DECLINED
+  EXPIRED
+}
+
+model QuoteLineItem {
+  id          String  @id @default(cuid())
+  quoteId     String
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+  sortOrder   Int     @default(0)
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  @@map("quote_line_items")
+}
+
+model Job {
+  id           String    @id @default(cuid())
+  customerId   String
+  propertyId   String?
+  quoteId      String?
+  assignedToId String?
+  jobNumber    String    @unique
+  title        String
+  description  String?
+  status       JobStatus @default(UNSCHEDULED)
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  duration     Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  property     Property? @relation(fields: [propertyId], references: [id])
+  quote        Quote?    @relation(fields: [quoteId], references: [id])
+  assignedTo   User?     @relation(fields: [assignedToId], references: [id])
+  invoices     Invoice[]
+  notes        Note[]
+  attachments  Attachment[]
+  activities   ActivityLog[]
+  @@map("jobs")
+}
+
+enum JobStatus {
+  UNSCHEDULED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  customerId    String
+  jobId         String?
+  invoiceNumber String        @unique
+  status        InvoiceStatus @default(DRAFT)
+  subtotal      Decimal       @default(0) @db.Decimal(10, 2)
+  tax           Decimal       @default(0) @db.Decimal(10, 2)
+  total         Decimal       @default(0) @db.Decimal(10, 2)
+  dueDate       DateTime?
+  paidAt        DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  job           Job?          @relation(fields: [jobId], references: [id])
+  lineItems     InvoiceLineItem[]
+  activities    ActivityLog[]
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceLineItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+  sortOrder   Int     @default(0)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  @@map("invoice_line_items")
+}
+
+model Note {
+  id         String    @id @default(cuid())
+  jobId      String?
+  customerId String?
+  authorId   String?
+  content    String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  job        Job?      @relation(fields: [jobId], references: [id])
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  author     User?     @relation(fields: [authorId], references: [id])
+  @@map("notes")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  jobId     String
+  fileName  String
+  fileUrl   String
+  fileSize  Int?
+  mimeType  String?
+  createdAt DateTime @default(now())
+  job       Job      @relation(fields: [jobId], references: [id])
+  @@map("attachments")
+}
+
+model ActivityLog {
+  id         String    @id @default(cuid())
+  customerId String?
+  jobId      String?
+  quoteId    String?
+  invoiceId  String?
+  leadId     String?
+  userId     String?
+  action     String
+  detail     String?
+  createdAt  DateTime  @default(now())
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  job        Job?      @relation(fields: [jobId], references: [id])
+  quote      Quote?    @relation(fields: [quoteId], references: [id])
+  invoice    Invoice?  @relation(fields: [invoiceId], references: [id])
+  lead       Lead?     @relation(fields: [leadId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
+  @@map("activity_logs")
+}
