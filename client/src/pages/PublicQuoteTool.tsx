@@ -217,7 +217,7 @@ export default function QuoteTool() {
     trpc.publicSite.quote.getPricing.useQuery();
   const { data: experienceConfig } =
     trpc.publicSite.quote.getExperienceConfig.useQuery();
-  const submitMutation = trpc.publicSite.quote.submit.useMutation();
+  const submitMutation = trpc.publicSite.quote.submitV2.useMutation();
   const startSessionMutation = trpc.publicSite.quote.startSession.useMutation();
   const trackEventMutation = trpc.publicSite.quote.trackEvent.useMutation();
   const uploadMutation = trpc.publicSite.quote.uploadPhoto.useMutation();
@@ -346,6 +346,55 @@ export default function QuoteTool() {
     [quoteSummary, upsellTotal]
   );
 
+  const previewInput = useMemo(
+    () => ({
+      companyId: experienceConfig?.settings?.companyId ?? 1,
+      distanceMiles,
+      travelFee: quoteSummary.travelFee,
+      items: pricingResults.map(item => ({
+        serviceType: item.serviceType,
+        basePrice: item.basePrice,
+        finalPrice: item.finalPrice,
+        packageTier: (serviceInputs[item.serviceType]?.packageTier ||
+          "good") as "good" | "better" | "best",
+      })),
+      acceptedUpsells: acceptedUpsellItems.map(upsell => ({
+        id: upsell.id,
+        title: upsell.title,
+        price: upsell.price,
+      })),
+    }),
+    [
+      acceptedUpsellItems,
+      distanceMiles,
+      experienceConfig?.settings?.companyId,
+      pricingResults,
+      quoteSummary.travelFee,
+      serviceInputs,
+    ]
+  );
+
+  const { data: previewData } = trpc.publicSite.quote.pricePreview.useQuery(
+    previewInput,
+    {
+      enabled: previewInput.items.length > 0,
+    }
+  );
+
+  const quotePreviewSummary = useMemo(() => {
+    if (!previewData?.breakdown) return finalQuoteSummary;
+
+    return {
+      ...finalQuoteSummary,
+      subtotal: previewData.breakdown.servicesSubtotal,
+      bundleDiscountPercent: previewData.breakdown.bundleDiscountPercent,
+      bundleDiscount: previewData.breakdown.bundleDiscountAmount,
+      travelFee: previewData.breakdown.travelFee,
+      jobMinimumApplied: previewData.breakdown.jobMinimumApplied,
+      totalPrice: previewData.breakdown.total,
+    };
+  }, [previewData?.breakdown, finalQuoteSummary]);
+
   const toggleService = (id: string) => {
     setSelectedServices(prev => {
       const next = new Set(prev);
@@ -446,11 +495,10 @@ export default function QuoteTool() {
         zip,
         lat: lat || undefined,
         lng: lng || undefined,
-        distanceMiles: distanceMiles || undefined,
-        subtotal: finalQuoteSummary.subtotal,
-        bundleDiscount: finalQuoteSummary.bundleDiscount,
-        travelFee: finalQuoteSummary.travelFee,
-        totalPrice: finalQuoteSummary.totalPrice,
+        subtotal: quotePreviewSummary.subtotal,
+        bundleDiscount: quotePreviewSummary.bundleDiscount,
+        travelFee: quotePreviewSummary.travelFee,
+        totalPrice: quotePreviewSummary.totalPrice,
         preferredDate: preferredDate || undefined,
         preferredTime: preferredTime || undefined,
         referralSource: referralSource || undefined,
@@ -478,6 +526,15 @@ export default function QuoteTool() {
             description: upsell.title,
           })),
         ],
+        acceptedUpsells: acceptedUpsellItems.map(upsell => ({
+          id: upsell.id,
+          title: upsell.title,
+          price: upsell.price,
+        })),
+        confidenceMode: quotePreviewSummary.jobMinimumApplied
+          ? "manual_review"
+          : "exact",
+        schedulingEligible: !quotePreviewSummary.jobMinimumApplied,
         sessionToken: sessionToken || undefined,
       });
       setQuoteResult(result);
@@ -707,8 +764,8 @@ export default function QuoteTool() {
               {step === 5 && (
                 <StepReview
                   pricingResults={pricingResults}
-                  quoteSummary={quoteSummary}
-                  finalQuoteSummary={finalQuoteSummary}
+                  quoteSummary={quotePreviewSummary}
+                  finalQuoteSummary={quotePreviewSummary}
                   serviceInputs={serviceInputs}
                   address={`${address}, ${city}, ${stateVal} ${zip}`}
                   name={name}
