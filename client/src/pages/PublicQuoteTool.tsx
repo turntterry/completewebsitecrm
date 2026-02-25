@@ -159,6 +159,47 @@ const SLIDER_DEFAULTS: Record<
   },
 };
 
+const UPSELL_CATALOG: {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  appliesTo: string[];
+  badge?: string;
+}[] = [
+  {
+    id: "window_screen_deep_clean",
+    title: "Screen Deep Clean",
+    description: "Full screen scrub and rinse for better clarity and airflow.",
+    price: 89,
+    appliesTo: ["window_cleaning"],
+    badge: "Popular",
+  },
+  {
+    id: "window_track_sill_detail",
+    title: "Track + Sill Detailing",
+    description: "Premium detailing for tracks, sills, and frame edges.",
+    price: 129,
+    appliesTo: ["window_cleaning"],
+  },
+  {
+    id: "curb_appeal_bundle",
+    title: "Curb Appeal Bundle",
+    description: "Add walkway touch-up and edge rinse for a full-front finish.",
+    price: 99,
+    appliesTo: ["house_washing", "driveway_cleaning", "walkway_cleaning"],
+    badge: "Bundle",
+  },
+  {
+    id: "gutter_brightening_addon",
+    title: "Gutter Brightening",
+    description:
+      "Restore exterior gutter appearance with targeted brightening.",
+    price: 79,
+    appliesTo: ["house_washing", "gutter_cleaning"],
+  },
+];
+
 const STEPS = [
   "Address",
   "Contact",
@@ -212,6 +253,10 @@ export default function QuoteTool() {
     totalPrice: number;
   } | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [acceptedUpsells, setAcceptedUpsells] = useState<
+    Record<string, boolean>
+  >({});
+  const shownUpsellsRef = useRef<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -265,6 +310,31 @@ export default function QuoteTool() {
   const quoteSummary = useMemo(() => {
     return calculateQuoteTotal(pricingResults, distanceMiles, globalConfig);
   }, [pricingResults, distanceMiles, globalConfig]);
+  const eligibleUpsells = useMemo(() => {
+    const selected = new Set(Array.from(selectedServices));
+    return UPSELL_CATALOG.filter(upsell =>
+      upsell.appliesTo.some(service => selected.has(service))
+    );
+  }, [selectedServices]);
+
+  const acceptedUpsellItems = useMemo(
+    () => eligibleUpsells.filter(upsell => acceptedUpsells[upsell.id]),
+    [eligibleUpsells, acceptedUpsells]
+  );
+
+  const upsellTotal = useMemo(
+    () => acceptedUpsellItems.reduce((sum, upsell) => sum + upsell.price, 0),
+    [acceptedUpsellItems]
+  );
+
+  const finalQuoteSummary = useMemo(
+    () => ({
+      ...quoteSummary,
+      subtotal: quoteSummary.subtotal + upsellTotal,
+      totalPrice: quoteSummary.totalPrice + upsellTotal,
+    }),
+    [quoteSummary, upsellTotal]
+  );
 
   const toggleService = (id: string) => {
     setSelectedServices(prev => {
@@ -272,6 +342,18 @@ export default function QuoteTool() {
       const removed = next.has(id);
       if (removed) {
         next.delete(id);
+        setAcceptedUpsells(prev => {
+          const nextAccepted = { ...prev };
+          for (const upsell of UPSELL_CATALOG) {
+            if (upsell.appliesTo.includes(id)) {
+              const stillEligible = upsell.appliesTo.some(service =>
+                next.has(service)
+              );
+              if (!stillEligible) delete nextAccepted[upsell.id];
+            }
+          }
+          return nextAccepted;
+        });
       } else {
         next.add(id);
         if (!serviceInputs[id]) {
@@ -296,6 +378,23 @@ export default function QuoteTool() {
       ...prev,
       [svcId]: { ...(prev[svcId] || { serviceType: svcId }), [key]: value },
     }));
+  };
+
+  const toggleUpsell = (upsellId: string) => {
+    setAcceptedUpsells(prev => {
+      const next = { ...prev, [upsellId]: !prev[upsellId] };
+      if (sessionToken && next[upsellId]) {
+        const upsell = UPSELL_CATALOG.find(item => item.id === upsellId);
+        if (upsell) {
+          trackEventMutation.mutate({
+            sessionToken,
+            eventName: "upsell_accepted",
+            payload: { upsellId, title: upsell.title, price: upsell.price },
+          });
+        }
+      }
+      return next;
+    });
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -338,29 +437,37 @@ export default function QuoteTool() {
         lat: lat || undefined,
         lng: lng || undefined,
         distanceMiles: distanceMiles || undefined,
-        subtotal: quoteSummary.subtotal,
-        bundleDiscount: quoteSummary.bundleDiscount,
-        travelFee: quoteSummary.travelFee,
-        totalPrice: quoteSummary.totalPrice,
+        subtotal: finalQuoteSummary.subtotal,
+        bundleDiscount: finalQuoteSummary.bundleDiscount,
+        travelFee: finalQuoteSummary.travelFee,
+        totalPrice: finalQuoteSummary.totalPrice,
         preferredDate: preferredDate || undefined,
         preferredTime: preferredTime || undefined,
         referralSource: referralSource || undefined,
         customerPhotos: photos.length > 0 ? photos : undefined,
-        items: pricingResults.map(r => ({
-          serviceType: r.serviceType,
-          packageTier: (serviceInputs[r.serviceType]?.packageTier || "good") as
-            | "good"
-            | "better"
-            | "best",
-          inputs:
-            (serviceInputs[r.serviceType] as unknown as Record<
-              string,
-              unknown
-            >) || {},
-          basePrice: r.basePrice,
-          finalPrice: r.finalPrice,
-          description: r.breakdown.join("; "),
-        })),
+        items: [
+          ...pricingResults.map(r => ({
+            serviceType: r.serviceType,
+            packageTier: (serviceInputs[r.serviceType]?.packageTier ||
+              "good") as "good" | "better" | "best",
+            inputs:
+              (serviceInputs[r.serviceType] as unknown as Record<
+                string,
+                unknown
+              >) || {},
+            basePrice: r.basePrice,
+            finalPrice: r.finalPrice,
+            description: r.breakdown.join("; "),
+          })),
+          ...acceptedUpsellItems.map(upsell => ({
+            serviceType: `upsell_${upsell.id}`,
+            packageTier: "good" as const,
+            inputs: { upsell: true, upsellId: upsell.id },
+            basePrice: upsell.price,
+            finalPrice: upsell.price,
+            description: upsell.title,
+          })),
+        ],
         sessionToken: sessionToken || undefined,
       });
       setQuoteResult(result);
@@ -393,6 +500,24 @@ export default function QuoteTool() {
         // Non-blocking analytics setup.
       });
   }, [sessionToken, startSessionMutation, trackEventMutation]);
+
+  useEffect(() => {
+    if (!sessionToken || eligibleUpsells.length === 0) return;
+
+    for (const upsell of eligibleUpsells) {
+      if (shownUpsellsRef.current.has(upsell.id)) continue;
+      shownUpsellsRef.current.add(upsell.id);
+      trackEventMutation.mutate({
+        sessionToken,
+        eventName: "upsell_shown",
+        payload: {
+          upsellId: upsell.id,
+          title: upsell.title,
+          price: upsell.price,
+        },
+      });
+    }
+  }, [sessionToken, eligibleUpsells, trackEventMutation]);
 
   const canProceed = () => {
     switch (step) {
@@ -557,10 +682,15 @@ export default function QuoteTool() {
                 <StepReview
                   pricingResults={pricingResults}
                   quoteSummary={quoteSummary}
+                  finalQuoteSummary={finalQuoteSummary}
                   serviceInputs={serviceInputs}
                   address={`${address}, ${city}, ${stateVal} ${zip}`}
                   name={name}
                   tierLabels={tierLabels}
+                  eligibleUpsells={eligibleUpsells}
+                  acceptedUpsells={acceptedUpsells}
+                  toggleUpsell={toggleUpsell}
+                  upsellTotal={upsellTotal}
                 />
               )}
               {step === 5 && (
@@ -589,7 +719,7 @@ export default function QuoteTool() {
                   <p className="text-muted-foreground mb-4">
                     Your estimated total is{" "}
                     <span className="font-bold text-foreground text-lg">
-                      ${quoteSummary.totalPrice.toFixed(2)}
+                      ${finalQuoteSummary.totalPrice.toFixed(2)}
                     </span>
                   </p>
                   <p className="text-sm text-muted-foreground max-w-md mx-auto">
@@ -1373,10 +1503,15 @@ function WindowPackageSelector({
 function StepReview({
   pricingResults,
   quoteSummary,
+  finalQuoteSummary,
   serviceInputs,
   address,
   name,
   tierLabels,
+  eligibleUpsells,
+  acceptedUpsells,
+  toggleUpsell,
+  upsellTotal,
 }: any) {
   return (
     <div>
@@ -1420,11 +1555,59 @@ function StepReview({
         })}
       </div>
 
+      {eligibleUpsells.length > 0 && (
+        <div className="mb-5 rounded-xl border bg-background p-4">
+          <p className="font-semibold mb-3">Recommended Add-ons</p>
+          <div className="space-y-2">
+            {eligibleUpsells.map((upsell: any) => {
+              const active = !!acceptedUpsells[upsell.id];
+              return (
+                <button
+                  key={upsell.id}
+                  type="button"
+                  onClick={() => toggleUpsell(upsell.id)}
+                  className={`w-full text-left rounded-lg border p-3 transition ${
+                    active
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-sm flex items-center gap-2">
+                        {upsell.title}
+                        {upsell.badge && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {upsell.badge}
+                          </Badge>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {upsell.description}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-sm">
+                      +${upsell.price.toFixed(2)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="bg-secondary rounded-xl p-5 space-y-2">
         <div className="flex justify-between text-sm">
           <span>Subtotal</span>
           <span>${quoteSummary.subtotal.toFixed(2)}</span>
         </div>
+        {upsellTotal > 0 && (
+          <div className="flex justify-between text-sm text-primary">
+            <span>Upsells</span>
+            <span>+${upsellTotal.toFixed(2)}</span>
+          </div>
+        )}
         {quoteSummary.bundleDiscount > 0 && (
           <div className="flex justify-between text-sm text-green-600">
             <span>Bundle Discount ({quoteSummary.bundleDiscountPercent}%)</span>
@@ -1442,7 +1625,7 @@ function StepReview({
         <div className="flex justify-between font-heading font-bold text-xl">
           <span>Total</span>
           <span className="text-primary">
-            ${quoteSummary.totalPrice.toFixed(2)}
+            ${finalQuoteSummary.totalPrice.toFixed(2)}
           </span>
         </div>
       </div>
