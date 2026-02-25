@@ -6,11 +6,12 @@ This plan converts the current CRM instant quote tool into a premium, QuoteIQ-st
 
 ## Repository setup
 
-- New repo name: `CodexSite`
-- Source baseline: current `completewebsitecrm` quote stack and APIs
+- Use the existing `completewebsitecrm` repository (no separate repo split).
+- Source baseline: current quote stack and APIs already in this repo.
 - Branch strategy:
-  - `main` = stable releases
-  - `feat/<phase>-<scope>` = active work
+  - `work` = current stable integration branch in this environment
+  - `feat/<phase>-<scope>` = active work per phase
+  - PR merge target = `work` unless directed otherwise
 
 ## Update cadence
 
@@ -30,12 +31,12 @@ This plan converts the current CRM instant quote tool into a premium, QuoteIQ-st
 
 ## Goals
 
-- Create `CodexSite` repo and initialize CI/lint/test baseline.
+- Create a dedicated feature branch and initialize phase delivery cadence.
 - Mirror current quote functionality so there is no regression at kickoff.
 
 ## Deliverables
 
-- Repo initialized and connected to remote.
+- Feature branch created from `work` and linked to phase scope.
 - Environment template + setup instructions.
 - Baseline smoke test pass for current quote flow.
 
