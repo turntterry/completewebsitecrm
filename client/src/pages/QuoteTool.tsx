@@ -79,6 +79,10 @@ export default function QuoteTool() {
     isLoading: servicesLoading,
     refetch: refetchServices,
   } = trpc.quoteToolSettings.getServices.useQuery();
+  const { data: upsellAnalytics } =
+    trpc.quoteToolSettings.getUpsellAnalytics.useQuery({
+      days: 30,
+    });
 
   // ── Pricing / Packages state ──────────────────────────────────────────────
   const [jobMinimum, setJobMinimum] = useState<string>("");
@@ -775,6 +779,49 @@ export default function QuoteTool() {
       {/* ── Upsells Tab ─────────────────────────────────────────────────── */}
       {activeTab === "upsells" && (
         <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                Upsell Performance (30 days)
+              </CardTitle>
+              <CardDescription>
+                Quick attach-rate snapshot from tracked quote events.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {upsellAnalytics?.rows?.length ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground pb-1 border-b">
+                    <span>Offer</span>
+                    <span>Shown / Accepted / Rate</span>
+                  </div>
+                  {upsellAnalytics.rows.slice(0, 8).map((row: any) => (
+                    <div
+                      key={row.upsellId}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="font-medium truncate pr-3">
+                        {row.title}
+                      </span>
+                      <span className="text-muted-foreground whitespace-nowrap">
+                        {row.shown} / {row.accepted} /{" "}
+                        {(row.acceptRate * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                  <div className="pt-2 mt-2 border-t text-xs text-muted-foreground flex justify-between">
+                    <span>Total shown: {upsellAnalytics.totalShown}</span>
+                    <span>Total accepted: {upsellAnalytics.totalAccepted}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No upsell event data yet.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Upsell Catalog</CardTitle>

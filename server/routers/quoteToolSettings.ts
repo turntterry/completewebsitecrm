@@ -1,8 +1,12 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { quoteToolSettings, quoteToolServices } from "../../drizzle/schema";
-import { eq, asc, and } from "drizzle-orm";
+import {
+  quoteSessionEvents,
+  quoteToolSettings,
+  quoteToolServices,
+} from "../../drizzle/schema";
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
 export const quoteToolSettingsRouter = router({
@@ -275,6 +279,72 @@ export const quoteToolSettingsRouter = router({
         .set({ customerTierLabels: input })
         .where(eq(quoteToolSettings.companyId, companyId));
       return { success: true };
+    }),
+
+  // Upsell analytics summary (owner dashboard)
+  getUpsellAnalytics: protectedProcedure
+    .input(
+      z
+        .object({ days: z.number().int().min(1).max(365).default(30) })
+        .optional()
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+
+      const days = input?.days ?? 30;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+      const events = await db
+        .select()
+        .from(quoteSessionEvents)
+        .where(
+          and(
+            inArray(quoteSessionEvents.eventName, [
+              "upsell_shown",
+              "upsell_accepted",
+            ]),
+            gte(quoteSessionEvents.createdAt, since)
+          )
+        )
+        .orderBy(desc(quoteSessionEvents.createdAt))
+        .limit(5000);
+
+      const metrics = new Map<
+        string,
+        { upsellId: string; title: string; shown: number; accepted: number }
+      >();
+
+      for (const event of events) {
+        const payload = (event.payload ?? {}) as Record<string, unknown>;
+        const upsellId = String(payload.upsellId ?? "").trim();
+        if (!upsellId) continue;
+
+        const existing = metrics.get(upsellId) ?? {
+          upsellId,
+          title: String(payload.title ?? upsellId),
+          shown: 0,
+          accepted: 0,
+        };
+
+        if (event.eventName === "upsell_shown") existing.shown += 1;
+        if (event.eventName === "upsell_accepted") existing.accepted += 1;
+        metrics.set(upsellId, existing);
+      }
+
+      const rows = Array.from(metrics.values())
+        .map(row => ({
+          ...row,
+          acceptRate: row.shown > 0 ? row.accepted / row.shown : 0,
+        }))
+        .sort((a, b) => b.accepted - a.accepted || b.shown - a.shown);
+
+      return {
+        windowDays: days,
+        totalShown: rows.reduce((sum, row) => sum + row.shown, 0),
+        totalAccepted: rows.reduce((sum, row) => sum + row.accepted, 0),
+        rows,
+      };
     }),
 
   // Update upsell catalog (owner-editable)
