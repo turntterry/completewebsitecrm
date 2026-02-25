@@ -277,6 +277,37 @@ export const quoteToolSettingsRouter = router({
       return { success: true };
     }),
 
+  // Update upsell catalog (owner-editable)
+  updateUpsells: protectedProcedure
+    .input(
+      z.object({
+        upsellCatalog: z.array(
+          z.object({
+            id: z.string().min(1).max(80),
+            title: z.string().min(1).max(120),
+            description: z.string().min(1).max(280),
+            price: z.number().min(0),
+            appliesTo: z.array(z.string().min(1)).min(1),
+            badge: z.string().max(40).optional(),
+            active: z.boolean().optional(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      const companyId = ctx.user.companyId;
+      if (!companyId) throw new Error("No company");
+
+      await db
+        .update(quoteToolSettings)
+        .set({ upsellCatalog: input.upsellCatalog })
+        .where(eq(quoteToolSettings.companyId, companyId));
+
+      return { success: true };
+    }),
+
   // Update appearance settings
   updateAppearance: protectedProcedure
     .input(

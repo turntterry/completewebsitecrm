@@ -48,12 +48,19 @@ const SERVICE_ICONS: Record<string, React.ReactNode> = {
   Droplets: <Droplets className="w-5 h-5" />,
 };
 
-type TabId = "services" | "packages" | "appearance" | "form" | "deploy";
+type TabId =
+  | "services"
+  | "packages"
+  | "appearance"
+  | "upsells"
+  | "form"
+  | "deploy";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "services", label: "Services" },
   { id: "packages", label: "Packages" },
   { id: "appearance", label: "Appearance" },
+  { id: "upsells", label: "Upsells" },
   { id: "form", label: "Form" },
   { id: "deploy", label: "Deploy" },
 ];
@@ -111,6 +118,18 @@ export default function QuoteTool() {
   // ── Add service dialog state ──────────────────────────────────────────────
   const [newServiceName, setNewServiceName] = useState("");
   const [showAddService, setShowAddService] = useState(false);
+  // ── Upsell state ─────────────────────────────────────────────────────────
+  const [upsellCatalog, setUpsellCatalog] = useState<
+    {
+      id: string;
+      title: string;
+      description: string;
+      price: string;
+      appliesTo: string;
+      badge?: string;
+      active: boolean;
+    }[]
+  >([]);
 
   // Sync state from loaded settings (once)
   const [synced, setSynced] = useState(false);
@@ -150,7 +169,50 @@ export default function QuoteTool() {
     setRequireAdvance(settings.requireAdvanceBooking ?? false);
     setAdvanceDays(settings.advanceBookingDays ?? 1);
     setCommercialRouting(settings.commercialRoutingEnabled ?? false);
-    setIsActive((settings as any).isActive ?? false);
+    const configuredUpsells = (settings as any).upsellCatalog as
+      | {
+          id: string;
+          title: string;
+          description: string;
+          price: number;
+          appliesTo: string[];
+          badge?: string;
+          active?: boolean;
+        }[]
+      | undefined;
+
+    if (Array.isArray(configuredUpsells) && configuredUpsells.length > 0) {
+      setUpsellCatalog(
+        configuredUpsells.map(upsell => ({
+          ...upsell,
+          price: String(upsell.price ?? 0),
+          appliesTo: (upsell.appliesTo ?? []).join(", "),
+          active: upsell.active !== false,
+        }))
+      );
+    } else {
+      setUpsellCatalog([
+        {
+          id: "window_screen_deep_clean",
+          title: "Screen Deep Clean",
+          description:
+            "Full screen scrub and rinse for better clarity and airflow.",
+          price: "89",
+          appliesTo: "window_cleaning",
+          badge: "Popular",
+          active: true,
+        },
+        {
+          id: "window_track_sill_detail",
+          title: "Track + Sill Detailing",
+          description: "Premium detailing for tracks, sills, and frame edges.",
+          price: "129",
+          appliesTo: "window_cleaning",
+          active: true,
+        },
+      ]);
+    }
+
     setSynced(true);
   }
 
@@ -199,6 +261,13 @@ export default function QuoteTool() {
   const updateTierLabels = trpc.quoteToolSettings.updateTierLabels.useMutation({
     onSuccess: () => {
       toast.success("Tier labels saved");
+      refetchSettings();
+    },
+    onError: e => toast.error(e.message),
+  });
+  const updateUpsells = trpc.quoteToolSettings.updateUpsells.useMutation({
+    onSuccess: () => {
+      toast.success("Upsells saved");
       refetchSettings();
     },
     onError: e => toast.error(e.message),
@@ -700,6 +769,207 @@ export default function QuoteTool() {
           >
             Save Appearance
           </Button>
+        </div>
+      )}
+
+      {/* ── Upsells Tab ─────────────────────────────────────────────────── */}
+      {activeTab === "upsells" && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Upsell Catalog</CardTitle>
+              <CardDescription>
+                Edit in-flow upsells shown on the public quote Enhance step. Use
+                comma-separated service keys in "Applies To".
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {upsellCatalog.map((upsell, idx) => (
+                <div
+                  key={upsell.id || idx}
+                  className="rounded-lg border p-3 space-y-3"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        ID
+                      </Label>
+                      <Input
+                        value={upsell.id}
+                        onChange={e =>
+                          setUpsellCatalog(prev =>
+                            prev.map((u, i) =>
+                              i === idx ? { ...u, id: e.target.value } : u
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        Badge
+                      </Label>
+                      <Input
+                        value={upsell.badge ?? ""}
+                        onChange={e =>
+                          setUpsellCatalog(prev =>
+                            prev.map((u, i) =>
+                              i === idx ? { ...u, badge: e.target.value } : u
+                            )
+                          )
+                        }
+                        placeholder="Popular"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">
+                      Title
+                    </Label>
+                    <Input
+                      value={upsell.title}
+                      onChange={e =>
+                        setUpsellCatalog(prev =>
+                          prev.map((u, i) =>
+                            i === idx ? { ...u, title: e.target.value } : u
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">
+                      Description
+                    </Label>
+                    <Input
+                      value={upsell.description}
+                      onChange={e =>
+                        setUpsellCatalog(prev =>
+                          prev.map((u, i) =>
+                            i === idx
+                              ? { ...u, description: e.target.value }
+                              : u
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        Price
+                      </Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={upsell.price}
+                        onChange={e =>
+                          setUpsellCatalog(prev =>
+                            prev.map((u, i) =>
+                              i === idx ? { ...u, price: e.target.value } : u
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        Applies To (service keys)
+                      </Label>
+                      <Input
+                        value={upsell.appliesTo}
+                        onChange={e =>
+                          setUpsellCatalog(prev =>
+                            prev.map((u, i) =>
+                              i === idx
+                                ? { ...u, appliesTo: e.target.value }
+                                : u
+                            )
+                          )
+                        }
+                        placeholder="window_cleaning, house_washing"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={upsell.active}
+                        onCheckedChange={checked =>
+                          setUpsellCatalog(prev =>
+                            prev.map((u, i) =>
+                              i === idx ? { ...u, active: checked } : u
+                            )
+                          )
+                        }
+                      />
+                      <span className="text-sm">Active</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() =>
+                        setUpsellCatalog(prev =>
+                          prev.filter((_, i) => i !== idx)
+                        )
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setUpsellCatalog(prev => [
+                      ...prev,
+                      {
+                        id: `upsell_${Date.now()}`,
+                        title: "New Upsell",
+                        description: "Describe the value of this add-on.",
+                        price: "0",
+                        appliesTo: "house_washing",
+                        badge: "",
+                        active: true,
+                      },
+                    ])
+                  }
+                >
+                  Add Upsell
+                </Button>
+                <Button
+                  className="bg-slate-800 hover:bg-slate-700 text-white"
+                  onClick={() =>
+                    updateUpsells.mutate({
+                      upsellCatalog: upsellCatalog
+                        .filter(item => item.id.trim() && item.title.trim())
+                        .map(item => ({
+                          id: item.id.trim(),
+                          title: item.title.trim(),
+                          description: item.description.trim(),
+                          price: Number(item.price || 0),
+                          appliesTo: item.appliesTo
+                            .split(",")
+                            .map(svc => svc.trim())
+                            .filter(Boolean),
+                          badge: item.badge?.trim() || undefined,
+                          active: item.active,
+                        }))
+                        .filter(item => item.appliesTo.length > 0),
+                    })
+                  }
+                  disabled={updateUpsells.isPending}
+                >
+                  Save Upsells
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

@@ -674,6 +674,17 @@ export const quoteToolSettings = mysqlTable("quote_tool_settings", {
     accentColor: string;
     cartStyle: "sidebar" | "footer_drawer";
   }>(),
+  upsellCatalog: json("upsellCatalog").$type<
+    {
+      id: string;
+      title: string;
+      description: string;
+      price: number;
+      appliesTo: string[];
+      badge?: string;
+      active?: boolean;
+    }[]
+  >(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

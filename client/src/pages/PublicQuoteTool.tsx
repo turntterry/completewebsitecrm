@@ -159,7 +159,7 @@ const SLIDER_DEFAULTS: Record<
   },
 };
 
-const UPSELL_CATALOG: {
+const DEFAULT_UPSELL_CATALOG: {
   id: string;
   title: string;
   description: string;
@@ -271,6 +271,15 @@ export default function QuoteTool() {
     [experienceConfig?.settings?.customerTierLabels]
   );
 
+  const upsellCatalog = useMemo(() => {
+    const configured = experienceConfig?.settings?.upsellCatalog;
+    if (!Array.isArray(configured) || configured.length === 0) {
+      return DEFAULT_UPSELL_CATALOG;
+    }
+
+    return configured.filter(upsell => upsell.active !== false);
+  }, [experienceConfig?.settings?.upsellCatalog]);
+
   const globalConfig = useMemo<GlobalConfig>(() => {
     if (!pricingData?.global_settings)
       return {
@@ -313,7 +322,7 @@ export default function QuoteTool() {
   }, [pricingResults, distanceMiles, globalConfig]);
   const eligibleUpsells = useMemo(() => {
     const selected = new Set(Array.from(selectedServices));
-    return UPSELL_CATALOG.filter(upsell =>
+    return upsellCatalog.filter(upsell =>
       upsell.appliesTo.some(service => selected.has(service))
     );
   }, [selectedServices]);
@@ -345,7 +354,7 @@ export default function QuoteTool() {
         next.delete(id);
         setAcceptedUpsells(prev => {
           const nextAccepted = { ...prev };
-          for (const upsell of UPSELL_CATALOG) {
+          for (const upsell of upsellCatalog) {
             if (upsell.appliesTo.includes(id)) {
               const stillEligible = upsell.appliesTo.some(service =>
                 next.has(service)
@@ -385,7 +394,7 @@ export default function QuoteTool() {
     setAcceptedUpsells(prev => {
       const next = { ...prev, [upsellId]: !prev[upsellId] };
       if (sessionToken && next[upsellId]) {
-        const upsell = UPSELL_CATALOG.find(item => item.id === upsellId);
+        const upsell = upsellCatalog.find(item => item.id === upsellId);
         if (upsell) {
           trackEventMutation.mutate({
             sessionToken,
