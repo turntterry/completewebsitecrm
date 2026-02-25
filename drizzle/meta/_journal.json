@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1771471976045,
+      "tag": "0000_thankful_morg",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1771472110277,
+      "tag": "0001_equal_scarlet_witch",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1771481912888,
+      "tag": "0002_aspiring_nehzno",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1771482579662,
+      "tag": "0003_robust_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1771485576276,
+      "tag": "0004_awesome_tinkerer",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1771490975580,
+      "tag": "0005_rare_lightspeed",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1771514520123,
+      "tag": "0006_volatile_karma",
+      "breakpoints": true
+    }
+  ]
+}
