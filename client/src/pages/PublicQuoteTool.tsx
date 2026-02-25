@@ -3,7 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -13,51 +19,165 @@ import { Switch } from "@/components/ui/switch";
 import { BUSINESS, SERVICES } from "@shared/data";
 import { trpc } from "@/lib/trpc";
 import {
-  calculateServicePrice, calculateQuoteTotal,
-  type PricingInput, type PricingResult, type GlobalConfig, type ServiceConfig,
+  calculateServicePrice,
+  calculateQuoteTotal,
+  type PricingInput,
+  type PricingResult,
+  type GlobalConfig,
+  type ServiceConfig,
 } from "@shared/pricing";
 import {
-  ArrowRight, ArrowLeft, CheckCircle, Phone, MapPin, Upload, Calendar, Clock,
-  Home as HomeIcon, Droplets, SquareStack, Filter, LayoutGrid, Triangle, Fence, X, Loader2, Shield, Star,
-  Ruler, FlipHorizontal, Info,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle,
+  Phone,
+  MapPin,
+  Upload,
+  Calendar,
+  Clock,
+  Home as HomeIcon,
+  Droplets,
+  SquareStack,
+  Filter,
+  LayoutGrid,
+  Triangle,
+  Fence,
+  X,
+  Loader2,
+  Shield,
+  Star,
+  Ruler,
+  FlipHorizontal,
+  Info,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
 import { toast } from "sonner";
 
 const ICON_MAP: Record<string, React.ElementType> = {
-  Home: HomeIcon, Droplets, SquareStack, Filter, LayoutGrid, Triangle, Fence,
+  Home: HomeIcon,
+  Droplets,
+  SquareStack,
+  Filter,
+  LayoutGrid,
+  Triangle,
+  Fence,
 };
 
 // Quotable services (subset of SERVICES)
 const QUOTABLE_SERVICES = [
-  { id: "house_washing", name: "House Washing", icon: "Home", desc: "Soft wash your home's exterior" },
-  { id: "window_cleaning", name: "Window Cleaning", icon: "SquareStack", desc: "Interior & exterior windows" },
-  { id: "gutter_cleaning", name: "Gutter Cleaning", icon: "Filter", desc: "Debris removal & flushing" },
-  { id: "driveway_cleaning", name: "Driveway / Concrete", icon: "LayoutGrid", desc: "Driveways, sidewalks & patios" },
-  { id: "roof_cleaning", name: "Roof Cleaning", icon: "Triangle", desc: "Soft wash roof treatment" },
-  { id: "deck_cleaning", name: "Deck Cleaning", icon: "Fence", desc: "Deck surface cleaning" },
-  { id: "fence_cleaning", name: "Fence Cleaning", icon: "Fence", desc: "Fence washing & restoration" },
-  { id: "patio_cleaning", name: "Patio Cleaning", icon: "LayoutGrid", desc: "Patio surface cleaning" },
-  { id: "walkway_cleaning", name: "Walkway Cleaning", icon: "LayoutGrid", desc: "Walkway & path cleaning" },
+  {
+    id: "house_washing",
+    name: "House Washing",
+    icon: "Home",
+    desc: "Soft wash your home's exterior",
+  },
+  {
+    id: "window_cleaning",
+    name: "Window Cleaning",
+    icon: "SquareStack",
+    desc: "Interior & exterior windows",
+  },
+  {
+    id: "gutter_cleaning",
+    name: "Gutter Cleaning",
+    icon: "Filter",
+    desc: "Debris removal & flushing",
+  },
+  {
+    id: "driveway_cleaning",
+    name: "Driveway / Concrete",
+    icon: "LayoutGrid",
+    desc: "Driveways, sidewalks & patios",
+  },
+  {
+    id: "roof_cleaning",
+    name: "Roof Cleaning",
+    icon: "Triangle",
+    desc: "Soft wash roof treatment",
+  },
+  {
+    id: "deck_cleaning",
+    name: "Deck Cleaning",
+    icon: "Fence",
+    desc: "Deck surface cleaning",
+  },
+  {
+    id: "fence_cleaning",
+    name: "Fence Cleaning",
+    icon: "Fence",
+    desc: "Fence washing & restoration",
+  },
+  {
+    id: "patio_cleaning",
+    name: "Patio Cleaning",
+    icon: "LayoutGrid",
+    desc: "Patio surface cleaning",
+  },
+  {
+    id: "walkway_cleaning",
+    name: "Walkway Cleaning",
+    icon: "LayoutGrid",
+    desc: "Walkway & path cleaning",
+  },
 ];
 
 // Slider configs per service (defaults, overridden by DB config)
-const SLIDER_DEFAULTS: Record<string, { min: number; max: number; step: number; default: number; unit: string }> = {
-  gutter_cleaning: { min: 50, max: 400, step: 10, default: 150, unit: "linear ft" },
-  fence_cleaning: { min: 20, max: 500, step: 10, default: 100, unit: "linear ft" },
+const SLIDER_DEFAULTS: Record<
+  string,
+  { min: number; max: number; step: number; default: number; unit: string }
+> = {
+  gutter_cleaning: {
+    min: 50,
+    max: 400,
+    step: 10,
+    default: 150,
+    unit: "linear ft",
+  },
+  fence_cleaning: {
+    min: 20,
+    max: 500,
+    step: 10,
+    default: 100,
+    unit: "linear ft",
+  },
   deck_cleaning: { min: 50, max: 1200, step: 25, default: 300, unit: "sq ft" },
-  driveway_cleaning: { min: 100, max: 10000, step: 50, default: 500, unit: "sq ft" },
+  driveway_cleaning: {
+    min: 100,
+    max: 10000,
+    step: 50,
+    default: 500,
+    unit: "sq ft",
+  },
   patio_cleaning: { min: 50, max: 1000, step: 25, default: 250, unit: "sq ft" },
-  walkway_cleaning: { min: 20, max: 500, step: 10, default: 100, unit: "sq ft" },
+  walkway_cleaning: {
+    min: 20,
+    max: 500,
+    step: 10,
+    default: 100,
+    unit: "sq ft",
+  },
 };
 
-const STEPS = ["Address", "Contact", "Services", "Details", "Review", "Schedule", "Submit"];
+const STEPS = [
+  "Address",
+  "Contact",
+  "Services",
+  "Details",
+  "Review",
+  "Schedule",
+  "Submit",
+];
 
 export default function QuoteTool() {
   useCanonical("/instant-quote");
-  const { data: pricingData, isLoading: pricingLoading } = trpc.publicSite.quote.getPricing.useQuery();
+  const { data: pricingData, isLoading: pricingLoading } =
+    trpc.publicSite.quote.getPricing.useQuery();
+  const { data: experienceConfig } =
+    trpc.publicSite.quote.getExperienceConfig.useQuery();
   const submitMutation = trpc.publicSite.quote.submit.useMutation();
+  const startSessionMutation = trpc.publicSite.quote.startSession.useMutation();
+  const trackEventMutation = trpc.publicSite.quote.trackEvent.useMutation();
   const uploadMutation = trpc.publicSite.quote.uploadPhoto.useMutation();
 
   const [step, setStep] = useState(0);
@@ -74,8 +194,12 @@ export default function QuoteTool() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
 
-  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
-  const [serviceInputs, setServiceInputs] = useState<Record<string, PricingInput>>({});
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(
+    new Set()
+  );
+  const [serviceInputs, setServiceInputs] = useState<
+    Record<string, PricingInput>
+  >({});
 
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
@@ -83,24 +207,47 @@ export default function QuoteTool() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [quoteResult, setQuoteResult] = useState<{ quoteId: number; totalPrice: number } | null>(null);
+  const [quoteResult, setQuoteResult] = useState<{
+    quoteId: number;
+    totalPrice: number;
+  } | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const tierLabels = useMemo(
+    () =>
+      experienceConfig?.settings?.customerTierLabels ?? {
+        good: "Expert Essential",
+        better: "Signature Sparkle",
+        best: "Platinum Perfection",
+      },
+    [experienceConfig?.settings?.customerTierLabels]
+  );
+
   const globalConfig = useMemo<GlobalConfig>(() => {
-    if (!pricingData?.global_settings) return {
-      jobMinimum: 225, taxRate: 0, travelRadius: 40,
-      baseAddress: BUSINESS.fullAddress, baseLat: BUSINESS.baseLat, baseLng: BUSINESS.baseLng,
-      bundleDiscounts: { "2": 5, "3": 10, "4": 15, "5": 20 },
-      travelFeePerMile: 3, freeRadius: 15,
-    };
+    if (!pricingData?.global_settings)
+      return {
+        jobMinimum: 225,
+        taxRate: 0,
+        travelRadius: 40,
+        baseAddress: BUSINESS.fullAddress,
+        baseLat: BUSINESS.baseLat,
+        baseLng: BUSINESS.baseLng,
+        bundleDiscounts: { "2": 5, "3": 10, "4": 15, "5": 20 },
+        travelFeePerMile: 3,
+        freeRadius: 15,
+      };
     return pricingData.global_settings as unknown as GlobalConfig;
   }, [pricingData]);
 
-  const getServiceConfig = useCallback((serviceType: string): ServiceConfig => {
-    if (!pricingData?.[serviceType]) return {};
-    return pricingData[serviceType] as unknown as ServiceConfig;
-  }, [pricingData]);
+  const getServiceConfig = useCallback(
+    (serviceType: string): ServiceConfig => {
+      if (!pricingData?.[serviceType]) return {};
+      return pricingData[serviceType] as unknown as ServiceConfig;
+    },
+    [pricingData]
+  );
 
   // Calculate prices for all selected services
   const pricingResults = useMemo(() => {
@@ -108,7 +255,9 @@ export default function QuoteTool() {
     selectedServices.forEach(svcId => {
       const input = serviceInputs[svcId] || { serviceType: svcId };
       const config = getServiceConfig(svcId);
-      results.push(calculateServicePrice({ ...input, serviceType: svcId }, config));
+      results.push(
+        calculateServicePrice({ ...input, serviceType: svcId }, config)
+      );
     });
     return results;
   }, [selectedServices, serviceInputs, getServiceConfig]);
@@ -120,7 +269,8 @@ export default function QuoteTool() {
   const toggleService = (id: string) => {
     setSelectedServices(prev => {
       const next = new Set(prev);
-      if (next.has(id)) {
+      const removed = next.has(id);
+      if (removed) {
         next.delete(id);
       } else {
         next.add(id);
@@ -128,6 +278,15 @@ export default function QuoteTool() {
           setServiceInputs(prev => ({ ...prev, [id]: getDefaultInputs(id) }));
         }
       }
+
+      if (sessionToken) {
+        trackEventMutation.mutate({
+          sessionToken,
+          eventName: removed ? "service_removed" : "service_added",
+          payload: { serviceType: id, selectedCount: next.size },
+        });
+      }
+
       return next;
     });
   };
@@ -173,7 +332,9 @@ export default function QuoteTool() {
         customerEmail: email,
         customerPhone: phone,
         address: `${address}, ${city}, ${stateVal} ${zip}`,
-        city, state: stateVal, zip,
+        city,
+        state: stateVal,
+        zip,
         lat: lat || undefined,
         lng: lng || undefined,
         distanceMiles: distanceMiles || undefined,
@@ -187,12 +348,20 @@ export default function QuoteTool() {
         customerPhotos: photos.length > 0 ? photos : undefined,
         items: pricingResults.map(r => ({
           serviceType: r.serviceType,
-          packageTier: (serviceInputs[r.serviceType]?.packageTier || "good") as "good" | "better" | "best",
-          inputs: (serviceInputs[r.serviceType] as unknown as Record<string, unknown>) || {},
+          packageTier: (serviceInputs[r.serviceType]?.packageTier || "good") as
+            | "good"
+            | "better"
+            | "best",
+          inputs:
+            (serviceInputs[r.serviceType] as unknown as Record<
+              string,
+              unknown
+            >) || {},
           basePrice: r.basePrice,
           finalPrice: r.finalPrice,
           description: r.breakdown.join("; "),
         })),
+        sessionToken: sessionToken || undefined,
       });
       setQuoteResult(result);
       setSubmitted(true);
@@ -201,15 +370,52 @@ export default function QuoteTool() {
     }
   };
 
+  useEffect(() => {
+    if (sessionToken || startSessionMutation.isPending) return;
+
+    startSessionMutation
+      .mutateAsync({
+        source: "public_quote_tool",
+        referrer:
+          typeof document !== "undefined"
+            ? document.referrer || undefined
+            : undefined,
+      })
+      .then(result => {
+        setSessionToken(result.sessionToken);
+        trackEventMutation.mutate({
+          sessionToken: result.sessionToken,
+          eventName: "quote_viewed",
+          payload: { path: "/instant-quote" },
+        });
+      })
+      .catch(() => {
+        // Non-blocking analytics setup.
+      });
+  }, [sessionToken, startSessionMutation, trackEventMutation]);
+
   const canProceed = () => {
     switch (step) {
-      case 0: return address.trim().length > 0 && city.trim().length > 0 && !outOfRange;
-      case 1: return name.trim().length > 0 && email.trim().length > 0 && phone.trim().length > 0;
-      case 2: return selectedServices.size > 0;
-      case 3: return true;
-      case 4: return true;
-      case 5: return true;
-      default: return true;
+      case 0:
+        return (
+          address.trim().length > 0 && city.trim().length > 0 && !outOfRange
+        );
+      case 1:
+        return (
+          name.trim().length > 0 &&
+          email.trim().length > 0 &&
+          phone.trim().length > 0
+        );
+      case 2:
+        return selectedServices.size > 0;
+      case 3:
+        return true;
+      case 4:
+        return true;
+      case 5:
+        return true;
+      default:
+        return true;
     }
   };
 
@@ -231,20 +437,32 @@ export default function QuoteTool() {
             <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h1 className="font-heading font-bold text-3xl md:text-4xl mb-4">Quote Submitted!</h1>
-            <p className="text-lg text-muted-foreground mb-2">Your estimated total:</p>
-            <p className="font-heading font-black text-5xl text-primary mb-6">${quoteResult.totalPrice.toFixed(2)}</p>
+            <h1 className="font-heading font-bold text-3xl md:text-4xl mb-4">
+              Quote Submitted!
+            </h1>
+            <p className="text-lg text-muted-foreground mb-2">
+              Your estimated total:
+            </p>
+            <p className="font-heading font-black text-5xl text-primary mb-6">
+              ${quoteResult.totalPrice.toFixed(2)}
+            </p>
             <p className="text-muted-foreground mb-8">
-              Quote #{quoteResult.quoteId} has been sent to {BUSINESS.owner}. We'll reach out within 24 hours to confirm your appointment.
+              Quote #{quoteResult.quoteId} has been sent to {BUSINESS.owner}.
+              We'll reach out within 24 hours to confirm your appointment.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a href={`tel:${BUSINESS.phoneRaw}`}>
-                <Button size="lg" className="bg-primary hover:bg-navy-light text-white font-bold">
+                <Button
+                  size="lg"
+                  className="bg-primary hover:bg-navy-light text-white font-bold"
+                >
                   <Phone className="w-4 h-4 mr-2" /> Call Now: {BUSINESS.phone}
                 </Button>
               </a>
               <a href="/">
-                <Button size="lg" variant="outline">Back to Home</Button>
+                <Button size="lg" variant="outline">
+                  Back to Home
+                </Button>
               </a>
             </div>
           </div>
@@ -272,45 +490,146 @@ export default function QuoteTool() {
           <div className="mb-8">
             <div className="flex justify-between text-xs font-medium text-muted-foreground mb-2">
               {STEPS.map((s, i) => (
-                <span key={s} className={i <= step ? "text-primary font-semibold" : ""}>{s}</span>
+                <span
+                  key={s}
+                  className={i <= step ? "text-primary font-semibold" : ""}
+                >
+                  {s}
+                </span>
               ))}
             </div>
-            <Progress value={(step / (STEPS.length - 1)) * 100} className="h-2" />
+            <Progress
+              value={(step / (STEPS.length - 1)) * 100}
+              className="h-2"
+            />
           </div>
 
           <Card className="shadow-lg border-0">
             <CardContent className="p-6 md:p-8">
-              {step === 0 && <StepAddress address={address} setAddress={setAddress} city={city} setCity={setCity} stateVal={stateVal} setStateVal={setStateVal} zip={zip} setZip={setZip} lat={lat} setLat={setLat} lng={lng} setLng={setLng} distanceMiles={distanceMiles} setDistanceMiles={setDistanceMiles} outOfRange={outOfRange} setOutOfRange={setOutOfRange} globalConfig={globalConfig} />}
-              {step === 1 && <StepContact name={name} setName={setName} email={email} setEmail={setEmail} phone={phone} setPhone={setPhone} />}
-              {step === 2 && <StepServices selectedServices={selectedServices} toggleService={toggleService} />}
-              {step === 3 && <StepDetails selectedServices={selectedServices} serviceInputs={serviceInputs} updateServiceInput={updateServiceInput} pricingResults={pricingResults} getServiceConfig={getServiceConfig} />}
-              {step === 4 && <StepReview pricingResults={pricingResults} quoteSummary={quoteSummary} serviceInputs={serviceInputs} address={`${address}, ${city}, ${stateVal} ${zip}`} name={name} />}
-              {step === 5 && <StepSchedule preferredDate={preferredDate} setPreferredDate={setPreferredDate} preferredTime={preferredTime} setPreferredTime={setPreferredTime} referralSource={referralSource} setReferralSource={setReferralSource} photos={photos} setPhotos={setPhotos} uploading={uploading} handlePhotoUpload={handlePhotoUpload} fileInputRef={fileInputRef} />}
+              {step === 0 && (
+                <StepAddress
+                  address={address}
+                  setAddress={setAddress}
+                  city={city}
+                  setCity={setCity}
+                  stateVal={stateVal}
+                  setStateVal={setStateVal}
+                  zip={zip}
+                  setZip={setZip}
+                  lat={lat}
+                  setLat={setLat}
+                  lng={lng}
+                  setLng={setLng}
+                  distanceMiles={distanceMiles}
+                  setDistanceMiles={setDistanceMiles}
+                  outOfRange={outOfRange}
+                  setOutOfRange={setOutOfRange}
+                  globalConfig={globalConfig}
+                />
+              )}
+              {step === 1 && (
+                <StepContact
+                  name={name}
+                  setName={setName}
+                  email={email}
+                  setEmail={setEmail}
+                  phone={phone}
+                  setPhone={setPhone}
+                />
+              )}
+              {step === 2 && (
+                <StepServices
+                  selectedServices={selectedServices}
+                  toggleService={toggleService}
+                />
+              )}
+              {step === 3 && (
+                <StepDetails
+                  selectedServices={selectedServices}
+                  serviceInputs={serviceInputs}
+                  updateServiceInput={updateServiceInput}
+                  pricingResults={pricingResults}
+                  getServiceConfig={getServiceConfig}
+                  tierLabels={tierLabels}
+                />
+              )}
+              {step === 4 && (
+                <StepReview
+                  pricingResults={pricingResults}
+                  quoteSummary={quoteSummary}
+                  serviceInputs={serviceInputs}
+                  address={`${address}, ${city}, ${stateVal} ${zip}`}
+                  name={name}
+                  tierLabels={tierLabels}
+                />
+              )}
+              {step === 5 && (
+                <StepSchedule
+                  preferredDate={preferredDate}
+                  setPreferredDate={setPreferredDate}
+                  preferredTime={preferredTime}
+                  setPreferredTime={setPreferredTime}
+                  referralSource={referralSource}
+                  setReferralSource={setReferralSource}
+                  photos={photos}
+                  setPhotos={setPhotos}
+                  uploading={uploading}
+                  handlePhotoUpload={handlePhotoUpload}
+                  fileInputRef={fileInputRef}
+                />
+              )}
               {step === 6 && (
                 <div className="text-center py-4">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <CheckCircle className="w-8 h-8 text-primary" />
                   </div>
-                  <h2 className="font-heading font-bold text-2xl mb-2">Ready to Submit?</h2>
-                  <p className="text-muted-foreground mb-4">Your estimated total is <span className="font-bold text-foreground text-lg">${quoteSummary.totalPrice.toFixed(2)}</span></p>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto">By submitting, you'll receive a confirmation email with your quote details. We'll reach out within 24 hours to confirm measurements and schedule your service.</p>
+                  <h2 className="font-heading font-bold text-2xl mb-2">
+                    Ready to Submit?
+                  </h2>
+                  <p className="text-muted-foreground mb-4">
+                    Your estimated total is{" "}
+                    <span className="font-bold text-foreground text-lg">
+                      ${quoteSummary.totalPrice.toFixed(2)}
+                    </span>
+                  </p>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                    By submitting, you'll receive a confirmation email with your
+                    quote details. We'll reach out within 24 hours to confirm
+                    measurements and schedule your service.
+                  </p>
                 </div>
               )}
 
               {/* Navigation */}
-              <div className={`flex justify-between mt-8 ${step < 6 ? 'pt-4 border-t' : ''}`}>
+              <div
+                className={`flex justify-between mt-8 ${step < 6 ? "pt-4 border-t" : ""}`}
+              >
                 {step > 0 ? (
                   <Button variant="outline" onClick={() => setStep(step - 1)}>
                     <ArrowLeft className="w-4 h-4 mr-1" /> Back
                   </Button>
-                ) : <div />}
+                ) : (
+                  <div />
+                )}
                 {step < STEPS.length - 1 ? (
-                  <Button onClick={() => setStep(step + 1)} disabled={!canProceed()} className="bg-primary hover:bg-navy-light text-white font-semibold">
+                  <Button
+                    onClick={() => setStep(step + 1)}
+                    disabled={!canProceed()}
+                    className="bg-primary hover:bg-navy-light text-white font-semibold"
+                  >
                     Next <ArrowRight className="w-4 h-4 ml-1" />
                   </Button>
                 ) : (
-                  <Button onClick={handleSubmit} disabled={submitMutation.isPending} className="bg-primary hover:bg-navy-light text-white font-semibold px-8">
-                    {submitMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitMutation.isPending}
+                    className="bg-primary hover:bg-navy-light text-white font-semibold px-8"
+                  >
+                    {submitMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                    )}
                     Submit Quote
                   </Button>
                 )}
@@ -320,9 +639,15 @@ export default function QuoteTool() {
 
           {/* Trust badges */}
           <div className="flex items-center justify-center gap-6 mt-6 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Shield className="w-4 h-4" /> Licensed & Insured</span>
-            <span className="flex items-center gap-1"><Star className="w-4 h-4" /> 5-Star Rated</span>
-            <span className="flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Satisfaction Guaranteed</span>
+            <span className="flex items-center gap-1">
+              <Shield className="w-4 h-4" /> Licensed & Insured
+            </span>
+            <span className="flex items-center gap-1">
+              <Star className="w-4 h-4" /> 5-Star Rated
+            </span>
+            <span className="flex items-center gap-1">
+              <CheckCircle className="w-4 h-4" /> Satisfaction Guaranteed
+            </span>
           </div>
         </div>
       </section>
@@ -332,33 +657,87 @@ export default function QuoteTool() {
 
 // ─── Step Components ──────────────────────────────────────────────────
 
-function StepAddress({ address, setAddress, city, setCity, stateVal, setStateVal, zip, setZip, lat, setLat, lng, setLng, distanceMiles, setDistanceMiles, outOfRange, setOutOfRange, globalConfig }: any) {
+function StepAddress({
+  address,
+  setAddress,
+  city,
+  setCity,
+  stateVal,
+  setStateVal,
+  zip,
+  setZip,
+  lat,
+  setLat,
+  lng,
+  setLng,
+  distanceMiles,
+  setDistanceMiles,
+  outOfRange,
+  setOutOfRange,
+  globalConfig,
+}: any) {
   return (
     <div>
-      <h2 className="font-heading font-bold text-xl mb-1">Where's your property?</h2>
-      <p className="text-sm text-muted-foreground mb-6">We need your address to calculate travel and provide accurate pricing.</p>
+      <h2 className="font-heading font-bold text-xl mb-1">
+        Where's your property?
+      </h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        We need your address to calculate travel and provide accurate pricing.
+      </p>
       <div className="space-y-4">
         <div>
-          <Label htmlFor="address"><MapPin className="w-4 h-4 inline mr-1" />Street Address</Label>
-          <Input id="address" value={address} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddress(e.target.value)} placeholder="123 Main Street" />
+          <Label htmlFor="address">
+            <MapPin className="w-4 h-4 inline mr-1" />
+            Street Address
+          </Label>
+          <Input
+            id="address"
+            value={address}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setAddress(e.target.value)
+            }
+            placeholder="123 Main Street"
+          />
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-1">
             <Label htmlFor="city">City</Label>
-            <Input id="city" value={city} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCity(e.target.value)} placeholder="Cookeville" />
+            <Input
+              id="city"
+              value={city}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setCity(e.target.value)
+              }
+              placeholder="Cookeville"
+            />
           </div>
           <div>
             <Label htmlFor="state">State</Label>
-            <Input id="state" value={stateVal} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStateVal(e.target.value)} />
+            <Input
+              id="state"
+              value={stateVal}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setStateVal(e.target.value)
+              }
+            />
           </div>
           <div>
             <Label htmlFor="zip">ZIP</Label>
-            <Input id="zip" value={zip} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setZip(e.target.value)} placeholder="38501" />
+            <Input
+              id="zip"
+              value={zip}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setZip(e.target.value)
+              }
+              placeholder="38501"
+            />
           </div>
         </div>
         {outOfRange && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-            This address appears to be outside our service area ({globalConfig.travelRadius} mile radius). Please call us at {BUSINESS.phone} for availability.
+            This address appears to be outside our service area (
+            {globalConfig.travelRadius} mile radius). Please call us at{" "}
+            {BUSINESS.phone} for availability.
           </div>
         )}
       </div>
@@ -370,19 +749,44 @@ function StepContact({ name, setName, email, setEmail, phone, setPhone }: any) {
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">Your contact info</h2>
-      <p className="text-sm text-muted-foreground mb-6">So we can send your quote and reach out to schedule.</p>
+      <p className="text-sm text-muted-foreground mb-6">
+        So we can send your quote and reach out to schedule.
+      </p>
       <div className="space-y-4">
         <div>
           <Label htmlFor="name">Full Name</Label>
-          <Input id="name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="John Smith" />
+          <Input
+            id="name"
+            value={name}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setName(e.target.value)
+            }
+            placeholder="John Smith"
+          />
         </div>
         <div>
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" value={email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} placeholder="john@example.com" />
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setEmail(e.target.value)
+            }
+            placeholder="john@example.com"
+          />
         </div>
         <div>
           <Label htmlFor="phone">Phone</Label>
-          <Input id="phone" type="tel" value={phone} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPhone(e.target.value)} placeholder="(931) 555-0123" />
+          <Input
+            id="phone"
+            type="tel"
+            value={phone}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setPhone(e.target.value)
+            }
+            placeholder="(931) 555-0123"
+          />
         </div>
       </div>
     </div>
@@ -393,7 +797,9 @@ function StepServices({ selectedServices, toggleService }: any) {
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">What do you need?</h2>
-      <p className="text-sm text-muted-foreground mb-6">Select all services you're interested in. Bundle for savings!</p>
+      <p className="text-sm text-muted-foreground mb-6">
+        Select all services you're interested in. Bundle for savings!
+      </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {QUOTABLE_SERVICES.map(svc => {
           const Icon = ICON_MAP[svc.icon] || LayoutGrid;
@@ -403,17 +809,23 @@ function StepServices({ selectedServices, toggleService }: any) {
               key={svc.id}
               onClick={() => toggleService(svc.id)}
               className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
-                selected ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/30 hover:shadow-sm"
+                selected
+                  ? "border-primary bg-primary/5 shadow-md"
+                  : "border-border hover:border-primary/30 hover:shadow-sm"
               }`}
             >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${selected ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}>
+              <div
+                className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${selected ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}
+              >
                 <Icon className="w-5 h-5" />
               </div>
               <div>
                 <p className="font-semibold text-sm">{svc.name}</p>
                 <p className="text-xs text-muted-foreground">{svc.desc}</p>
               </div>
-              {selected && <CheckCircle className="w-5 h-5 text-primary shrink-0 ml-auto" />}
+              {selected && (
+                <CheckCircle className="w-5 h-5 text-primary shrink-0 ml-auto" />
+              )}
             </button>
           );
         })}
@@ -427,15 +839,30 @@ function StepServices({ selectedServices, toggleService }: any) {
   );
 }
 
-function StepDetails({ selectedServices, serviceInputs, updateServiceInput, pricingResults, getServiceConfig }: any) {
+function StepDetails({
+  selectedServices,
+  serviceInputs,
+  updateServiceInput,
+  pricingResults,
+  getServiceConfig,
+  tierLabels,
+}: any) {
   const services = Array.from(selectedServices as Set<string>);
   return (
     <div>
-      <h2 className="font-heading font-bold text-xl mb-1">Tell us about your property</h2>
-      <p className="text-sm text-muted-foreground mb-4">Configure each service for accurate pricing.</p>
+      <h2 className="font-heading font-bold text-xl mb-1">
+        Tell us about your property
+      </h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Configure each service for accurate pricing.
+      </p>
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 flex items-start gap-2">
         <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-        <p className="text-sm text-blue-800">Don't worry about being exact — a rough estimate is perfectly fine. We'll take final measurements on-site before any work begins, and your price will be adjusted if needed.</p>
+        <p className="text-sm text-blue-800">
+          Don't worry about being exact — a rough estimate is perfectly fine.
+          We'll take final measurements on-site before any work begins, and your
+          price will be adjusted if needed.
+        </p>
       </div>
       <div className="space-y-6">
         {services.map((svcId: string) => (
@@ -443,9 +870,14 @@ function StepDetails({ selectedServices, serviceInputs, updateServiceInput, pric
             key={svcId}
             serviceId={svcId}
             inputs={serviceInputs[svcId] || { serviceType: svcId }}
-            updateInput={(key: string, val: unknown) => updateServiceInput(svcId, key, val)}
+            updateInput={(key: string, val: unknown) =>
+              updateServiceInput(svcId, key, val)
+            }
             config={getServiceConfig(svcId)}
-            price={pricingResults.find((r: PricingResult) => r.serviceType === svcId)}
+            tierLabels={tierLabels}
+            price={pricingResults.find(
+              (r: PricingResult) => r.serviceType === svcId
+            )}
           />
         ))}
       </div>
@@ -482,7 +914,9 @@ function PremiumSlider({
           {label}
         </Label>
         <div className="bg-primary/10 rounded-lg px-3 py-1.5 flex items-center gap-1">
-          <span className="font-heading font-bold text-primary text-lg">{value}</span>
+          <span className="font-heading font-bold text-primary text-lg">
+            {value}
+          </span>
           <span className="text-xs text-primary/70 font-medium">{unit}</span>
         </div>
       </div>
@@ -497,8 +931,12 @@ function PremiumSlider({
         />
       </div>
       <div className="flex justify-between text-[10px] text-muted-foreground px-1">
-        <span>{min} {unit}</span>
-        <span>{max} {unit}</span>
+        <span>
+          {min} {unit}
+        </span>
+        <span>
+          {max} {unit}
+        </span>
       </div>
     </div>
   );
@@ -506,7 +944,13 @@ function PremiumSlider({
 
 // ─── Fence Side Toggle ────────────────────────────────────────────────
 
-function FenceSideToggle({ value, onChange }: { value: 1 | 2; onChange: (v: 1 | 2) => void }) {
+function FenceSideToggle({
+  value,
+  onChange,
+}: {
+  value: 1 | 2;
+  onChange: (v: 1 | 2) => void;
+}) {
   return (
     <div className="space-y-2">
       <Label className="flex items-center gap-1.5">
@@ -517,20 +961,28 @@ function FenceSideToggle({ value, onChange }: { value: 1 | 2; onChange: (v: 1 | 
         <button
           onClick={() => onChange(1)}
           className={`p-3 rounded-xl border-2 text-center transition-all ${
-            value === 1 ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/30"
+            value === 1
+              ? "border-primary bg-primary/5 shadow-sm"
+              : "border-border hover:border-primary/30"
           }`}
         >
           <p className="font-semibold text-sm">One Side</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Front or back only</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Front or back only
+          </p>
         </button>
         <button
           onClick={() => onChange(2)}
           className={`p-3 rounded-xl border-2 text-center transition-all ${
-            value === 2 ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/30"
+            value === 2
+              ? "border-primary bg-primary/5 shadow-sm"
+              : "border-border hover:border-primary/30"
           }`}
         >
           <p className="font-semibold text-sm">Both Sides</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Front & back</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Front & back
+          </p>
         </button>
       </div>
     </div>
@@ -539,9 +991,20 @@ function FenceSideToggle({ value, onChange }: { value: 1 | 2; onChange: (v: 1 | 
 
 // ─── Service Detail Form ──────────────────────────────────────────────
 
-function ServiceDetailForm({ serviceId, inputs, updateInput, config, price }: {
-  serviceId: string; inputs: PricingInput; updateInput: (key: string, val: unknown) => void;
-  config: ServiceConfig; price?: PricingResult;
+function ServiceDetailForm({
+  serviceId,
+  inputs,
+  updateInput,
+  config,
+  tierLabels,
+  price,
+}: {
+  serviceId: string;
+  inputs: PricingInput;
+  updateInput: (key: string, val: unknown) => void;
+  config: ServiceConfig;
+  tierLabels: { good: string; better: string; best: string };
+  price?: PricingResult;
 }) {
   const svc = QUOTABLE_SERVICES.find(s => s.id === serviceId);
   if (!svc) return null;
@@ -556,7 +1019,9 @@ function ServiceDetailForm({ serviceId, inputs, updateInput, config, price }: {
           <h3 className="font-heading font-bold text-lg">{svc.name}</h3>
           {price && (
             <div className="text-right">
-              <span className="font-heading font-bold text-xl text-primary">${price.finalPrice.toFixed(2)}</span>
+              <span className="font-heading font-bold text-xl text-primary">
+                ${price.finalPrice.toFixed(2)}
+              </span>
             </div>
           )}
         </div>
@@ -577,13 +1042,18 @@ function ServiceDetailForm({ serviceId, inputs, updateInput, config, price }: {
               />
               <div>
                 <Label>Number of Stories</Label>
-                <RadioGroup value={String(inputs.stories || 1)} onValueChange={v => updateInput("stories", Number(v))}>
+                <RadioGroup
+                  value={String(inputs.stories || 1)}
+                  onValueChange={v => updateInput("stories", Number(v))}
+                >
                   <div className="flex gap-3 mt-2">
                     {[1, 2, 3].map(n => (
                       <label
                         key={n}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${
-                          String(inputs.stories || 1) === String(n) ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                          String(inputs.stories || 1) === String(n)
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/30"
                         }`}
                       >
                         <RadioGroupItem value={String(n)} id={`stories-${n}`} />
@@ -614,6 +1084,7 @@ function ServiceDetailForm({ serviceId, inputs, updateInput, config, price }: {
                 onChange={v => updateInput("packageTier", v)}
                 windowCount={inputs.windowCount || 15}
                 config={config}
+                tierLabels={tierLabels}
               />
             </>
           )}
@@ -633,13 +1104,22 @@ function ServiceDetailForm({ serviceId, inputs, updateInput, config, price }: {
               />
               <div>
                 <Label>Roof Pitch</Label>
-                <RadioGroup value={inputs.roofPitch || "low"} onValueChange={v => updateInput("roofPitch", v)}>
+                <RadioGroup
+                  value={inputs.roofPitch || "low"}
+                  onValueChange={v => updateInput("roofPitch", v)}
+                >
                   <div className="flex gap-3 mt-2">
-                    {[{ v: "low", l: "Low" }, { v: "medium", l: "Medium" }, { v: "steep", l: "Steep" }].map(p => (
+                    {[
+                      { v: "low", l: "Low" },
+                      { v: "medium", l: "Medium" },
+                      { v: "steep", l: "Steep" },
+                    ].map(p => (
                       <label
                         key={p.v}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${
-                          (inputs.roofPitch || "low") === p.v ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                          (inputs.roofPitch || "low") === p.v
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/30"
                         }`}
                       >
                         <RadioGroupItem value={p.v} id={`pitch-${p.v}`} />
@@ -667,16 +1147,24 @@ function ServiceDetailForm({ serviceId, inputs, updateInput, config, price }: {
               />
               <div>
                 <Label>Number of Stories</Label>
-                <RadioGroup value={String(inputs.stories || 1)} onValueChange={v => updateInput("stories", Number(v))}>
+                <RadioGroup
+                  value={String(inputs.stories || 1)}
+                  onValueChange={v => updateInput("stories", Number(v))}
+                >
                   <div className="flex gap-3 mt-2">
                     {[1, 2, 3].map(n => (
                       <label
                         key={n}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${
-                          String(inputs.stories || 1) === String(n) ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                          String(inputs.stories || 1) === String(n)
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/30"
                         }`}
                       >
-                        <RadioGroupItem value={String(n)} id={`gstories-${n}`} />
+                        <RadioGroupItem
+                          value={String(n)}
+                          id={`gstories-${n}`}
+                        />
                         <span className="text-sm font-medium">{n}-Story</span>
                       </label>
                     ))}
@@ -769,34 +1257,69 @@ function ServiceDetailForm({ serviceId, inputs, updateInput, config, price }: {
 
 // ─── Window Package Selector with Per-Tier Pricing ────────────────────
 
-function WindowPackageSelector({ value, onChange, windowCount, config }: {
-  value?: string; onChange: (v: string) => void; windowCount: number; config: ServiceConfig;
+function WindowPackageSelector({
+  value,
+  onChange,
+  windowCount,
+  config,
+  tierLabels,
+}: {
+  value?: string;
+  onChange: (v: string) => void;
+  windowCount: number;
+  config: ServiceConfig;
+  tierLabels: { good: string; better: string; best: string };
 }) {
   const extRate = config.exteriorPerWindow || 11;
-  const packageMults = config.windowPackageMultipliers || { good: 1.0, better: 1.35, best: 1.75 };
+  const packageMults = config.windowPackageMultipliers || {
+    good: 1.0,
+    better: 1.35,
+    best: 1.75,
+  };
 
   const tiers = [
     {
       id: "good",
-      name: "Expert Essential",
+      name: tierLabels.good,
       included: ["Exterior Glass Cleaning", "Screen Removal & Replacement"],
-      notIncluded: ["Interior Glass", "Frames & Sills", "Deep Track & Screen Scrub"],
-      price: Math.round(windowCount * extRate * (packageMults.good || 1.0) * 100) / 100,
+      notIncluded: [
+        "Interior Glass",
+        "Frames & Sills",
+        "Deep Track & Screen Scrub",
+      ],
+      price:
+        Math.round(windowCount * extRate * (packageMults.good || 1.0) * 100) /
+        100,
     },
     {
       id: "better",
-      name: "Signature Sparkle",
+      name: tierLabels.better,
       badge: "Most Popular",
-      included: ["Exterior Glass Cleaning", "Interior Glass Cleaning", "Frames Wiped Down", "Interior Ledges Wiped"],
+      included: [
+        "Exterior Glass Cleaning",
+        "Interior Glass Cleaning",
+        "Frames Wiped Down",
+        "Interior Ledges Wiped",
+      ],
       notIncluded: ["Sills", "Deep Track Cleaning or Screen Scrub"],
-      price: Math.round(windowCount * extRate * (packageMults.better || 1.35) * 100) / 100,
+      price:
+        Math.round(
+          windowCount * extRate * (packageMults.better || 1.35) * 100
+        ) / 100,
     },
     {
       id: "best",
-      name: "Platinum Perfection",
-      included: ["Exterior & Interior Glass", "Frames, Sills & Ledges", "Deep Screen Washing (Soap & Scrub)", "Deep Track Detailing (Clean & Rinse)"],
+      name: tierLabels.best,
+      included: [
+        "Exterior & Interior Glass",
+        "Frames, Sills & Ledges",
+        "Deep Screen Washing (Soap & Scrub)",
+        "Deep Track Detailing (Clean & Rinse)",
+      ],
       notIncluded: [],
-      price: Math.round(windowCount * extRate * (packageMults.best || 1.75) * 100) / 100,
+      price:
+        Math.round(windowCount * extRate * (packageMults.best || 1.75) * 100) /
+        100,
     },
   ];
 
@@ -809,7 +1332,9 @@ function WindowPackageSelector({ value, onChange, windowCount, config }: {
             key={t.id}
             onClick={() => onChange(t.id)}
             className={`p-4 rounded-xl border-2 text-left transition-all relative ${
-              (value || "good") === t.id ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/30"
+              (value || "good") === t.id
+                ? "border-primary bg-primary/5 shadow-md"
+                : "border-border hover:border-primary/30"
             }`}
           >
             {t.badge && (
@@ -818,7 +1343,9 @@ function WindowPackageSelector({ value, onChange, windowCount, config }: {
               </span>
             )}
             <p className="font-bold text-sm mb-1">{t.name}</p>
-            <p className="font-heading font-bold text-primary text-lg mb-2">${t.price.toFixed(2)}</p>
+            <p className="font-heading font-bold text-primary text-lg mb-2">
+              ${t.price.toFixed(2)}
+            </p>
             <div className="space-y-1">
               {t.included.map(item => (
                 <p key={item} className="text-xs flex items-start gap-1.5">
@@ -827,7 +1354,10 @@ function WindowPackageSelector({ value, onChange, windowCount, config }: {
                 </p>
               ))}
               {t.notIncluded.map(item => (
-                <p key={item} className="text-xs flex items-start gap-1.5 text-muted-foreground">
+                <p
+                  key={item}
+                  className="text-xs flex items-start gap-1.5 text-muted-foreground"
+                >
                   <span className="text-red-400 font-bold shrink-0">✗</span>
                   <span>{item}</span>
                 </p>
@@ -840,29 +1370,51 @@ function WindowPackageSelector({ value, onChange, windowCount, config }: {
   );
 }
 
-function StepReview({ pricingResults, quoteSummary, serviceInputs, address, name }: any) {
+function StepReview({
+  pricingResults,
+  quoteSummary,
+  serviceInputs,
+  address,
+  name,
+  tierLabels,
+}: any) {
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">Review Your Quote</h2>
-      <p className="text-sm text-muted-foreground mb-6">Here's your detailed price breakdown.</p>
+      <p className="text-sm text-muted-foreground mb-6">
+        Here's your detailed price breakdown.
+      </p>
 
       <div className="space-y-3 mb-6">
         {pricingResults.map((r: PricingResult) => {
           const svc = QUOTABLE_SERVICES.find(s => s.id === r.serviceType);
           return (
-            <div key={r.serviceType} className="flex justify-between items-center py-3 border-b">
+            <div
+              key={r.serviceType}
+              className="flex justify-between items-center py-3 border-b"
+            >
               <div>
                 <p className="font-semibold">{svc?.name || r.serviceType}</p>
-                {r.serviceType === "window_cleaning" && serviceInputs[r.serviceType]?.packageTier && (
-                  <Badge variant="secondary" className="text-xs mt-1">
-                    {serviceInputs[r.serviceType].packageTier === "best" ? "Platinum Perfection" : serviceInputs[r.serviceType].packageTier === "better" ? "Signature Sparkle" : "Expert Essential"}
-                  </Badge>
-                )}
-                {r.serviceType === "fence_cleaning" && serviceInputs[r.serviceType]?.fenceSides === 2 && (
-                  <Badge variant="secondary" className="text-xs mt-1">Both Sides</Badge>
-                )}
+                {r.serviceType === "window_cleaning" &&
+                  serviceInputs[r.serviceType]?.packageTier && (
+                    <Badge variant="secondary" className="text-xs mt-1">
+                      {serviceInputs[r.serviceType].packageTier === "best"
+                        ? tierLabels.best
+                        : serviceInputs[r.serviceType].packageTier === "better"
+                          ? tierLabels.better
+                          : tierLabels.good}
+                    </Badge>
+                  )}
+                {r.serviceType === "fence_cleaning" &&
+                  serviceInputs[r.serviceType]?.fenceSides === 2 && (
+                    <Badge variant="secondary" className="text-xs mt-1">
+                      Both Sides
+                    </Badge>
+                  )}
               </div>
-              <span className="font-heading font-bold">${r.finalPrice.toFixed(2)}</span>
+              <span className="font-heading font-bold">
+                ${r.finalPrice.toFixed(2)}
+              </span>
             </div>
           );
         })}
@@ -889,38 +1441,80 @@ function StepReview({ pricingResults, quoteSummary, serviceInputs, address, name
         <Separator />
         <div className="flex justify-between font-heading font-bold text-xl">
           <span>Total</span>
-          <span className="text-primary">${quoteSummary.totalPrice.toFixed(2)}</span>
+          <span className="text-primary">
+            ${quoteSummary.totalPrice.toFixed(2)}
+          </span>
         </div>
       </div>
 
       <div className="mt-4 text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
-        <p><strong>Property:</strong> {address}</p>
-        <p><strong>Customer:</strong> {name}</p>
-        <p className="mt-2">This is an estimate based on the measurements you provided. We'll verify all measurements on-site before starting any work, and your final price may be adjusted if there's a significant difference.</p>
+        <p>
+          <strong>Property:</strong> {address}
+        </p>
+        <p>
+          <strong>Customer:</strong> {name}
+        </p>
+        <p className="mt-2">
+          This is an estimate based on the measurements you provided. We'll
+          verify all measurements on-site before starting any work, and your
+          final price may be adjusted if there's a significant difference.
+        </p>
       </div>
     </div>
   );
 }
 
-function StepSchedule({ preferredDate, setPreferredDate, preferredTime, setPreferredTime, referralSource, setReferralSource, photos, setPhotos, uploading, handlePhotoUpload, fileInputRef }: any) {
+function StepSchedule({
+  preferredDate,
+  setPreferredDate,
+  preferredTime,
+  setPreferredTime,
+  referralSource,
+  setReferralSource,
+  photos,
+  setPhotos,
+  uploading,
+  handlePhotoUpload,
+  fileInputRef,
+}: any) {
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">Schedule & Extras</h2>
-      <p className="text-sm text-muted-foreground mb-6">Optional: pick a preferred date and upload photos.</p>
+      <p className="text-sm text-muted-foreground mb-6">
+        Optional: pick a preferred date and upload photos.
+      </p>
 
       <div className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="date"><Calendar className="w-4 h-4 inline mr-1" />Preferred Date</Label>
-            <Input id="date" type="date" value={preferredDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPreferredDate(e.target.value)} min={new Date().toISOString().split("T")[0]} />
+            <Label htmlFor="date">
+              <Calendar className="w-4 h-4 inline mr-1" />
+              Preferred Date
+            </Label>
+            <Input
+              id="date"
+              type="date"
+              value={preferredDate}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setPreferredDate(e.target.value)
+              }
+              min={new Date().toISOString().split("T")[0]}
+            />
           </div>
           <div>
-            <Label htmlFor="time"><Clock className="w-4 h-4 inline mr-1" />Preferred Time</Label>
+            <Label htmlFor="time">
+              <Clock className="w-4 h-4 inline mr-1" />
+              Preferred Time
+            </Label>
             <Select value={preferredTime} onValueChange={setPreferredTime}>
-              <SelectTrigger><SelectValue placeholder="Select time" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select time" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="morning">Morning (7AM - 12PM)</SelectItem>
-                <SelectItem value="afternoon">Afternoon (12PM - 5PM)</SelectItem>
+                <SelectItem value="afternoon">
+                  Afternoon (12PM - 5PM)
+                </SelectItem>
                 <SelectItem value="flexible">Flexible</SelectItem>
               </SelectContent>
             </Select>
@@ -929,18 +1523,30 @@ function StepSchedule({ preferredDate, setPreferredDate, preferredTime, setPrefe
 
         <div>
           <Label>Upload Property Photos (Optional)</Label>
-          <p className="text-xs text-muted-foreground mb-2">Help us give a more accurate quote by sharing photos of your property.</p>
+          <p className="text-xs text-muted-foreground mb-2">
+            Help us give a more accurate quote by sharing photos of your
+            property.
+          </p>
           <div
             className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
             onClick={() => fileInputRef.current?.click()}
           >
-            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
             {uploading ? (
               <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
             ) : (
               <>
                 <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Click to upload photos (max 10MB each)</p>
+                <p className="text-sm text-muted-foreground">
+                  Click to upload photos (max 10MB each)
+                </p>
               </>
             )}
           </div>
@@ -948,9 +1554,17 @@ function StepSchedule({ preferredDate, setPreferredDate, preferredTime, setPrefe
             <div className="grid grid-cols-3 gap-2 mt-3">
               {photos.map((url: string, i: number) => (
                 <div key={i} className="relative group">
-                  <img src={url} alt={`Photo ${i + 1}`} className="w-full aspect-square object-cover rounded-lg" />
+                  <img
+                    src={url}
+                    alt={`Photo ${i + 1}`}
+                    className="w-full aspect-square object-cover rounded-lg"
+                  />
                   <button
-                    onClick={() => setPhotos((prev: string[]) => prev.filter((_: string, j: number) => j !== i))}
+                    onClick={() =>
+                      setPhotos((prev: string[]) =>
+                        prev.filter((_: string, j: number) => j !== i)
+                      )
+                    }
                     className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-3 h-3" />
@@ -964,12 +1578,16 @@ function StepSchedule({ preferredDate, setPreferredDate, preferredTime, setPrefe
         <div>
           <Label htmlFor="referral">How did you hear about us?</Label>
           <Select value={referralSource} onValueChange={setReferralSource}>
-            <SelectTrigger><SelectValue placeholder="Select one (optional)" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Select one (optional)" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="google">Google Search</SelectItem>
               <SelectItem value="facebook">Facebook</SelectItem>
               <SelectItem value="nextdoor">Nextdoor</SelectItem>
-              <SelectItem value="referral">Friend / Neighbor Referral</SelectItem>
+              <SelectItem value="referral">
+                Friend / Neighbor Referral
+              </SelectItem>
               <SelectItem value="repeat">Repeat Customer</SelectItem>
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
@@ -984,16 +1602,38 @@ function StepSchedule({ preferredDate, setPreferredDate, preferredTime, setPrefe
 
 function getDefaultInputs(serviceId: string): PricingInput {
   switch (serviceId) {
-    case "house_washing": return { serviceType: serviceId, sqft: 1800, stories: 1, packageTier: "good" };
-    case "window_cleaning": return { serviceType: serviceId, windowCount: 15, includeExterior: true, includeInterior: false, includeScreens: false, packageTier: "good" };
-    case "roof_cleaning": return { serviceType: serviceId, sqft: 2000, roofPitch: "low" };
-    case "gutter_cleaning": return { serviceType: serviceId, linearFeet: 150, stories: 1 };
-    case "fence_cleaning": return { serviceType: serviceId, linearFeet: 100, fenceSides: 1 };
-    case "deck_cleaning": return { serviceType: serviceId, sqft: 300 };
-    case "driveway_cleaning": return { serviceType: serviceId, sqft: 500 };
-    case "patio_cleaning": return { serviceType: serviceId, sqft: 250 };
-    case "walkway_cleaning": return { serviceType: serviceId, sqft: 100 };
-    default: return { serviceType: serviceId, sqft: 300 };
+    case "house_washing":
+      return {
+        serviceType: serviceId,
+        sqft: 1800,
+        stories: 1,
+        packageTier: "good",
+      };
+    case "window_cleaning":
+      return {
+        serviceType: serviceId,
+        windowCount: 15,
+        includeExterior: true,
+        includeInterior: false,
+        includeScreens: false,
+        packageTier: "good",
+      };
+    case "roof_cleaning":
+      return { serviceType: serviceId, sqft: 2000, roofPitch: "low" };
+    case "gutter_cleaning":
+      return { serviceType: serviceId, linearFeet: 150, stories: 1 };
+    case "fence_cleaning":
+      return { serviceType: serviceId, linearFeet: 100, fenceSides: 1 };
+    case "deck_cleaning":
+      return { serviceType: serviceId, sqft: 300 };
+    case "driveway_cleaning":
+      return { serviceType: serviceId, sqft: 500 };
+    case "patio_cleaning":
+      return { serviceType: serviceId, sqft: 250 };
+    case "walkway_cleaning":
+      return { serviceType: serviceId, sqft: 100 };
+    default:
+      return { serviceType: serviceId, sqft: 300 };
   }
 }
 

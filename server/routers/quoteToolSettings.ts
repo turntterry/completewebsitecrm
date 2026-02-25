@@ -22,7 +22,9 @@ export const quoteToolSettingsRouter = router({
     if (!settings) {
       // Create default settings with a standalone token
       const token = crypto.randomBytes(16).toString("hex");
-      await db.insert(quoteToolSettings).values({ companyId, standaloneToken: token });
+      await db
+        .insert(quoteToolSettings)
+        .values({ companyId, standaloneToken: token });
       [settings] = await db
         .select()
         .from(quoteToolSettings)
@@ -47,7 +49,7 @@ export const quoteToolSettingsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-    if (!db) throw new Error("DB unavailable");
+      if (!db) throw new Error("DB unavailable");
       const companyId = ctx.user.companyId;
       if (!companyId) throw new Error("No company");
 
@@ -78,7 +80,7 @@ export const quoteToolSettingsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-    if (!db) throw new Error("DB unavailable");
+      if (!db) throw new Error("DB unavailable");
       const companyId = ctx.user.companyId;
       if (!companyId) throw new Error("No company");
 
@@ -108,7 +110,11 @@ export const quoteToolSettingsRouter = router({
         { name: "House Washing", icon: "Home", iconColor: "#3b82f6" },
         { name: "Driveway Cleaning", icon: "Car", iconColor: "#8b5cf6" },
         { name: "Roof Cleaning", icon: "Triangle", iconColor: "#10b981" },
-        { name: "Detached Structure Wash", icon: "Building2", iconColor: "#f59e0b" },
+        {
+          name: "Detached Structure Wash",
+          icon: "Building2",
+          iconColor: "#f59e0b",
+        },
         { name: "Fence Cleaning", icon: "Fence", iconColor: "#ef4444" },
         { name: "Patio Cleaning", icon: "LayoutGrid", iconColor: "#f97316" },
         { name: "Walkway Cleaning", icon: "Footprints", iconColor: "#06b6d4" },
@@ -117,7 +123,12 @@ export const quoteToolSettingsRouter = router({
         { name: "Gutter Cleanout", icon: "Droplets", iconColor: "#eab308" },
       ];
       await db.insert(quoteToolServices).values(
-        defaults.map((d, i) => ({ ...d, companyId, sortOrder: i, enabled: true }))
+        defaults.map((d, i) => ({
+          ...d,
+          companyId,
+          sortOrder: i,
+          enabled: true,
+        }))
       );
       return db
         .select()
@@ -141,7 +152,7 @@ export const quoteToolSettingsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-    if (!db) throw new Error("DB unavailable");
+      if (!db) throw new Error("DB unavailable");
       const companyId = ctx.user.companyId;
       if (!companyId) throw new Error("No company");
 
@@ -158,7 +169,7 @@ export const quoteToolSettingsRouter = router({
     .input(z.array(z.object({ id: z.number(), sortOrder: z.number() })))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-    if (!db) throw new Error("DB unavailable");
+      if (!db) throw new Error("DB unavailable");
       const companyId = ctx.user.companyId;
       if (!companyId) throw new Error("No company");
 
@@ -179,7 +190,9 @@ export const quoteToolSettingsRouter = router({
         icon: z.string().optional(),
         iconColor: z.string().optional(),
         description: z.string().optional(),
-        pricingType: z.enum(["fixed", "per_sqft", "per_linear_ft", "per_unit", "tiered"]).optional(),
+        pricingType: z
+          .enum(["fixed", "per_sqft", "per_linear_ft", "per_unit", "tiered"])
+          .optional(),
         basePrice: z.number().optional(),
         pricePerUnit: z.number().optional(),
         minimumCharge: z.number().optional(),
@@ -203,9 +216,18 @@ export const quoteToolSettingsRouter = router({
         iconColor: input.iconColor ?? "#3b82f6",
         description: input.description ?? null,
         pricingType: (input.pricingType ?? "per_sqft") as any,
-        basePrice: input.basePrice !== undefined ? String(input.basePrice.toFixed(2)) : "0",
-        pricePerUnit: input.pricePerUnit !== undefined ? String(input.pricePerUnit.toFixed(4)) : "0",
-        minimumCharge: input.minimumCharge !== undefined ? String(input.minimumCharge.toFixed(2)) : "0",
+        basePrice:
+          input.basePrice !== undefined
+            ? String(input.basePrice.toFixed(2))
+            : "0",
+        pricePerUnit:
+          input.pricePerUnit !== undefined
+            ? String(input.pricePerUnit.toFixed(4))
+            : "0",
+        minimumCharge:
+          input.minimumCharge !== undefined
+            ? String(input.minimumCharge.toFixed(2))
+            : "0",
         enabled: true,
         isActive: true,
         sortOrder: existingServices.length,
@@ -224,7 +246,34 @@ export const quoteToolSettingsRouter = router({
 
       await db
         .delete(quoteToolServices)
-        .where(and(eq(quoteToolServices.id, input.id), eq(quoteToolServices.companyId, companyId)));
+        .where(
+          and(
+            eq(quoteToolServices.id, input.id),
+            eq(quoteToolServices.companyId, companyId)
+          )
+        );
+      return { success: true };
+    }),
+
+  // Update customer-facing tier labels (internal good/better/best keys stay stable)
+  updateTierLabels: protectedProcedure
+    .input(
+      z.object({
+        good: z.string().min(1).max(80),
+        better: z.string().min(1).max(80),
+        best: z.string().min(1).max(80),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      const companyId = ctx.user.companyId;
+      if (!companyId) throw new Error("No company");
+
+      await db
+        .update(quoteToolSettings)
+        .set({ customerTierLabels: input })
+        .where(eq(quoteToolSettings.companyId, companyId));
       return { success: true };
     }),
 
@@ -294,18 +343,17 @@ export const quoteToolSettingsRouter = router({
     }),
 
   // Regenerate standalone token (invalidates old link)
-  regenerateToken: protectedProcedure
-    .mutation(async ({ ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
-      const companyId = ctx.user.companyId;
-      if (!companyId) throw new Error("No company");
+  regenerateToken: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    const companyId = ctx.user.companyId;
+    if (!companyId) throw new Error("No company");
 
-      const newToken = crypto.randomBytes(16).toString("hex");
-      await db
-        .update(quoteToolSettings)
-        .set({ standaloneToken: newToken })
-        .where(eq(quoteToolSettings.companyId, companyId));
-      return { token: newToken };
-    }),
+    const newToken = crypto.randomBytes(16).toString("hex");
+    await db
+      .update(quoteToolSettings)
+      .set({ standaloneToken: newToken })
+      .where(eq(quoteToolSettings.companyId, companyId));
+    return { token: newToken };
+  }),
 });
