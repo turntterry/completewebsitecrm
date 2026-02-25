@@ -47,6 +47,7 @@ const quoteRouter = router({
   startSession: publicProcedure
     .input(
       z.object({
+        companyId: z.number().int().positive().optional(),
         source: z.string().max(120).optional(),
         referrer: z.string().max(500).optional(),
         utmSource: z.string().max(120).optional(),
@@ -59,7 +60,9 @@ const quoteRouter = router({
       if (!db) throw new Error("Database unavailable");
 
       const sessionToken = nanoid(24);
+      const companyId = input.companyId ?? 1;
       const [result] = await db.insert(quoteSessions).values({
+        companyId,
         sessionToken,
         source: input.source ?? null,
         referrer: input.referrer ?? null,

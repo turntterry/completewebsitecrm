@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   quoteSessionEvents,
+  quoteSessions,
   quoteToolSettings,
   quoteToolServices,
 } from "../../drizzle/schema";
@@ -288,18 +289,30 @@ export const quoteToolSettingsRouter = router({
         .object({ days: z.number().int().min(1).max(365).default(30) })
         .optional()
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("DB unavailable");
 
       const days = input?.days ?? 30;
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+      const companyId = ctx.user.companyId;
+      if (!companyId) throw new Error("No company");
+
       const events = await db
-        .select()
+        .select({
+          eventName: quoteSessionEvents.eventName,
+          payload: quoteSessionEvents.payload,
+          createdAt: quoteSessionEvents.createdAt,
+        })
         .from(quoteSessionEvents)
+        .innerJoin(
+          quoteSessions,
+          eq(quoteSessionEvents.sessionId, quoteSessions.id)
+        )
         .where(
           and(
+            eq(quoteSessions.companyId, companyId),
             inArray(quoteSessionEvents.eventName, [
               "upsell_shown",
               "upsell_accepted",

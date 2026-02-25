@@ -492,6 +492,7 @@ export default function QuoteTool() {
 
     startSessionMutation
       .mutateAsync({
+        companyId: experienceConfig?.settings?.companyId ?? 1,
         source: "public_quote_tool",
         referrer:
           typeof document !== "undefined"
@@ -509,7 +510,12 @@ export default function QuoteTool() {
       .catch(() => {
         // Non-blocking analytics setup.
       });
-  }, [sessionToken, startSessionMutation, trackEventMutation]);
+  }, [
+    experienceConfig?.settings?.companyId,
+    sessionToken,
+    startSessionMutation,
+    trackEventMutation,
+  ]);
 
   useEffect(() => {
     if (!sessionToken || eligibleUpsells.length === 0) return;

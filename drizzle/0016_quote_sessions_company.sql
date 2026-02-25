@@ -1,0 +1,2 @@
+ALTER TABLE `quote_sessions`
+  ADD COLUMN `companyId` int NOT NULL DEFAULT 1;

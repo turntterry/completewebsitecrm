@@ -746,6 +746,7 @@ export type InsertQuoteToolService = typeof quoteToolServices.$inferInsert;
 // ─── Quote Sessions & Analytics Events (Instant Quote v2 foundation) ────────
 export const quoteSessions = mysqlTable("quote_sessions", {
   id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().default(1),
   sessionToken: varchar("sessionToken", { length: 64 }).notNull().unique(),
   source: varchar("source", { length: 120 }),
   referrer: varchar("referrer", { length: 500 }),
