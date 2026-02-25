@@ -18,7 +18,9 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  crmRole: mysqlEnum("crmRole", ["owner", "dispatcher", "technician"]).default("owner"),
+  crmRole: mysqlEnum("crmRole", ["owner", "dispatcher", "technician"]).default(
+    "owner"
+  ),
   phone: varchar("phone", { length: 32 }),
   companyId: int("companyId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -38,8 +40,12 @@ export const companies = mysqlTable("companies", {
   phone: varchar("phone", { length: 32 }),
   email: varchar("email", { length: 320 }),
   website: text("website"),
-  defaultTaxRate: decimal("defaultTaxRate", { precision: 5, scale: 2 }).default("0.00"),
-  invoiceTerms: varchar("invoiceTerms", { length: 64 }).default("due_on_receipt"),
+  defaultTaxRate: decimal("defaultTaxRate", { precision: 5, scale: 2 }).default(
+    "0.00"
+  ),
+  invoiceTerms: varchar("invoiceTerms", { length: 64 }).default(
+    "due_on_receipt"
+  ),
   invoiceMessage: text("invoiceMessage"),
   quoteMessage: text("quoteMessage"),
   quoteExpiryDays: int("quoteExpiryDays").default(30),
@@ -116,7 +122,16 @@ export const leads = mysqlTable("leads", {
   services: json("services").$type<string[]>().default([]),
   notes: text("notes"),
   source: varchar("source", { length: 64 }).default("website"),
-  status: mysqlEnum("status", ["new", "contacted", "follow_up", "quoted", "won", "lost"]).default("new").notNull(),
+  status: mysqlEnum("status", [
+    "new",
+    "contacted",
+    "follow_up",
+    "quoted",
+    "won",
+    "lost",
+  ])
+    .default("new")
+    .notNull(),
   lostReason: text("lostReason"),
   convertedToQuoteId: int("convertedToQuoteId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -135,11 +150,22 @@ export const quotes = mysqlTable("quotes", {
   leadId: int("leadId"),
   quoteNumber: int("quoteNumber").notNull(),
   title: varchar("title", { length: 255 }),
-  status: mysqlEnum("status", ["draft", "sent", "accepted", "changes_requested", "expired", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", [
+    "draft",
+    "sent",
+    "accepted",
+    "changes_requested",
+    "expired",
+    "archived",
+  ])
+    .default("draft")
+    .notNull(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0.00"),
   taxRate: decimal("taxRate", { precision: 5, scale: 2 }).default("0.00"),
   taxAmount: decimal("taxAmount", { precision: 10, scale: 2 }).default("0.00"),
-  depositAmount: decimal("depositAmount", { precision: 10, scale: 2 }).default("0.00"),
+  depositAmount: decimal("depositAmount", { precision: 10, scale: 2 }).default(
+    "0.00"
+  ),
   total: decimal("total", { precision: 10, scale: 2 }).default("0.00"),
   message: text("message"),
   internalNotes: text("internalNotes"),
@@ -160,7 +186,9 @@ export const quoteLineItems = mysqlTable("quote_line_items", {
   sortOrder: int("sortOrder").default(0),
   description: varchar("description", { length: 255 }).notNull(),
   details: text("details"),
-  featureList: json("featureList").$type<{ label: string; included: boolean }[]>().default([]),
+  featureList: json("featureList")
+    .$type<{ label: string; included: boolean }[]>()
+    .default([]),
   unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).default("0.00"),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).default("1.000"),
   total: decimal("total", { precision: 10, scale: 2 }).default("0.00"),
@@ -179,7 +207,16 @@ export const jobs = mysqlTable("jobs", {
   quoteId: int("quoteId"),
   jobNumber: int("jobNumber").notNull(),
   title: varchar("title", { length: 255 }),
-  status: mysqlEnum("status", ["draft", "scheduled", "in_progress", "requires_invoicing", "completed", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", [
+    "draft",
+    "scheduled",
+    "in_progress",
+    "requires_invoicing",
+    "completed",
+    "archived",
+  ])
+    .default("draft")
+    .notNull(),
   isRecurring: boolean("isRecurring").default(false),
   recurrenceRule: varchar("recurrenceRule", { length: 64 }),
   instructions: text("instructions"),
@@ -196,7 +233,15 @@ export const visits = mysqlTable("visits", {
   id: int("id").autoincrement().primaryKey(),
   jobId: int("jobId").notNull(),
   companyId: int("companyId").notNull(),
-  status: mysqlEnum("status", ["unscheduled", "scheduled", "in_progress", "completed", "cancelled"]).default("unscheduled").notNull(),
+  status: mysqlEnum("status", [
+    "unscheduled",
+    "scheduled",
+    "in_progress",
+    "completed",
+    "cancelled",
+  ])
+    .default("unscheduled")
+    .notNull(),
   scheduledAt: timestamp("scheduledAt"),
   scheduledEndAt: timestamp("scheduledEndAt"),
   checkInAt: timestamp("checkInAt"),
@@ -262,13 +307,24 @@ export const invoices = mysqlTable("invoices", {
   customerId: int("customerId").notNull(),
   jobId: int("jobId"),
   invoiceNumber: int("invoiceNumber").notNull(),
-  status: mysqlEnum("status", ["draft", "upcoming", "sent", "paid", "past_due", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", [
+    "draft",
+    "upcoming",
+    "sent",
+    "paid",
+    "past_due",
+    "archived",
+  ])
+    .default("draft")
+    .notNull(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0.00"),
   taxRate: decimal("taxRate", { precision: 5, scale: 2 }).default("0.00"),
   taxAmount: decimal("taxAmount", { precision: 10, scale: 2 }).default("0.00"),
   tipAmount: decimal("tipAmount", { precision: 10, scale: 2 }).default("0.00"),
   total: decimal("total", { precision: 10, scale: 2 }).default("0.00"),
-  amountPaid: decimal("amountPaid", { precision: 10, scale: 2 }).default("0.00"),
+  amountPaid: decimal("amountPaid", { precision: 10, scale: 2 }).default(
+    "0.00"
+  ),
   balance: decimal("balance", { precision: 10, scale: 2 }).default("0.00"),
   message: text("message"),
   internalNotes: text("internalNotes"),
@@ -305,7 +361,13 @@ export const payments = mysqlTable("payments", {
   invoiceId: int("invoiceId").notNull(),
   companyId: int("companyId").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  method: mysqlEnum("method", ["card", "ach", "check", "cash", "other"]).notNull(),
+  method: mysqlEnum("method", [
+    "card",
+    "ach",
+    "check",
+    "cash",
+    "other",
+  ]).notNull(),
   stripeChargeId: varchar("stripeChargeId", { length: 128 }),
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 128 }),
   notes: text("notes"),
@@ -338,8 +400,12 @@ export const campaigns = mysqlTable("campaigns", {
   companyId: int("companyId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   type: mysqlEnum("type", ["email", "sms"]).notNull(),
-  campaignType: mysqlEnum("campaignType", ["automated", "one_off"]).default("one_off"),
-  status: mysqlEnum("status", ["draft", "active", "sent", "inactive"]).default("draft"),
+  campaignType: mysqlEnum("campaignType", ["automated", "one_off"]).default(
+    "one_off"
+  ),
+  status: mysqlEnum("status", ["draft", "active", "sent", "inactive"]).default(
+    "draft"
+  ),
   subject: varchar("subject", { length: 255 }),
   body: text("body"),
   audience: json("audience"),
@@ -362,8 +428,12 @@ export const referrals = mysqlTable("referrals", {
   referredCustomerId: int("referredCustomerId"),
   referredName: varchar("referredName", { length: 255 }),
   referredEmail: varchar("referredEmail", { length: 320 }),
-  status: mysqlEnum("status", ["pending", "converted", "rewarded"]).default("pending"),
-  creditAmount: decimal("creditAmount", { precision: 10, scale: 2 }).default("50.00"),
+  status: mysqlEnum("status", ["pending", "converted", "rewarded"]).default(
+    "pending"
+  ),
+  creditAmount: decimal("creditAmount", { precision: 10, scale: 2 }).default(
+    "50.00"
+  ),
   jobId: int("jobId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -379,7 +449,12 @@ export const reviewRequests = mysqlTable("review_requests", {
   invoiceId: int("invoiceId"),
   platform: mysqlEnum("platform", ["google", "facebook"]).notNull(),
   method: mysqlEnum("method", ["email", "sms"]).notNull(),
-  status: mysqlEnum("status", ["pending", "sent", "clicked", "reviewed"]).default("pending"),
+  status: mysqlEnum("status", [
+    "pending",
+    "sent",
+    "clicked",
+    "reviewed",
+  ]).default("pending"),
   sentAt: timestamp("sentAt"),
   scheduledAt: timestamp("scheduledAt"),
   reviewerName: varchar("reviewerName", { length: 120 }),
@@ -397,13 +472,17 @@ export const quoteTemplates = mysqlTable("quote_templates", {
   companyId: int("companyId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  lineItems: json("lineItems").$type<{
-    description: string;
-    details?: string;
-    featureList: { label: string; included: boolean }[];
-    unitPrice: number;
-    quantity: number;
-  }[]>().default([]),
+  lineItems: json("lineItems")
+    .$type<
+      {
+        description: string;
+        details?: string;
+        featureList: { label: string; included: boolean }[];
+        unitPrice: number;
+        quantity: number;
+      }[]
+    >()
+    .default([]),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -430,20 +509,32 @@ export const instantQuotes = mysqlTable("instant_quotes", {
   exteriorMaterial: varchar("exteriorMaterial", { length: 64 }),
   propertyType: varchar("propertyType", { length: 64 }),
   // Quote details
-  services: json("services").$type<{
-    serviceId: string;
-    serviceName: string;
-    sizeLabel: string;
-    sizeValue: number;
-    options: Record<string, string | number>;
-    price: number;
-  }[]>().default([]),
+  services: json("services")
+    .$type<
+      {
+        serviceId: string;
+        serviceName: string;
+        sizeLabel: string;
+        sizeValue: number;
+        options: Record<string, string | number>;
+        price: number;
+      }[]
+    >()
+    .default([]),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0.00"),
-  discountPercent: decimal("discountPercent", { precision: 5, scale: 2 }).default("0.00"),
-  discountAmount: decimal("discountAmount", { precision: 10, scale: 2 }).default("0.00"),
+  discountPercent: decimal("discountPercent", {
+    precision: 5,
+    scale: 2,
+  }).default("0.00"),
+  discountAmount: decimal("discountAmount", {
+    precision: 10,
+    scale: 2,
+  }).default("0.00"),
   total: decimal("total", { precision: 10, scale: 2 }).default("0.00"),
   // Status
-  status: mysqlEnum("status", ["pending", "booked", "declined", "converted"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["pending", "booked", "declined", "converted"])
+    .default("pending")
+    .notNull(),
   // Marketing consent
   emailConsent: boolean("emailConsent").default(false),
   smsConsent: boolean("smsConsent").default(false),
@@ -476,7 +567,9 @@ export const quoteOptionItems = mysqlTable("quote_option_items", {
   quoteId: int("quoteId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  featureList: json("featureList").$type<{ label: string; included: boolean }[]>().default([]),
+  featureList: json("featureList")
+    .$type<{ label: string; included: boolean }[]>()
+    .default([]),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).default("1.000"),
   unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).default("0.00"),
   total: decimal("total", { precision: 10, scale: 2 }).default("0.00"),
@@ -529,7 +622,9 @@ export const quoteToolSettings = mysqlTable("quote_tool_settings", {
   companyId: int("companyId").notNull().unique(),
   isActive: boolean("isActive").default(false),
   standaloneToken: varchar("standaloneToken", { length: 64 }),
-  headerTitle: varchar("headerTitle", { length: 300 }).default("Get Your Instant Quote"),
+  headerTitle: varchar("headerTitle", { length: 300 }).default(
+    "Get Your Instant Quote"
+  ),
   headerSubtitle: text("headerSubtitle"),
   primaryColor: varchar("primaryColor", { length: 20 }).default("#2563eb"),
   logoUrl: text("logoUrl"),
@@ -541,18 +636,44 @@ export const quoteToolSettings = mysqlTable("quote_tool_settings", {
   requireEmail: boolean("requireEmail").default(true),
   requirePhone: boolean("requirePhone").default(true),
   bundleDiscountEnabled: boolean("bundleDiscountEnabled").default(true),
-  bundleDiscountTiers: json("bundleDiscountTiers").$type<{ minServices: number; discountPercent: number }[]>(),
-  jobMinimum: decimal("jobMinimum", { precision: 10, scale: 2 }).default("0.00"),
+  bundleDiscountTiers: json("bundleDiscountTiers").$type<
+    { minServices: number; discountPercent: number }[]
+  >(),
+  jobMinimum: decimal("jobMinimum", { precision: 10, scale: 2 }).default(
+    "0.00"
+  ),
   defaultExpirationDays: int("defaultExpirationDays").default(7),
   packageDiscountsEnabled: boolean("packageDiscountsEnabled").default(false),
-  discount2Services: decimal("discount2Services", { precision: 5, scale: 2 }).default("5.00"),
-  discount3Services: decimal("discount3Services", { precision: 5, scale: 2 }).default("7.00"),
-  discount4Services: decimal("discount4Services", { precision: 5, scale: 2 }).default("10.00"),
-  discount5PlusServices: decimal("discount5PlusServices", { precision: 5, scale: 2 }).default("12.00"),
+  discount2Services: decimal("discount2Services", {
+    precision: 5,
+    scale: 2,
+  }).default("5.00"),
+  discount3Services: decimal("discount3Services", {
+    precision: 5,
+    scale: 2,
+  }).default("7.00"),
+  discount4Services: decimal("discount4Services", {
+    precision: 5,
+    scale: 2,
+  }).default("10.00"),
+  discount5PlusServices: decimal("discount5PlusServices", {
+    precision: 5,
+    scale: 2,
+  }).default("12.00"),
   onlineBookingEnabled: boolean("onlineBookingEnabled").default(true),
   requireAdvanceBooking: boolean("requireAdvanceBooking").default(false),
   advanceBookingDays: int("advanceBookingDays").default(1),
   commercialRoutingEnabled: boolean("commercialRoutingEnabled").default(false),
+  customerTierLabels: json("customerTierLabels").$type<{
+    good: string;
+    better: string;
+    best: string;
+  }>(),
+  premiumTheme: json("premiumTheme").$type<{
+    style: "classic" | "glass" | "elevated";
+    accentColor: string;
+    cartStyle: "sidebar" | "footer_drawer";
+  }>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -572,30 +693,105 @@ export const quoteToolServices = mysqlTable("quote_tool_services", {
   isActive: boolean("isActive").default(true),
   enabled: boolean("enabled").default(true),
   sortOrder: int("sortOrder").default(0),
-  pricingType: mysqlEnum("pricingType", ["fixed", "per_sqft", "per_linear_ft", "per_unit", "tiered"]).default("per_sqft"),
+  pricingType: mysqlEnum("pricingType", [
+    "fixed",
+    "per_sqft",
+    "per_linear_ft",
+    "per_unit",
+    "tiered",
+  ]).default("per_sqft"),
   basePrice: decimal("basePrice", { precision: 10, scale: 2 }).default("0"),
-  pricePerUnit: decimal("pricePerUnit", { precision: 10, scale: 4 }).default("0"),
-  minimumCharge: decimal("minimumCharge", { precision: 10, scale: 2 }).default("0"),
-  sizeTiers: json("sizeTiers").$type<{ minSize: number; maxSize: number | null; ratePerUnit: number }[]>(),
-  storyMultiplier: json("storyMultiplier").$type<{ one_story: number; two_story: number; three_story: number }>(),
-  conditionMultiplier: json("conditionMultiplier").$type<{ light: number; medium: number; heavy: number }>(),
-  addOns: json("addOns").$type<{ name: string; price: number; description?: string }[]>(),
+  pricePerUnit: decimal("pricePerUnit", { precision: 10, scale: 4 }).default(
+    "0"
+  ),
+  minimumCharge: decimal("minimumCharge", { precision: 10, scale: 2 }).default(
+    "0"
+  ),
+  sizeTiers:
+    json("sizeTiers").$type<
+      { minSize: number; maxSize: number | null; ratePerUnit: number }[]
+    >(),
+  storyMultiplier: json("storyMultiplier").$type<{
+    one_story: number;
+    two_story: number;
+    three_story: number;
+  }>(),
+  conditionMultiplier: json("conditionMultiplier").$type<{
+    light: number;
+    medium: number;
+    heavy: number;
+  }>(),
+  addOns:
+    json("addOns").$type<
+      { name: string; price: number; description?: string }[]
+    >(),
   pricingConfig: json("pricingConfig"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type QuoteToolService = typeof quoteToolServices.$inferSelect;
 export type InsertQuoteToolService = typeof quoteToolServices.$inferInsert;
+
+// ─── Quote Sessions & Analytics Events (Instant Quote v2 foundation) ────────
+export const quoteSessions = mysqlTable("quote_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionToken: varchar("sessionToken", { length: 64 }).notNull().unique(),
+  source: varchar("source", { length: 120 }),
+  referrer: varchar("referrer", { length: 500 }),
+  utmSource: varchar("utmSource", { length: 120 }),
+  utmMedium: varchar("utmMedium", { length: 120 }),
+  utmCampaign: varchar("utmCampaign", { length: 120 }),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  submittedAt: timestamp("submittedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type QuoteSession = typeof quoteSessions.$inferSelect;
+
+export const quoteSessionEvents = mysqlTable("quote_session_events", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: int("sessionId").notNull(),
+  eventName: varchar("eventName", { length: 80 }).notNull(),
+  payload: json("payload")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type QuoteSessionEvent = typeof quoteSessionEvents.$inferSelect;
+
+// ─── Quote Config Versions (draft/publish + rollback foundation) ─────────────
+export const quoteConfigVersions = mysqlTable("quote_config_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  versionLabel: varchar("versionLabel", { length: 120 }).notNull(),
+  status: mysqlEnum("status", ["draft", "published", "archived"])
+    .notNull()
+    .default("draft"),
+  config: json("config").$type<Record<string, unknown>>().notNull(),
+  publishedAt: timestamp("publishedAt"),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type QuoteConfigVersion = typeof quoteConfigVersions.$inferSelect;
+
 // ─── Quote Global Settings (Phase 2) ─────────────────────────────────────────
 export const quoteGlobalSettings = mysqlTable("quote_global_settings", {
   id: int("id").autoincrement().primaryKey(),
-  jobMinimum: decimal("jobMinimum", { precision: 10, scale: 2 }).notNull().default("149.00"),
+  jobMinimum: decimal("jobMinimum", { precision: 10, scale: 2 })
+    .notNull()
+    .default("149.00"),
   quoteExpirationDays: int("quoteExpirationDays").notNull().default(30),
   baseAddress: varchar("baseAddress", { length: 255 }).default(""),
   baseLat: decimal("baseLat", { precision: 10, scale: 7 }),
   baseLng: decimal("baseLng", { precision: 10, scale: 7 }),
-  freeMiles: decimal("freeMiles", { precision: 6, scale: 2 }).notNull().default("0.00"),
-  pricePerMile: decimal("pricePerMile", { precision: 6, scale: 2 }).notNull().default("0.00"),
+  freeMiles: decimal("freeMiles", { precision: 6, scale: 2 })
+    .notNull()
+    .default("0.00"),
+  pricePerMile: decimal("pricePerMile", { precision: 6, scale: 2 })
+    .notNull()
+    .default("0.00"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type QuoteGlobalSettings = typeof quoteGlobalSettings.$inferSelect;
@@ -603,7 +799,9 @@ export type QuoteGlobalSettings = typeof quoteGlobalSettings.$inferSelect;
 export const packageDiscountTiers = mysqlTable("package_discount_tiers", {
   id: int("id").autoincrement().primaryKey(),
   serviceCount: int("serviceCount").notNull(),
-  discountPercent: decimal("discountPercent", { precision: 5, scale: 2 }).notNull().default("0.00"),
+  discountPercent: decimal("discountPercent", { precision: 5, scale: 2 })
+    .notNull()
+    .default("0.00"),
   label: varchar("label", { length: 50 }).default(""),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -613,14 +811,19 @@ export const serviceConfigs = mysqlTable("service_configs", {
   id: int("id").autoincrement().primaryKey(),
   serviceKey: varchar("serviceKey", { length: 100 }).notNull().unique(),
   displayName: varchar("displayName", { length: 150 }).notNull(),
-  pricingMode: varchar("pricingMode", { length: 30 }).notNull().default("smartscale"),
+  pricingMode: varchar("pricingMode", { length: 30 })
+    .notNull()
+    .default("smartscale"),
   pricingConfig: json("pricingConfig").notNull(),
   multipliers: json("multipliers").notNull(),
   taxable: boolean("taxable").notNull().default(true),
   taxCode: varchar("taxCode", { length: 50 }).default(""),
   iconUrl: varchar("iconUrl", { length: 500 }).default(""),
   photoUrl: varchar("photoUrl", { length: 500 }).default(""),
-  highlights: json("highlights").$type<{ text: string; visible: boolean }[]>().notNull().default([]),
+  highlights: json("highlights")
+    .$type<{ text: string; visible: boolean }[]>()
+    .notNull()
+    .default([]),
   sortOrder: int("sortOrder").notNull().default(0),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -633,11 +836,19 @@ export const jobCosts = mysqlTable("job_costs", {
   id: int("id").autoincrement().primaryKey(),
   jobId: int("jobId").notNull(),
   companyId: int("companyId").notNull(),
-  category: mysqlEnum("category", ["labor", "materials", "subcontractor", "equipment", "other"])
+  category: mysqlEnum("category", [
+    "labor",
+    "materials",
+    "subcontractor",
+    "equipment",
+    "other",
+  ])
     .notNull()
     .default("other"),
   description: varchar("description", { length: 255 }).notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  amount: decimal("amount", { precision: 10, scale: 2 })
+    .notNull()
+    .default("0.00"),
   notes: text("notes"),
   costDate: timestamp("costDate").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -667,7 +878,13 @@ export const smsMessages = mysqlTable("sms_messages", {
   direction: mysqlEnum("direction", ["inbound", "outbound"]).notNull(),
   body: text("body").notNull(),
   twilioSid: varchar("twilioSid", { length: 64 }),
-  status: mysqlEnum("status", ["queued", "sent", "delivered", "failed", "received"])
+  status: mysqlEnum("status", [
+    "queued",
+    "sent",
+    "delivered",
+    "failed",
+    "received",
+  ])
     .notNull()
     .default("queued"),
   sentAt: timestamp("sentAt").defaultNow().notNull(),
@@ -713,7 +930,9 @@ export const automationLogs = mysqlTable("automation_logs", {
   triggerEvent: varchar("triggerEvent", { length: 64 }).notNull(),
   entityType: varchar("entityType", { length: 32 }), // "job", "quote", etc.
   entityId: int("entityId"),
-  status: mysqlEnum("status", ["success", "failed", "skipped"]).notNull().default("success"),
+  status: mysqlEnum("status", ["success", "failed", "skipped"])
+    .notNull()
+    .default("success"),
   actionsRun: json("actionsRun"), // summary of what ran
   error: text("error"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
