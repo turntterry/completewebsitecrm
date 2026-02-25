@@ -205,6 +205,7 @@ const STEPS = [
   "Contact",
   "Services",
   "Details",
+  "Enhance",
   "Review",
   "Schedule",
   "Submit",
@@ -539,6 +540,8 @@ export default function QuoteTool() {
         return true;
       case 5:
         return true;
+      case 6:
+        return true;
       default:
         return true;
     }
@@ -679,6 +682,14 @@ export default function QuoteTool() {
                 />
               )}
               {step === 4 && (
+                <StepUpsells
+                  eligibleUpsells={eligibleUpsells}
+                  acceptedUpsells={acceptedUpsells}
+                  toggleUpsell={toggleUpsell}
+                  upsellTotal={upsellTotal}
+                />
+              )}
+              {step === 5 && (
                 <StepReview
                   pricingResults={pricingResults}
                   quoteSummary={quoteSummary}
@@ -687,13 +698,11 @@ export default function QuoteTool() {
                   address={`${address}, ${city}, ${stateVal} ${zip}`}
                   name={name}
                   tierLabels={tierLabels}
-                  eligibleUpsells={eligibleUpsells}
-                  acceptedUpsells={acceptedUpsells}
-                  toggleUpsell={toggleUpsell}
+                  acceptedUpsellItems={acceptedUpsellItems}
                   upsellTotal={upsellTotal}
                 />
               )}
-              {step === 5 && (
+              {step === 6 && (
                 <StepSchedule
                   preferredDate={preferredDate}
                   setPreferredDate={setPreferredDate}
@@ -708,7 +717,7 @@ export default function QuoteTool() {
                   fileInputRef={fileInputRef}
                 />
               )}
-              {step === 6 && (
+              {step === 7 && (
                 <div className="text-center py-4">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <CheckCircle className="w-8 h-8 text-primary" />
@@ -732,7 +741,7 @@ export default function QuoteTool() {
 
               {/* Navigation */}
               <div
-                className={`flex justify-between mt-8 ${step < 6 ? "pt-4 border-t" : ""}`}
+                className={`flex justify-between mt-8 ${step < 7 ? "pt-4 border-t" : ""}`}
               >
                 {step > 0 ? (
                   <Button variant="outline" onClick={() => setStep(step - 1)}>
@@ -1500,6 +1509,76 @@ function WindowPackageSelector({
   );
 }
 
+function StepUpsells({
+  eligibleUpsells,
+  acceptedUpsells,
+  toggleUpsell,
+  upsellTotal,
+}: any) {
+  return (
+    <div>
+      <h2 className="font-heading font-bold text-xl mb-1">
+        Enhance Your Quote
+      </h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        Add premium options with one tap. You can keep, change, or skip any of
+        these.
+      </p>
+
+      {eligibleUpsells.length === 0 ? (
+        <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+          Select at least one service to unlock personalized add-on
+          recommendations.
+        </div>
+      ) : (
+        <div className="space-y-3 mb-5">
+          {eligibleUpsells.map((upsell: any) => {
+            const active = !!acceptedUpsells[upsell.id];
+            return (
+              <button
+                key={upsell.id}
+                type="button"
+                onClick={() => toggleUpsell(upsell.id)}
+                className={`w-full text-left rounded-xl border p-4 transition ${
+                  active
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-border hover:border-primary/40"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-sm flex items-center gap-2">
+                      {upsell.title}
+                      {upsell.badge && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {upsell.badge}
+                        </Badge>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {upsell.description}
+                    </p>
+                  </div>
+                  <p className="font-semibold text-sm">
+                    +${upsell.price.toFixed(2)}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="rounded-lg bg-secondary p-4 flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Upsell total</p>
+        <p className="font-heading font-bold text-lg text-primary">
+          +${upsellTotal.toFixed(2)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function StepReview({
   pricingResults,
   quoteSummary,
@@ -1508,9 +1587,7 @@ function StepReview({
   address,
   name,
   tierLabels,
-  eligibleUpsells,
-  acceptedUpsells,
-  toggleUpsell,
+  acceptedUpsellItems,
   upsellTotal,
 }: any) {
   return (
@@ -1555,45 +1632,20 @@ function StepReview({
         })}
       </div>
 
-      {eligibleUpsells.length > 0 && (
-        <div className="mb-5 rounded-xl border bg-background p-4">
-          <p className="font-semibold mb-3">Recommended Add-ons</p>
-          <div className="space-y-2">
-            {eligibleUpsells.map((upsell: any) => {
-              const active = !!acceptedUpsells[upsell.id];
-              return (
-                <button
-                  key={upsell.id}
-                  type="button"
-                  onClick={() => toggleUpsell(upsell.id)}
-                  className={`w-full text-left rounded-lg border p-3 transition ${
-                    active
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-sm flex items-center gap-2">
-                        {upsell.title}
-                        {upsell.badge && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            {upsell.badge}
-                          </Badge>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {upsell.description}
-                      </p>
-                    </div>
-                    <p className="font-semibold text-sm">
-                      +${upsell.price.toFixed(2)}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+      {acceptedUpsellItems.length > 0 && (
+        <div className="space-y-3 mb-6">
+          <p className="font-semibold text-sm">Selected Add-ons</p>
+          {acceptedUpsellItems.map((upsell: any) => (
+            <div
+              key={upsell.id}
+              className="flex justify-between items-center py-2 border-b"
+            >
+              <span className="text-sm">{upsell.title}</span>
+              <span className="font-heading font-semibold">
+                +${upsell.price.toFixed(2)}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
