@@ -156,6 +156,255 @@ const quoteRouter = router({
     return result;
   }),
 
+  pricePreview: publicProcedure
+    .input(
+      z.object({
+        companyId: z.number().int().positive().optional(),
+        distanceMiles: z.number().min(0).default(0),
+        travelFee: z.number().min(0).optional(),
+        items: z.array(
+          z.object({
+            serviceType: z.string(),
+            basePrice: z.number().min(0),
+            finalPrice: z.number().min(0),
+            packageTier: z.enum(["good", "better", "best"]).optional(),
+          })
+        ),
+        acceptedUpsells: z
+          .array(
+            z.object({
+              id: z.string(),
+              title: z.string(),
+              price: z.number().min(0),
+            })
+          )
+          .default([]),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      const companyId = input.companyId ?? 1;
+
+      let jobMinimum = 0;
+      let bundleDiscountPercent = 0;
+
+      if (db) {
+        const [settings] = await db
+          .select()
+          .from(quoteToolSettings)
+          .where(eq(quoteToolSettings.companyId, companyId))
+          .limit(1);
+
+        if (settings) {
+          jobMinimum = Number(settings.jobMinimum ?? 0);
+          const count = input.items.length;
+          if (settings.packageDiscountsEnabled) {
+            if (count >= 5)
+              bundleDiscountPercent = Number(
+                settings.discount5PlusServices ?? 0
+              );
+            else if (count === 4)
+              bundleDiscountPercent = Number(settings.discount4Services ?? 0);
+            else if (count === 3)
+              bundleDiscountPercent = Number(settings.discount3Services ?? 0);
+            else if (count === 2)
+              bundleDiscountPercent = Number(settings.discount2Services ?? 0);
+          }
+        }
+      }
+
+      const servicesSubtotal = input.items.reduce(
+        (sum, item) => sum + item.finalPrice,
+        0
+      );
+      const upsellTotal = input.acceptedUpsells.reduce(
+        (sum, item) => sum + item.price,
+        0
+      );
+      const subtotalBeforeDiscounts = servicesSubtotal + upsellTotal;
+      const bundleDiscountAmount =
+        subtotalBeforeDiscounts * (bundleDiscountPercent / 100);
+      const travelFee = input.travelFee ?? 0;
+
+      let totalBeforeMinimum =
+        subtotalBeforeDiscounts - bundleDiscountAmount + travelFee;
+      const jobMinimumApplied = totalBeforeMinimum < jobMinimum;
+      if (jobMinimumApplied) totalBeforeMinimum = jobMinimum;
+
+      return {
+        lineItems: input.items,
+        acceptedUpsells: input.acceptedUpsells,
+        breakdown: {
+          servicesSubtotal,
+          upsellTotal,
+          bundleDiscountPercent,
+          bundleDiscountAmount,
+          travelFee,
+          jobMinimum,
+          jobMinimumApplied,
+          total: totalBeforeMinimum,
+        },
+        appliedRules: [
+          "base_service_prices",
+          "upsell_additions",
+          bundleDiscountPercent > 0 ? "bundle_discount" : null,
+          travelFee > 0 ? "travel_fee" : null,
+          jobMinimumApplied ? "job_minimum_floor" : null,
+        ].filter(Boolean),
+      };
+    }),
+
+  submitV2: publicProcedure
+    .input(
+      z.object({
+        customerName: z.string().min(1),
+        customerEmail: z.string().email(),
+        customerPhone: z.string().min(1),
+        address: z.string().min(1),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        zip: z.string().optional(),
+        lat: z.number().optional(),
+        lng: z.number().optional(),
+        subtotal: z.number(),
+        bundleDiscount: z.number().optional(),
+        travelFee: z.number().optional(),
+        totalPrice: z.number(),
+        preferredDate: z.string().optional(),
+        preferredTime: z.string().optional(),
+        referralSource: z.string().optional(),
+        customerPhotos: z.array(z.string()).optional(),
+        confidenceMode: z
+          .enum(["exact", "range", "manual_review"])
+          .default("exact"),
+        schedulingEligible: z.boolean().default(true),
+        acceptedUpsells: z
+          .array(
+            z.object({
+              id: z.string(),
+              title: z.string(),
+              price: z.number().min(0),
+            })
+          )
+          .default([]),
+        items: z.array(
+          z.object({
+            serviceType: z.string(),
+            packageTier: z.enum(["good", "better", "best"]).optional(),
+            inputs: z.record(z.string(), z.unknown()).optional(),
+            basePrice: z.number(),
+            finalPrice: z.number(),
+            description: z.string().optional(),
+          })
+        ),
+        sessionToken: z.string().max(64).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+
+      const nameParts = input.customerName.trim().split(/\s+/);
+      const firstName = nameParts[0] ?? input.customerName;
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      const baseServices = input.items.map(item => ({
+        serviceId: item.serviceType,
+        serviceName: item.serviceType
+          .replace(/_/g, " ")
+          .replace(/\w/g, c => c.toUpperCase()),
+        sizeLabel: item.description ?? item.serviceType,
+        sizeValue:
+          (item.inputs?.sqft as number) ??
+          (item.inputs?.linearFeet as number) ??
+          0,
+        options: {
+          ...(item.inputs ?? {}),
+          packageTier: item.packageTier ?? "good",
+        } as Record<string, string | number>,
+        price: item.finalPrice,
+      }));
+
+      const upsellServices = input.acceptedUpsells.map(upsell => ({
+        serviceId: `upsell_${upsell.id}`,
+        serviceName: upsell.title,
+        sizeLabel: "Upsell",
+        sizeValue: 1,
+        options: {
+          upsellId: upsell.id,
+          upsell: "true",
+        },
+        price: upsell.price,
+      }));
+
+      const services = [...baseServices, ...upsellServices];
+
+      const bundleDiscount = input.bundleDiscount ?? 0;
+      const [result] = await db.insert(instantQuotes).values([
+        {
+          firstName,
+          lastName,
+          email: input.customerEmail,
+          phone: input.customerPhone,
+          emailConsent: false,
+          smsConsent: false,
+          address: input.address,
+          city: input.city ?? null,
+          state: input.state ?? null,
+          zip: input.zip ?? null,
+          lat: input.lat !== undefined ? String(input.lat) : null,
+          lng: input.lng !== undefined ? String(input.lng) : null,
+          squareFootage: null,
+          stories: null,
+          exteriorMaterial: null,
+          propertyType: null,
+          services: services as any,
+          subtotal: String(input.subtotal.toFixed(2)),
+          discountPercent: "0",
+          discountAmount: String(bundleDiscount.toFixed(2)),
+          total: String(input.totalPrice.toFixed(2)),
+          status:
+            input.confidenceMode === "manual_review" ? "pending" : "pending",
+        },
+      ]);
+
+      const quoteId = (result as any).insertId as number;
+
+      if (input.sessionToken) {
+        const [session] = await db
+          .select()
+          .from(quoteSessions)
+          .where(eq(quoteSessions.sessionToken, input.sessionToken))
+          .limit(1);
+
+        if (session) {
+          await db
+            .update(quoteSessions)
+            .set({ submittedAt: new Date() })
+            .where(eq(quoteSessions.id, session.id));
+
+          await db.insert(quoteSessionEvents).values({
+            sessionId: session.id,
+            eventName: "quote_submitted",
+            payload: {
+              quoteId,
+              totalPrice: input.totalPrice,
+              services: input.items.length,
+              upsells: input.acceptedUpsells.length,
+              confidenceMode: input.confidenceMode,
+            },
+          });
+        }
+      }
+
+      return {
+        quoteId,
+        totalPrice: input.totalPrice,
+        confidenceMode: input.confidenceMode,
+        schedulingEligible: input.schedulingEligible,
+      };
+    }),
+
   // Accept the website QuoteTool's submission format and store in instant_quotes.
   submit: publicProcedure
     .input(
