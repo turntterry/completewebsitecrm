@@ -683,6 +683,8 @@ export const quoteToolSettings = mysqlTable("quote_tool_settings", {
       appliesTo: string[];
       badge?: string;
       active?: boolean;
+      sortOrder?: number;
+      rules?: Record<string, unknown>;
     }[]
   >(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

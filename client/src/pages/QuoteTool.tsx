@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
@@ -32,6 +33,8 @@ import {
   Settings,
   Eye,
   EyeOff,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -83,6 +86,10 @@ export default function QuoteTool() {
     trpc.quoteToolSettings.getUpsellAnalytics.useQuery({
       days: 30,
     });
+  const { data: upsells, refetch: refetchUpsells } =
+    trpc.quoteToolSettings.listUpsells.useQuery();
+  const { data: experienceVersions = [], refetch: refetchVersions } =
+    trpc.quoteToolSettings.listExperienceVersions.useQuery();
 
   // ── Pricing / Packages state ──────────────────────────────────────────────
   const [jobMinimum, setJobMinimum] = useState<string>("");
@@ -122,6 +129,7 @@ export default function QuoteTool() {
   // ── Add service dialog state ──────────────────────────────────────────────
   const [newServiceName, setNewServiceName] = useState("");
   const [showAddService, setShowAddService] = useState(false);
+  const [draftVersionLabel, setDraftVersionLabel] = useState("Config Snapshot");
   // ── Upsell state ─────────────────────────────────────────────────────────
   const [upsellCatalog, setUpsellCatalog] = useState<
     {
@@ -132,12 +140,14 @@ export default function QuoteTool() {
       appliesTo: string;
       badge?: string;
       active: boolean;
+      sortOrder: number;
+      rulesText: string;
     }[]
   >([]);
 
   // Sync state from loaded settings (once)
   const [synced, setSynced] = useState(false);
-  if (settings && !synced) {
+  if (settings && upsells && !synced) {
     setJobMinimum(settings.jobMinimum ?? "0.00");
     setExpirationDays(String(settings.defaultExpirationDays ?? 7));
     setPackageDiscountsEnabled(settings.packageDiscountsEnabled ?? false);
@@ -173,25 +183,15 @@ export default function QuoteTool() {
     setRequireAdvance(settings.requireAdvanceBooking ?? false);
     setAdvanceDays(settings.advanceBookingDays ?? 1);
     setCommercialRouting(settings.commercialRoutingEnabled ?? false);
-    const configuredUpsells = (settings as any).upsellCatalog as
-      | {
-          id: string;
-          title: string;
-          description: string;
-          price: number;
-          appliesTo: string[];
-          badge?: string;
-          active?: boolean;
-        }[]
-      | undefined;
-
-    if (Array.isArray(configuredUpsells) && configuredUpsells.length > 0) {
+    if (Array.isArray(upsells) && upsells.length > 0) {
       setUpsellCatalog(
-        configuredUpsells.map(upsell => ({
+        upsells.map((upsell, idx) => ({
           ...upsell,
           price: String(upsell.price ?? 0),
           appliesTo: (upsell.appliesTo ?? []).join(", "),
           active: upsell.active !== false,
+          sortOrder: Number(upsell.sortOrder ?? idx),
+          rulesText: JSON.stringify(upsell.rules ?? {}, null, 2),
         }))
       );
     } else {
@@ -205,6 +205,8 @@ export default function QuoteTool() {
           appliesTo: "window_cleaning",
           badge: "Popular",
           active: true,
+          sortOrder: 0,
+          rulesText: "{}",
         },
         {
           id: "window_track_sill_detail",
@@ -213,6 +215,8 @@ export default function QuoteTool() {
           price: "129",
           appliesTo: "window_cleaning",
           active: true,
+          sortOrder: 1,
+          rulesText: "{}",
         },
       ]);
     }
@@ -269,13 +273,59 @@ export default function QuoteTool() {
     },
     onError: e => toast.error(e.message),
   });
-  const updateUpsells = trpc.quoteToolSettings.updateUpsells.useMutation({
+  const upsertUpsell = trpc.quoteToolSettings.upsertUpsell.useMutation({
     onSuccess: () => {
-      toast.success("Upsells saved");
+      refetchUpsells();
       refetchSettings();
     },
     onError: e => toast.error(e.message),
   });
+  const deleteUpsell = trpc.quoteToolSettings.deleteUpsell.useMutation({
+    onSuccess: () => {
+      refetchUpsells();
+      refetchSettings();
+    },
+    onError: e => toast.error(e.message),
+  });
+  const reorderUpsells = trpc.quoteToolSettings.reorderUpsells.useMutation({
+    onSuccess: () => {
+      refetchUpsells();
+    },
+    onError: e => toast.error(e.message),
+  });
+  const setUpsellRules = trpc.quoteToolSettings.setUpsellRules.useMutation({
+    onSuccess: () => {
+      refetchUpsells();
+      toast.success("Upsell rules saved");
+    },
+    onError: e => toast.error(e.message),
+  });
+  const createExperienceDraft =
+    trpc.quoteToolSettings.createExperienceDraft.useMutation({
+      onSuccess: () => {
+        toast.success("Draft snapshot created");
+        refetchVersions();
+      },
+      onError: e => toast.error(e.message),
+    });
+  const publishExperienceVersion =
+    trpc.quoteToolSettings.publishExperienceVersion.useMutation({
+      onSuccess: () => {
+        toast.success("Version published");
+        refetchVersions();
+      },
+      onError: e => toast.error(e.message),
+    });
+  const rollbackExperienceVersion =
+    trpc.quoteToolSettings.rollbackExperienceVersion.useMutation({
+      onSuccess: () => {
+        toast.success("Rollback applied");
+        refetchSettings();
+        refetchServices();
+        refetchVersions();
+      },
+      onError: e => toast.error(e.message),
+    });
   const updateFormSettings =
     trpc.quoteToolSettings.updateFormSettings.useMutation({
       onSuccess: () => {
@@ -824,6 +874,100 @@ export default function QuoteTool() {
 
           <Card>
             <CardHeader className="pb-3">
+              <CardTitle className="text-base">Experience Versions</CardTitle>
+              <CardDescription>
+                Create draft snapshots, publish versions, and rollback quickly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  value={draftVersionLabel}
+                  onChange={e => setDraftVersionLabel(e.target.value)}
+                  placeholder="Config Snapshot"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    createExperienceDraft.mutate({
+                      versionLabel:
+                        draftVersionLabel.trim() || "Config Snapshot",
+                    })
+                  }
+                  disabled={createExperienceDraft.isPending}
+                >
+                  Save Draft
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {experienceVersions.slice(0, 8).map((version: any) => (
+                  <div
+                    key={version.id}
+                    className="rounded-md border p-2 flex items-center justify-between gap-2"
+                  >
+                    <div>
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        {version.versionLabel}
+                        {version.status === "published" && (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] uppercase font-semibold">
+                            Live
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {version.status} ·{" "}
+                        {new Date(version.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (version.status === "published") return;
+                          if (
+                            confirm(
+                              `Publish version "${version.versionLabel}"?`
+                            )
+                          ) {
+                            publishExperienceVersion.mutate({ id: version.id });
+                          }
+                        }}
+                        disabled={
+                          publishExperienceVersion.isPending ||
+                          version.status === "published"
+                        }
+                      >
+                        Publish
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Rollback current experience to "${version.versionLabel}"? This replaces current settings and services.`
+                            )
+                          ) {
+                            rollbackExperienceVersion.mutate({
+                              id: version.id,
+                            });
+                          }
+                        }}
+                        disabled={rollbackExperienceVersion.isPending}
+                      >
+                        Rollback
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">Upsell Catalog</CardTitle>
               <CardDescription>
                 Edit in-flow upsells shown on the public quote Enhance step. Use
@@ -836,6 +980,57 @@ export default function QuoteTool() {
                   key={upsell.id || idx}
                   className="rounded-lg border p-3 space-y-3"
                 >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Display order: {idx + 1}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        disabled={idx === 0}
+                        onClick={() =>
+                          setUpsellCatalog(prev => {
+                            if (idx === 0) return prev;
+                            const next = [...prev];
+                            [next[idx - 1], next[idx]] = [
+                              next[idx],
+                              next[idx - 1],
+                            ];
+                            return next.map((item, orderIdx) => ({
+                              ...item,
+                              sortOrder: orderIdx,
+                            }));
+                          })
+                        }
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        disabled={idx === upsellCatalog.length - 1}
+                        onClick={() =>
+                          setUpsellCatalog(prev => {
+                            if (idx >= prev.length - 1) return prev;
+                            const next = [...prev];
+                            [next[idx + 1], next[idx]] = [
+                              next[idx],
+                              next[idx + 1],
+                            ];
+                            return next.map((item, orderIdx) => ({
+                              ...item,
+                              sortOrder: orderIdx,
+                            }));
+                          })
+                        }
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-muted-foreground mb-1 block">
@@ -939,6 +1134,23 @@ export default function QuoteTool() {
                       />
                     </div>
                   </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">
+                      Rules (JSON)
+                    </Label>
+                    <Textarea
+                      value={upsell.rulesText}
+                      rows={5}
+                      onChange={e =>
+                        setUpsellCatalog(prev =>
+                          prev.map((u, i) =>
+                            i === idx ? { ...u, rulesText: e.target.value } : u
+                          )
+                        )
+                      }
+                      placeholder='{"minSubtotal": 250, "excludePropertyTypes": ["commercial"]}'
+                    />
+                  </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Switch
@@ -953,18 +1165,76 @@ export default function QuoteTool() {
                       />
                       <span className="text-sm">Active</span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      onClick={() =>
-                        setUpsellCatalog(prev =>
-                          prev.filter((_, i) => i !== idx)
-                        )
-                      }
-                    >
-                      Remove
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const parsedRules = upsell.rulesText.trim()
+                              ? JSON.parse(upsell.rulesText)
+                              : {};
+                            await upsertUpsell.mutateAsync({
+                              id: upsell.id.trim(),
+                              title: upsell.title.trim(),
+                              description: upsell.description.trim(),
+                              price: Number(upsell.price || 0),
+                              appliesTo: upsell.appliesTo
+                                .split(",")
+                                .map(svc => svc.trim())
+                                .filter(Boolean),
+                              badge: upsell.badge?.trim() || undefined,
+                              active: upsell.active,
+                              sortOrder: idx,
+                              rules: parsedRules,
+                            });
+                            toast.success(`Saved ${upsell.title || upsell.id}`);
+                          } catch (error: any) {
+                            toast.error(error?.message || "Invalid rules JSON");
+                          }
+                        }}
+                        disabled={upsertUpsell.isPending}
+                      >
+                        Save Row
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const parsedRules = upsell.rulesText.trim()
+                              ? JSON.parse(upsell.rulesText)
+                              : {};
+                            await setUpsellRules.mutateAsync({
+                              id: upsell.id.trim(),
+                              rules: parsedRules,
+                            });
+                          } catch {
+                            toast.error("Invalid rules JSON");
+                          }
+                        }}
+                        disabled={setUpsellRules.isPending}
+                      >
+                        Save Rules
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={async () => {
+                          if (!confirm(`Remove upsell "${upsell.title}"?`))
+                            return;
+                          if (upsells?.some(item => item.id === upsell.id)) {
+                            await deleteUpsell.mutateAsync({ id: upsell.id });
+                          }
+                          setUpsellCatalog(prev =>
+                            prev.filter((_, i) => i !== idx)
+                          );
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -983,6 +1253,8 @@ export default function QuoteTool() {
                         appliesTo: "house_washing",
                         badge: "",
                         active: true,
+                        sortOrder: prev.length,
+                        rulesText: "{}",
                       },
                     ])
                   }
@@ -991,11 +1263,11 @@ export default function QuoteTool() {
                 </Button>
                 <Button
                   className="bg-slate-800 hover:bg-slate-700 text-white"
-                  onClick={() =>
-                    updateUpsells.mutate({
-                      upsellCatalog: upsellCatalog
+                  onClick={async () => {
+                    try {
+                      const normalized = upsellCatalog
                         .filter(item => item.id.trim() && item.title.trim())
-                        .map(item => ({
+                        .map((item, orderIdx) => ({
                           id: item.id.trim(),
                           title: item.title.trim(),
                           description: item.description.trim(),
@@ -1006,13 +1278,30 @@ export default function QuoteTool() {
                             .filter(Boolean),
                           badge: item.badge?.trim() || undefined,
                           active: item.active,
+                          sortOrder: orderIdx,
+                          rules: item.rulesText.trim()
+                            ? JSON.parse(item.rulesText)
+                            : {},
                         }))
-                        .filter(item => item.appliesTo.length > 0),
-                    })
-                  }
-                  disabled={updateUpsells.isPending}
+                        .filter(item => item.appliesTo.length > 0);
+
+                      await Promise.all(
+                        normalized.map(item => upsertUpsell.mutateAsync(item))
+                      );
+                      await reorderUpsells.mutateAsync(
+                        normalized.map(item => ({
+                          id: item.id,
+                          sortOrder: item.sortOrder,
+                        }))
+                      );
+                      toast.success("Upsells saved");
+                    } catch (error: any) {
+                      toast.error(error?.message || "Unable to save upsells");
+                    }
+                  }}
+                  disabled={upsertUpsell.isPending || reorderUpsells.isPending}
                 >
-                  Save Upsells
+                  Save All Upsells
                 </Button>
               </div>
             </CardContent>
