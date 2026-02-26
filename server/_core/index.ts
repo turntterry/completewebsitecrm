@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerSmsWebhook } from "../webhooks/twilioWebhook";
+import { registerPaymentWebhook } from "../webhooks/paymentWebhook";
 import { mockAvailabilityProvider } from "@shared/availability";
 import { trpcOnError } from "./observability";
 
@@ -40,6 +41,8 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Twilio inbound SMS webhook
   registerSmsWebhook(app);
+  // Payment provider webhook
+  registerPaymentWebhook(app);
   // Local-only mock scheduler endpoint for development
   app.post("/api/mock/scheduler", (req, res) => {
     try {

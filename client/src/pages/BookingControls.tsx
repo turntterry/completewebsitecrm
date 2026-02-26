@@ -17,6 +17,7 @@ import {
   CheckCircle,
   XCircle,
   Settings,
+  Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -24,6 +25,7 @@ import { Link } from "wouter";
 export default function BookingControls() {
   const utils = trpc.useUtils();
   const { data: settings, isLoading } = trpc.quoteToolSettings.getSettings.useQuery();
+   const { data: company } = trpc.company.get.useQuery();
 
   const [synced, setSynced] = useState(false);
   const [onlineBooking, setOnlineBooking] = useState(true);
@@ -31,17 +33,26 @@ export default function BookingControls() {
   const [advanceDays, setAdvanceDays] = useState(1);
   const [commercialRouting, setCommercialRouting] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [autoJobApprove, setAutoJobApprove] = useState(true);
+  const [autoJobRequest, setAutoJobRequest] = useState(true);
+  const [visitStart, setVisitStart] = useState(9);
+  const [visitEnd, setVisitEnd] = useState(11);
   const maxServicesForInstantBooking = settings?.maxServicesForInstantBooking ?? 2;
   const blockedInstantServices = Array.isArray((settings as any)?.instantBookingBlockedServices)
     ? ((settings as any).instantBookingBlockedServices as string[])
     : [];
 
-  if (settings && !synced) {
+  if (settings && company && !synced) {
     setOnlineBooking(settings.onlineBookingEnabled ?? true);
     setRequireAdvance(settings.requireAdvanceBooking ?? false);
     setAdvanceDays(settings.advanceBookingDays ?? 1);
     setCommercialRouting(settings.commercialRoutingEnabled ?? false);
     setIsActive(!!(settings as any).isActive);
+    const portal = (company as any)?.settings?.portal ?? {};
+    setAutoJobApprove(portal.autoCreateJobOnApprove ?? true);
+    setAutoJobRequest(portal.autoCreateJobOnRequest ?? true);
+    setVisitStart(portal.defaultVisitStartHour ?? 9);
+    setVisitEnd(portal.defaultVisitEndHour ?? 11);
     setSynced(true);
   }
 
@@ -55,6 +66,14 @@ export default function BookingControls() {
 
   const setActiveMutation = trpc.quoteToolSettings.setActive.useMutation({
     onSuccess: () => utils.quoteToolSettings.getSettings.invalidate(),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateCompany = trpc.company.update.useMutation({
+    onSuccess: () => {
+      utils.company.get.invalidate();
+      toast.success("Portal automation settings saved");
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -267,6 +286,80 @@ export default function BookingControls() {
               <span className="text-sm text-muted-foreground">business days</span>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Portal automation */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Workflow className="h-4 w-4" /> Portal Automation
+          </CardTitle>
+          <CardDescription>
+            Control what happens when clients approve quotes or request work from the portal
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Auto-create job on approval</p>
+              <p className="text-xs text-muted-foreground">
+                When a client approves a quote, create a draft job and schedule the preferred slot if provided.
+              </p>
+            </div>
+            <Switch checked={autoJobApprove} onCheckedChange={setAutoJobApprove} />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Auto-create job on request</p>
+              <p className="text-xs text-muted-foreground">
+                When a client submits a request/rebook form, create a draft job and schedule a placeholder visit.
+              </p>
+            </div>
+            <Switch checked={autoJobRequest} onCheckedChange={setAutoJobRequest} />
+          </div>
+          <Separator />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Default visit start hour (0-23)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={23}
+                value={visitStart}
+                onChange={(e) => setVisitStart(Number(e.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Default visit end hour (0-23)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={23}
+                value={visitEnd}
+                onChange={(e) => setVisitEnd(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              disabled={updateCompany.isPending}
+              onClick={() =>
+                updateCompany.mutate({
+                  settings: {
+                    portal: {
+                      autoCreateJobOnApprove: autoJobApprove,
+                      autoCreateJobOnRequest: autoJobRequest,
+                      defaultVisitStartHour: visitStart,
+                      defaultVisitEndHour: visitEnd,
+                    },
+                  },
+                })
+              }
+            >
+              Save portal automation
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

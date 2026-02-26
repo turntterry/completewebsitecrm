@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, CheckCircle2, XCircle, Send, CreditCard, Home, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Send, CreditCard, Home, AlertCircle, ExternalLink, Copy } from "lucide-react";
 
 // ─── Session helpers (share key with ClientHub magic link) ───────────────────
 
@@ -113,18 +113,14 @@ export default function Portal() {
   const [requestServices, setRequestServices] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (pay.data) {
       if (pay.data.requiresAction && (pay.data.paymentUrl || pay.data.clientSecret)) {
-        setPaymentNotice(
-          pay.data.paymentUrl
-            ? `Continue payment here: ${pay.data.paymentUrl}`
-            : "Complete payment with the provided client secret."
-        );
-        if (pay.data.paymentUrl) {
-          window.open(pay.data.paymentUrl, "_blank");
-        }
+        setPaymentNotice(pay.data.paymentUrl ? "Continue payment to complete checkout." : "Complete payment with the provided client secret.");
+        setPaymentUrl(pay.data.paymentUrl ?? null);
+        if (pay.data.paymentUrl) window.open(pay.data.paymentUrl, "_blank");
       } else if (pay.data.remainingBalance !== undefined) {
         setPaymentNotice(`Payment recorded. Remaining balance: $${pay.data.remainingBalance?.toFixed?.(2) ?? pay.data.remainingBalance}`);
       }
@@ -186,7 +182,7 @@ export default function Portal() {
     snapshot.data;
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -301,7 +297,27 @@ export default function Portal() {
                     </Button>
                   )}
                   {paymentNotice && pay.isSuccess && (
-                    <p className="text-xs text-emerald-600 mt-1">{paymentNotice}</p>
+                    <div className="text-xs text-emerald-600 mt-2 space-y-1">
+                      <p>{paymentNotice}</p>
+                      {paymentUrl && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(paymentUrl, "_blank")}
+                          >
+                            <ExternalLink className="w-3 h-3 mr-1" /> Open payment
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => navigator.clipboard.writeText(paymentUrl)}
+                          >
+                            <Copy className="w-3 h-3 mr-1" /> Copy link
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}

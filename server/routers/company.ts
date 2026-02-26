@@ -22,11 +22,28 @@ export const companyRouter = router({
       quoteExpiryDays: z.number().optional(),
       googlePlaceId: z.string().optional(),
       googleReviewsEnabled: z.boolean().optional(),
+      settings: z
+        .object({
+          portal: z
+            .object({
+              autoCreateJobOnApprove: z.boolean().optional(),
+              autoCreateJobOnRequest: z.boolean().optional(),
+              defaultVisitStartHour: z.number().int().min(0).max(23).optional(),
+              defaultVisitEndHour: z.number().int().min(0).max(23).optional(),
+            })
+            .optional(),
+        })
+        .partial()
+        .optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const company = await getOrCreateCompany(ctx.user.id, ctx.user.name ?? "Exterior Experts");
       if (!company) throw new Error("Company not found");
-      await updateCompany(company.id, input);
+      const nextSettings = {
+        ...(company.settings as any),
+        ...(input.settings ?? {}),
+      };
+      await updateCompany(company.id, { ...input, settings: nextSettings });
       return getCompany(company.id);
     }),
 

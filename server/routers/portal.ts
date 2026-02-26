@@ -10,7 +10,15 @@ import {
   quotes,
   visits,
 } from "../../drizzle/schema";
-import { createPayment, getDb, getNextJobNumber, createJob, createVisit, updateJob } from "../db";
+import {
+  createPayment,
+  getDb,
+  getNextJobNumber,
+  createJob,
+  createVisit,
+  updateJob,
+  getCompany,
+} from "../db";
 import { createPaymentIntent } from "../services/payments";
 import { publicProcedure, router } from "../_core/trpc";
 
@@ -23,6 +31,17 @@ async function requireDb() {
     });
   }
   return db;
+}
+
+async function getPortalSettings(companyId: number) {
+  const company = await getCompany(companyId);
+  const portal = (company as any)?.settings?.portal ?? {};
+  return {
+    autoCreateJobOnApprove: portal.autoCreateJobOnApprove ?? true,
+    autoCreateJobOnRequest: portal.autoCreateJobOnRequest ?? true,
+    defaultVisitStartHour: portal.defaultVisitStartHour ?? 9,
+    defaultVisitEndHour: portal.defaultVisitEndHour ?? 11,
+  };
 }
 
 export const portalRouter = router({
@@ -141,6 +160,7 @@ export const portalRouter = router({
     )
     .mutation(async ({ input }) => {
       const db = await requireDb();
+      const portalSettings = await getPortalSettings(input.companyId);
 
       const [quote] = await db
         .select()
@@ -170,8 +190,11 @@ export const portalRouter = router({
         })
         .where(eq(quotes.id, input.quoteId));
 
+      const shouldAutoCreate =
+        input.autoCreateJob ?? portalSettings.autoCreateJobOnApprove ?? true;
+
       let jobId: number | null = null;
-      if (input.autoCreateJob) {
+      if (shouldAutoCreate) {
         const jobNumber = await getNextJobNumber(input.companyId);
 
         jobId = await createJob({
@@ -193,7 +216,9 @@ export const portalRouter = router({
             .limit(1)
             .then(rows => rows[0]);
 
-          const parsed = preferred?.preferredSlot ? parsePreferredSlot(preferred.preferredSlot) : null;
+          const parsed = preferred?.preferredSlot
+            ? parsePreferredSlot(preferred.preferredSlot)
+            : null;
           if (parsed) {
             await createVisit({
               jobId,
@@ -201,6 +226,22 @@ export const portalRouter = router({
               status: "scheduled",
               scheduledAt: parsed.start,
               scheduledEndAt: parsed.end,
+            } as any);
+            await updateJob(jobId, input.companyId, { status: "scheduled" });
+          } else {
+            // fallback to default visit window
+            const { defaultVisitStartHour, defaultVisitEndHour } = portalSettings;
+            const today = new Date();
+            today.setDate(today.getDate() + 1);
+            const dateStr = today.toISOString().split("T")[0];
+            const start = new Date(`${dateStr}T${String(defaultVisitStartHour).padStart(2, "0")}:00:00Z`);
+            const end = new Date(`${dateStr}T${String(defaultVisitEndHour).padStart(2, "0")}:00:00Z`);
+            await createVisit({
+              jobId,
+              companyId: input.companyId,
+              status: "scheduled",
+              scheduledAt: start,
+              scheduledEndAt: end,
             } as any);
             await updateJob(jobId, input.companyId, { status: "scheduled" });
           }
@@ -309,6 +350,7 @@ export const portalRouter = router({
     )
     .mutation(async ({ input }) => {
       const db = await requireDb();
+      const portalSettings = await getPortalSettings(input.companyId);
 
       const [customer] = await db
         .select()
@@ -342,7 +384,7 @@ export const portalRouter = router({
       const leadId = (leadResult as any).insertId as number;
 
       let jobId: number | null = null;
-      if (input.autoCreateJob) {
+      if (input.autoCreateJob ?? portalSettings.autoCreateJobOnRequest ?? true) {
         const jobNumber = await getNextJobNumber(input.companyId);
         jobId = await createJob({
           companyId: input.companyId,
@@ -353,8 +395,13 @@ export const portalRouter = router({
         } as any);
 
         if (jobId && input.preferredDate) {
-          const start = new Date(`${input.preferredDate}T09:00:00Z`);
-          const end = new Date(`${input.preferredDate}T11:00:00Z`);
+          const { defaultVisitStartHour, defaultVisitEndHour } = portalSettings;
+          const start = new Date(
+            `${input.preferredDate}T${String(defaultVisitStartHour).padStart(2, "0")}:00:00Z`
+          );
+          const end = new Date(
+            `${input.preferredDate}T${String(defaultVisitEndHour).padStart(2, "0")}:00:00Z`
+          );
           if (!isNaN(start.getTime())) {
             await createVisit({
               jobId,
