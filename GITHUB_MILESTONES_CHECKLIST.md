@@ -46,7 +46,7 @@
 
 - [ ] **Phase 6 — Hardening + launch**
   - [x] E2E smoke suite for quote funnel and upsells
-  - [ ] Error handling + observability pass
+  - [x] Error handling + observability pass
   - [ ] Launch checklist + rollback plan complete
 
 ---

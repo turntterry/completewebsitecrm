@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { logger } from "../_core/observability";
 import { quoteSessionEvents, quoteSessions } from "../../drizzle/schema";
 
 const analyticsWindowInput = z
@@ -30,9 +32,9 @@ export const quoteAnalyticsRouter = router({
     .input(analyticsWindowInput)
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
+      if (!db) { logger.warn("quoteAnalytics.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
       const companyId = ctx.user.companyId;
-      if (!companyId) throw new Error("No company");
+      if (!companyId) { logger.warn("quoteAnalytics.noCompany"); throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No company associated with this account" }); }
 
       const days = input?.days ?? 30;
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -159,9 +161,9 @@ export const quoteAnalyticsRouter = router({
     .input(analyticsWindowInput)
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
+      if (!db) { logger.warn("quoteAnalytics.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
       const companyId = ctx.user.companyId;
-      if (!companyId) throw new Error("No company");
+      if (!companyId) { logger.warn("quoteAnalytics.noCompany"); throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No company associated with this account" }); }
 
       const days = input?.days ?? 30;
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -230,9 +232,9 @@ export const quoteAnalyticsRouter = router({
     .input(analyticsWindowInput)
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
+      if (!db) { logger.warn("quoteAnalytics.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
       const companyId = ctx.user.companyId;
-      if (!companyId) throw new Error("No company");
+      if (!companyId) { logger.warn("quoteAnalytics.noCompany"); throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No company associated with this account" }); }
 
       const days = input?.days ?? 30;
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -302,9 +304,9 @@ export const quoteAnalyticsRouter = router({
     .input(analyticsWindowInput)
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
+      if (!db) { logger.warn("quoteAnalytics.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
       const companyId = ctx.user.companyId;
-      if (!companyId) throw new Error("No company");
+      if (!companyId) { logger.warn("quoteAnalytics.noCompany"); throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No company associated with this account" }); }
 
       const days = input?.days ?? 30;
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

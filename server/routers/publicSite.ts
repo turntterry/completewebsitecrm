@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { logger } from "../_core/observability";
 import {
   instantQuotes,
   leads,
@@ -57,7 +59,7 @@ const quoteRouter = router({
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
 
       const sessionToken = nanoid(24);
       const companyId = input.companyId ?? 1;
@@ -96,7 +98,7 @@ const quoteRouter = router({
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
 
       const [session] = await db
         .select()
@@ -121,7 +123,7 @@ const quoteRouter = router({
     .input(z.object({ sessionToken: z.string().min(6).max(64) }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
 
       const [session] = await db
         .select()
@@ -302,7 +304,7 @@ const quoteRouter = router({
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
 
       const nameParts = input.customerName.trim().split(/\s+/);
       const firstName = nameParts[0] ?? input.customerName;
@@ -449,6 +451,15 @@ const quoteRouter = router({
         }).catch(() => {});
       }
 
+      logger.info("quote.submitV2", {
+        quoteId,
+        totalPrice: input.totalPrice,
+        confidenceMode: finalConfidenceMode,
+        services: input.items.length,
+        upsells: input.acceptedUpsells.length,
+        manualReview: finalConfidenceMode === "manual_review",
+      });
+
       return {
         quoteId,
         totalPrice: input.totalPrice,
@@ -496,7 +507,7 @@ const quoteRouter = router({
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
 
       // Split name into first/last for the instant_quotes schema
       const nameParts = input.customerName.trim().split(/\s+/);
@@ -638,7 +649,7 @@ const contactRouter = router({
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
 
       // Store as a lead in the CRM so it shows up in the Leads view
       const nameParts = input.name.trim().split(/\s+/);

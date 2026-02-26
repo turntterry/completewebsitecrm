@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerSmsWebhook } from "../webhooks/twilioWebhook";
+import { trpcOnError } from "./observability";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -44,6 +45,7 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      onError: trpcOnError,
     })
   );
   // development mode uses Vite, production mode uses static files
