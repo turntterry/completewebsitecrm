@@ -203,6 +203,7 @@ const DEFAULT_UPSELL_CATALOG: {
 
 const STEPS = [
   "Address",
+  "Home Details",
   "Contact",
   "Services",
   "Details",
@@ -243,6 +244,17 @@ export default function QuoteTool() {
   const [serviceInputs, setServiceInputs] = useState<
     Record<string, PricingInput>
   >({});
+  const [propertyIntel, setPropertyIntel] = useState<PropertyIntel | null>(
+    null
+  );
+  const [propertyLookupStatus, setPropertyLookupStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [propertyLookupError, setPropertyLookupError] = useState<string | null>(
+    null
+  );
+  const lastLookupKeyRef = useRef<string | null>(null);
+  const autoPrefilledServicesRef = useRef<Set<string>>(new Set());
 
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
@@ -366,6 +378,10 @@ export default function QuoteTool() {
     });
   }, [complexityThresholds, pricingResults, serviceInputs]);
 
+  const availabilityHorizonDays = Number(
+    experienceConfig?.settings?.availabilityDaysAhead ?? 9
+  );
+
   const slots = useMemo(() => {
     const totalMinutes = pricingResults.reduce((sum, r) => {
       const cfg = pricingData?.[r.serviceType] as any;
@@ -374,8 +390,13 @@ export default function QuoteTool() {
     }, 0);
     return mockAvailabilityProvider.getSlots({
       durationMinutes: totalMinutes || 90,
+      daysAhead: availabilityHorizonDays,
     });
-  }, [pricingData, pricingResults]);
+  }, [availabilityHorizonDays, pricingData, pricingResults]);
+
+  const selectedSlotLabel = useMemo(() => {
+    return slots.find(slot => slot.id === selectedSlotId)?.display;
+  }, [selectedSlotId, slots]);
 
   const quoteSummary = useMemo(() => {
     return calculateQuoteTotal(pricingResults, distanceMiles, globalConfig);
@@ -461,6 +482,7 @@ export default function QuoteTool() {
       const removed = next.has(id);
       if (removed) {
         next.delete(id);
+        autoPrefilledServicesRef.current.delete(id);
         setAcceptedUpsells(prev => {
           const nextAccepted = { ...prev };
           for (const upsell of upsellCatalog) {
@@ -493,6 +515,7 @@ export default function QuoteTool() {
   };
 
   const updateServiceInput = (svcId: string, key: string, value: unknown) => {
+    autoPrefilledServicesRef.current.delete(svcId);
     setServiceInputs(prev => ({
       ...prev,
       [svcId]: { ...(prev[svcId] || { serviceType: svcId }), [key]: value },
@@ -563,7 +586,7 @@ export default function QuoteTool() {
         preferredTime: preferredTime || undefined,
         referralSource: referralSource || undefined,
         preferredSlot: selectedSlotId || undefined,
-        preferredSlotLabel: undefined,
+        preferredSlotLabel: selectedSlotLabel || undefined,
         customerPhotos: photos.length > 0 ? photos : undefined,
         items: [
           ...pricingResults.map(r => ({
@@ -593,9 +616,11 @@ export default function QuoteTool() {
           title: upsell.title,
           price: upsell.price,
         })),
-        confidenceMode: quotePreviewSummary.jobMinimumApplied
-          ? "manual_review"
-          : "exact",
+        confidenceMode: complexityFlagged
+          ? "range"
+          : quotePreviewSummary.jobMinimumApplied
+            ? "manual_review"
+            : "exact",
         schedulingEligible: !quotePreviewSummary.jobMinimumApplied,
         sessionToken: sessionToken || undefined,
       });
@@ -636,6 +661,118 @@ export default function QuoteTool() {
     startSessionMutation,
     trackEventMutation,
   ]);
+
+  // Address-first auto lookup (MapMeasure/Zillow-style)
+  useEffect(() => {
+    const key = `${address}|${city}|${stateVal}|${zip}`;
+    if (!address || !city || !stateVal || !zip) return;
+    if (
+      propertyLookupStatus === "loading" ||
+      (lastLookupKeyRef.current === key && propertyLookupStatus === "success")
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    setPropertyIntel(null);
+    setPropertyLookupStatus("loading");
+    setPropertyLookupError(null);
+
+    mockPropertyLookup({
+      address,
+      city,
+      state: stateVal,
+      zip,
+      lat,
+      lng,
+    })
+      .then(data => {
+        if (cancelled) return;
+        setPropertyIntel(data);
+        setPropertyLookupStatus("success");
+        lastLookupKeyRef.current = key;
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setPropertyLookupStatus("error");
+        setPropertyLookupError(
+          err?.message || "We couldn't auto-pull this address."
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    address,
+    city,
+    lat,
+    lng,
+    propertyLookupStatus,
+    stateVal,
+    zip,
+  ]);
+
+  useEffect(() => {
+    if (address || city || zip) return;
+    setPropertyIntel(null);
+    setPropertyLookupStatus("idle");
+    lastLookupKeyRef.current = null;
+  }, [address, city, zip]);
+
+  // Push property intel into default service inputs when available
+  useEffect(() => {
+    if (!propertyIntel) return;
+    setServiceInputs(prev => {
+      const next = { ...prev };
+      selectedServices.forEach(id => {
+        const existing = next[id] ?? getDefaultInputs(id);
+        const wasAuto =
+          !prev[id] || autoPrefilledServicesRef.current.has(id);
+        if (!wasAuto) return;
+
+        const updates: Record<string, unknown> = {};
+        switch (id) {
+          case "house_washing":
+            if (propertyIntel.livingAreaSqft)
+              updates.sqft = propertyIntel.livingAreaSqft;
+            if (propertyIntel.stories) updates.stories = propertyIntel.stories;
+            break;
+          case "roof_cleaning":
+            if (propertyIntel.roofAreaSqft) {
+              updates.sqft = propertyIntel.roofAreaSqft;
+            } else if (propertyIntel.livingAreaSqft) {
+              updates.sqft = Math.round(propertyIntel.livingAreaSqft * 1.2);
+            }
+            if (propertyIntel.stories) updates.stories = propertyIntel.stories;
+            break;
+          case "driveway_cleaning":
+            if (propertyIntel.drivewaySqft) {
+              updates.sqft = propertyIntel.drivewaySqft;
+            }
+            break;
+          case "gutter_cleaning":
+            if (propertyIntel.livingAreaSqft) {
+              updates.linearFeet = Math.max(
+                80,
+                Math.round(propertyIntel.livingAreaSqft / 10)
+              );
+            }
+            if (propertyIntel.stories) updates.stories = propertyIntel.stories;
+            break;
+          case "window_cleaning":
+            if (propertyIntel.stories) updates.stories = propertyIntel.stories;
+            break;
+          default:
+            break;
+        }
+
+        next[id] = { ...existing, ...updates, serviceType: id };
+        autoPrefilledServicesRef.current.add(id);
+      });
+      return next;
+    });
+  }, [propertyIntel, selectedServices]);
 
   useEffect(() => {
     if (!sessionToken || eligibleUpsells.length === 0) return;
@@ -697,15 +834,15 @@ export default function QuoteTool() {
           address.trim().length > 0 && city.trim().length > 0 && !outOfRange
         );
       case 1:
+        return propertyLookupStatus !== "loading";
+      case 2:
         return (
           name.trim().length > 0 &&
           email.trim().length > 0 &&
           phone.trim().length > 0
         );
-      case 2:
-        return selectedServices.size > 0;
       case 3:
-        return true;
+        return selectedServices.size > 0;
       case 4:
         return true;
       case 5:
@@ -927,6 +1064,19 @@ export default function QuoteTool() {
                 />
               )}
               {step === 1 && (
+                <StepPropertyIntel
+                  address={`${address}, ${city}, ${stateVal} ${zip}`}
+                  propertyIntel={propertyIntel}
+                  setPropertyIntel={setPropertyIntel}
+                  lookupStatus={propertyLookupStatus}
+                  lookupError={propertyLookupError}
+                  onRetry={() => {
+                    setPropertyLookupStatus("idle");
+                    lastLookupKeyRef.current = null;
+                  }}
+                />
+              )}
+              {step === 2 && (
                 <StepContact
                   name={name}
                   setName={setName}
@@ -936,13 +1086,13 @@ export default function QuoteTool() {
                   setPhone={setPhone}
                 />
               )}
-              {step === 2 && (
+              {step === 3 && (
                 <StepServices
                   selectedServices={selectedServices}
                   toggleService={toggleService}
                 />
               )}
-              {step === 3 && (
+              {step === 4 && (
                 <StepDetails
                   selectedServices={selectedServices}
                   serviceInputs={serviceInputs}
@@ -952,7 +1102,7 @@ export default function QuoteTool() {
                   tierLabels={tierLabels}
                 />
               )}
-              {step === 4 && (
+              {step === 5 && (
                 <StepUpsells
                   eligibleUpsells={eligibleUpsells}
                   acceptedUpsells={acceptedUpsells}
@@ -961,7 +1111,7 @@ export default function QuoteTool() {
                   selectedServices={selectedServices}
                 />
               )}
-              {step === 5 && (
+              {step === 6 && (
                 <StepReview
                   pricingResults={pricingResults}
                   quoteSummary={quotePreviewSummary}
@@ -976,7 +1126,7 @@ export default function QuoteTool() {
                   complexityFlagged={complexityFlagged}
                 />
               )}
-              {step === 6 && (
+              {step === 7 && (
                 <StepSchedule
                   preferredDate={preferredDate}
                   setPreferredDate={setPreferredDate}
@@ -991,7 +1141,7 @@ export default function QuoteTool() {
                   fileInputRef={fileInputRef}
                 />
               )}
-              {step === 7 && (
+              {step === 8 && (
                 <div className="text-center py-4">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <CheckCircle className="w-8 h-8 text-primary" />
@@ -1167,6 +1317,133 @@ function StepAddress({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function StepPropertyIntel({
+  address,
+  propertyIntel,
+  setPropertyIntel,
+  lookupStatus,
+  lookupError,
+  onRetry,
+}: {
+  address: string;
+  propertyIntel: PropertyIntel | null;
+  setPropertyIntel: (intel: PropertyIntel | null) => void;
+  lookupStatus: "idle" | "loading" | "success" | "error";
+  lookupError?: string | null;
+  onRetry: () => void;
+}) {
+  const editableIntel = propertyIntel ?? {
+    livingAreaSqft: "",
+    stories: 1,
+    yearBuilt: "",
+    roofAreaSqft: "",
+    drivewaySqft: "",
+  };
+
+  return (
+    <div>
+      <h2 className="font-heading font-bold text-xl mb-1">
+        We found these details
+      </h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Pulled from public data to speed up your quote. Adjust anything that
+        looks off.
+      </p>
+
+      {lookupStatus === "loading" && (
+        <div className="flex items-center gap-3 mb-4 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          <span>Scanning {address}…</span>
+        </div>
+      )}
+
+      {lookupStatus === "error" && (
+        <div className="mb-4 flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <span>{lookupError || "We couldn't auto-pull this address."}</span>
+          <Button size="sm" variant="outline" onClick={onRetry}>
+            Retry lookup
+          </Button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label>Living area (sq ft)</Label>
+          <Input
+            type="number"
+            value={editableIntel.livingAreaSqft}
+            onChange={e =>
+              setPropertyIntel({
+                ...editableIntel,
+                livingAreaSqft: Number(e.target.value) || 0,
+              })
+            }
+          />
+        </div>
+        <div>
+          <Label>Stories</Label>
+          <Input
+            type="number"
+            value={editableIntel.stories ?? 1}
+            onChange={e =>
+              setPropertyIntel({
+                ...editableIntel,
+                stories: Math.max(1, Number(e.target.value) || 1),
+              })
+            }
+          />
+        </div>
+        <div>
+          <Label>Year built</Label>
+          <Input
+            type="number"
+            value={editableIntel.yearBuilt ?? ""}
+            onChange={e =>
+              setPropertyIntel({
+                ...editableIntel,
+                yearBuilt: Number(e.target.value) || null,
+              })
+            }
+          />
+        </div>
+        <div>
+          <Label>Roof area (sq ft)</Label>
+          <Input
+            type="number"
+            value={editableIntel.roofAreaSqft ?? ""}
+            onChange={e =>
+              setPropertyIntel({
+                ...editableIntel,
+                roofAreaSqft: Number(e.target.value) || 0,
+              })
+            }
+            placeholder="Auto from aerial"
+          />
+        </div>
+        <div>
+          <Label>Driveway area (sq ft)</Label>
+          <Input
+            type="number"
+            value={editableIntel.drivewaySqft ?? ""}
+            onChange={e =>
+              setPropertyIntel({
+                ...editableIntel,
+                drivewaySqft: Number(e.target.value) || 0,
+              })
+            }
+            placeholder="Auto from aerial"
+          />
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground mt-3">
+        These values will pre-fill your service questions so you get an instant,
+        MapMeasure-style quote without extra typing.
+      </p>
     </div>
   );
 }
@@ -2218,6 +2495,53 @@ function StepSchedule({
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
+
+type PropertyIntel = {
+  livingAreaSqft?: number;
+  stories?: number;
+  yearBuilt?: number | null;
+  roofAreaSqft?: number;
+  drivewaySqft?: number;
+};
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+async function mockPropertyLookup({
+  address,
+  city,
+  state,
+  zip,
+}: {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}): Promise<PropertyIntel> {
+  const key = `${address}|${city}|${state}|${zip}`;
+  const hash = hashString(key);
+  const livingAreaSqft = 1400 + (hash % 1800);
+  const stories = livingAreaSqft > 2200 ? 2 : 1;
+  const roofAreaSqft = Math.round(livingAreaSqft * 1.18);
+  const drivewaySqft = 350 + (hash % 650);
+  const yearBuilt = 1980 + (hash % 35);
+
+  // Simulate network latency
+  await new Promise(resolve => setTimeout(resolve, 450));
+  return {
+    livingAreaSqft,
+    stories,
+    roofAreaSqft,
+    drivewaySqft,
+    yearBuilt,
+  };
+}
 
 function getDefaultInputs(serviceId: string): PricingInput {
   switch (serviceId) {

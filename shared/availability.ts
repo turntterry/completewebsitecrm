@@ -8,6 +8,8 @@ export type Slot = {
 export interface AvailabilityProviderOptions {
   durationMinutes: number;
   daysAhead?: number;
+  startHour?: number; // 24h format; default 9
+  endHour?: number; // default 17
 }
 
 export interface AvailabilityProvider {
@@ -16,7 +18,7 @@ export interface AvailabilityProvider {
 
 // Mock provider: duration-aware windows generated locally.
 export const mockAvailabilityProvider: AvailabilityProvider = {
-  getSlots({ durationMinutes, daysAhead = 5 }) {
+  getSlots({ durationMinutes, daysAhead = 7, startHour = 9, endHour = 17 }) {
     const now = new Date();
     const windowMinutes = Math.min(180, Math.max(60, durationMinutes + 30));
 
@@ -31,16 +33,28 @@ export const mockAvailabilityProvider: AvailabilityProvider = {
         day: "numeric",
       });
 
-      const windows =
-        windowMinutes <= 90
-          ? ["09:00-10:30", "11:00-12:30", "13:00-14:30", "15:00-16:30"]
-          : windowMinutes <= 120
-            ? ["09:00-11:00", "12:00-14:00", "15:00-17:00"]
-            : ["09:00-12:00", "13:00-16:00"];
+      const windows: string[] = [];
+      const dayStart = Math.max(6, startHour);
+      const dayEnd = Math.min(20, endHour);
+      const increment = windowMinutes <= 90 ? 90 : windowMinutes <= 120 ? 120 : 180;
+
+      for (let hour = dayStart; hour + windowMinutes / 60 <= dayEnd; hour += increment / 60) {
+        const start = `${String(hour).padStart(2, "0")}:${windowMinutes === 90 ? "00" : "00"}`;
+        const endMinutes = hour * 60 + windowMinutes;
+        const endHourLocal = Math.floor(endMinutes / 60);
+        const endMinLocal = endMinutes % 60;
+        const end = `${String(endHourLocal).padStart(2, "0")}:${String(endMinLocal).padStart(2, "0")}`;
+        windows.push(`${start}-${end}`);
+      }
+
+      // Fallback windows if config produces none
+      if (windows.length === 0) {
+        windows.push("09:00-11:00", "12:00-14:00", "15:00-17:00");
+      }
 
       windows.forEach((w, idx) => {
         slots.push({
-          id: `${dateStr}_${idx}`,
+          id: `${dateStr}_${idx}_${w}`,
           date: dateStr,
           window: w,
           display: `${label} · ${w}`,

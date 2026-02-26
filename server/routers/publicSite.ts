@@ -350,6 +350,9 @@ const quoteRouter = router({
       if (input.confidenceMode === "manual_review") {
         lowConfidenceReasons.push("client_requested_manual_review");
       }
+      if (input.confidenceMode === "range") {
+        lowConfidenceReasons.push("range_output");
+      }
       if (!input.schedulingEligible) {
         lowConfidenceReasons.push("scheduling_not_eligible");
       }
@@ -463,6 +466,7 @@ const quoteRouter = router({
 
       if (complexityTriggers) {
         schedulingBlockedReasons.push("size_or_complexity");
+        lowConfidenceReasons.push("size_or_complexity");
       }
 
       if (input.confidenceMode === "range") {
@@ -536,6 +540,35 @@ const quoteRouter = router({
           });
         }
       }
+
+      const serviceList = input.items
+        .map(i => i.serviceType.replace(/_/g, " "))
+        .join(", ");
+
+      notifyOwner({
+        title: `New Quote (${finalConfidenceMode}): $${input.totalPrice.toFixed(
+          2
+        )} from ${input.customerName}`,
+        content: `Name: ${input.customerName}\nPhone: ${
+          input.customerPhone
+        }\nEmail: ${input.customerEmail}\nAddress: ${
+          input.address
+        }\nServices: ${serviceList}\nTotal: $${input.totalPrice.toFixed(
+          2
+        )}\nConfidence: ${finalConfidenceMode}${
+          lowConfidenceReasons.length
+            ? `\nLow-confidence reasons: ${lowConfidenceReasons.join(", ")}`
+            : ""
+        }\nScheduling eligible: ${finalSchedulingEligible ? "yes" : "no"}${
+          schedulingBlockedReasons.length
+            ? `\nScheduling blocked: ${schedulingBlockedReasons.join(", ")}`
+            : ""
+        }${input.preferredDate ? `\nPreferred date: ${input.preferredDate}` : ""}${
+          (input as any).preferredSlotLabel
+            ? `\nPreferred slot: ${(input as any).preferredSlotLabel}`
+            : ""
+        }${complexityTriggers ? "\nComplexity flagged: yes" : ""}`,
+      }).catch(() => {});
 
       let manualReviewLeadId: number | null = null;
       if (finalConfidenceMode === "manual_review") {
@@ -707,7 +740,9 @@ const quoteRouter = router({
 
       notifyOwner({
         title: `New Quote: $${input.totalPrice.toFixed(2)} from ${input.customerName}`,
-        content: `Name: ${input.customerName}\nPhone: ${input.customerPhone}\nEmail: ${input.customerEmail}\nAddress: ${input.address}\nServices: ${serviceList}\nTotal: $${input.totalPrice.toFixed(2)}${input.preferredDate ? `\nPreferred date: ${input.preferredDate}` : ""}${(input as any).preferredSlotLabel ? `\nPreferred slot: ${(input as any).preferredSlotLabel}` : ""}`,
+        content: `Name: ${input.customerName}\nPhone: ${input.customerPhone}\nEmail: ${input.customerEmail}\nAddress: ${input.address}\nServices: ${serviceList}\nTotal: $${input.totalPrice.toFixed(2)}${input.preferredDate ? `\nPreferred date: ${input.preferredDate}` : ""}${(input as any).preferredSlotLabel ? `\nPreferred slot: ${(input as any).preferredSlotLabel}` : ""}${
+          (input as any).confidenceMode === "range" ? `\nPresented as range: yes` : ""
+        }`,
       }).catch(() => {});
 
       return { quoteId, totalPrice: input.totalPrice };
