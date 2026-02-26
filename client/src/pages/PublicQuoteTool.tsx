@@ -252,12 +252,15 @@ export default function QuoteTool() {
   const [quoteResult, setQuoteResult] = useState<{
     quoteId: number;
     totalPrice: number;
+    confidenceMode: "exact" | "range" | "manual_review";
+    schedulingEligible: boolean;
   } | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [acceptedUpsells, setAcceptedUpsells] = useState<
     Record<string, boolean>
   >({});
   const shownUpsellsRef = useRef<Set<string>>(new Set());
+  const [scheduleHandoffStarted, setScheduleHandoffStarted] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -538,6 +541,7 @@ export default function QuoteTool() {
         sessionToken: sessionToken || undefined,
       });
       setQuoteResult(result);
+      setScheduleHandoffStarted(false);
       setSubmitted(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to submit quote");
@@ -591,6 +595,33 @@ export default function QuoteTool() {
       });
     }
   }, [sessionToken, eligibleUpsells, trackEventMutation]);
+
+  const handleScheduleHandoffStart = () => {
+    if (!sessionToken || !quoteResult?.schedulingEligible) return;
+
+    setScheduleHandoffStarted(true);
+    trackEventMutation.mutate({
+      sessionToken,
+      eventName: "schedule_started",
+      payload: {
+        quoteId: quoteResult.quoteId,
+        confidenceMode: quoteResult.confidenceMode,
+      },
+    });
+  };
+
+  const handleScheduleHandoffComplete = () => {
+    if (!sessionToken || !quoteResult?.schedulingEligible) return;
+
+    trackEventMutation.mutate({
+      sessionToken,
+      eventName: "schedule_completed",
+      payload: {
+        quoteId: quoteResult.quoteId,
+      },
+    });
+    toast.success("Great — we marked your scheduling handoff as completed.");
+  };
 
   const canProceed = () => {
     switch (step) {
@@ -646,19 +677,45 @@ export default function QuoteTool() {
             <p className="font-heading font-black text-5xl text-primary mb-6">
               ${quoteResult.totalPrice.toFixed(2)}
             </p>
-            <p className="text-muted-foreground mb-8">
+            <p className="text-muted-foreground mb-3">
               Quote #{quoteResult.quoteId} has been sent to {BUSINESS.owner}.
-              We'll reach out within 24 hours to confirm your appointment.
             </p>
+            {quoteResult.confidenceMode === "manual_review" ? (
+              <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 text-sm">
+                This quote is in <strong>manual review</strong> mode due to job
+                minimum or complexity. Our team will verify details and confirm
+                exact scheduling options within 24 hours.
+              </p>
+            ) : (
+              <p className="text-muted-foreground mb-8">
+                You're eligible for fast scheduling handoff right now. Use the
+                buttons below to start and complete scheduling.
+              </p>
+            )}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href={`tel:${BUSINESS.phoneRaw}`}>
+              <a
+                href={`tel:${BUSINESS.phoneRaw}`}
+                onClick={handleScheduleHandoffStart}
+              >
                 <Button
                   size="lg"
                   className="bg-primary hover:bg-navy-light text-white font-bold"
                 >
-                  <Phone className="w-4 h-4 mr-2" /> Call Now: {BUSINESS.phone}
+                  <Phone className="w-4 h-4 mr-2" />
+                  {quoteResult.schedulingEligible
+                    ? `Start Scheduling: ${BUSINESS.phone}`
+                    : `Call Now: ${BUSINESS.phone}`}
                 </Button>
               </a>
+              {quoteResult.schedulingEligible && scheduleHandoffStarted && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleScheduleHandoffComplete}
+                >
+                  I Picked a Time
+                </Button>
+              )}
               <a href="/">
                 <Button size="lg" variant="outline">
                   Back to Home

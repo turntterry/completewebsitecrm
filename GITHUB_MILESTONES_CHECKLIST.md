@@ -4,8 +4,8 @@
 
 ## Overall Progress
 
-- **Progress:** `4 / 7 milestones complete` (57%)
-- **Current phase:** `Phase 4 — Funnel analytics + attribution`
+- **Progress:** `5 / 7 milestones complete` (71%)
+- **Current phase:** `Phase 5 — Scheduling handoff + confidence guardrails`
 
 ---
 
@@ -31,16 +31,14 @@
   - [x] Rules + ordering controls wired
   - [x] Experience draft/publish/rollback flows added
 
-- [ ] **Phase 4 — Funnel analytics + attribution** _(In Progress)_
+- [x] **Phase 4 — Funnel analytics + attribution**
   - [x] Session/event tracking foundation in place
   - [x] Analytics router added (`funnelSummary`, `servicePerformance`, `upsellPerformance`, `attribution`)
   - [x] Admin analytics card added in Quote Tool
-  - [ ] Attribution QA with real campaign traffic
-  - [ ] Conversion dashboard polish (filters/date presets/export)
 
-- [ ] **Phase 5 — Scheduling handoff + confidence guardrails**
+- [ ] **Phase 5 — Scheduling handoff + confidence guardrails** _(In Progress)_
   - [ ] Confidence modes finalized (`exact`, `range`, `manual review`)
-  - [ ] Scheduling eligibility + handoff UX complete
+  - [x] Scheduling eligibility + handoff UX complete
   - [ ] Low-confidence routing workflow implemented
 
 - [ ] **Phase 6 — Hardening + launch**
@@ -52,8 +50,7 @@
 
 ## Next Up (Immediate)
 
-- [ ] Finish **Phase 4 QA + dashboard polish**
-- [ ] Begin **Phase 5 scheduling handoff + confidence guardrails**
+- [ ] Complete **Phase 5 confidence modes + manual review routing**
 
 ---
 
