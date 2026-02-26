@@ -1060,6 +1060,43 @@ const contactRouter = router({
 
       return { success: true };
     }),
+
+  // For embeddable widget: create a lead with minimal friction.
+  requestWorkWidget: publicProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        email: z.string().email().optional(),
+        phone: z.string().optional(),
+        address: z.string().optional(),
+        services: z.array(z.string()).max(20).optional(),
+        message: z.string().optional(),
+        companyId: z.number().optional().default(1),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
+
+      const nameParts = input.name.trim().split(/\s+/);
+      const firstName = nameParts[0] ?? input.name;
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      const [result] = await db.insert(leads).values({
+        companyId: input.companyId,
+        firstName,
+        lastName,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        address: input.address ?? null,
+        services: input.services ?? [],
+        notes: input.message ?? null,
+        source: "widget_request",
+        status: "new",
+      });
+
+      return { success: true, leadId: (result as any).insertId as number };
+    }),
 });
 
 // ─── Combined Public Site Router ──────────────────────────────────────────────

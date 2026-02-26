@@ -32,6 +32,13 @@ export const companyRouter = router({
               defaultVisitEndHour: z.number().int().min(0).max(23).optional(),
             })
             .optional(),
+          payments: z
+            .object({
+              useStripe: z.boolean().optional(),
+              publishableKey: z.string().optional(),
+              depositPercent: z.number().min(0).max(100).optional(),
+            })
+            .optional(),
         })
         .partial()
         .optional(),

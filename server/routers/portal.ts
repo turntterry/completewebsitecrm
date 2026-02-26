@@ -20,6 +20,7 @@ import {
   getCompany,
 } from "../db";
 import { createPaymentIntent } from "../services/payments";
+import { pushExternalSchedule } from "../services/scheduler";
 import { publicProcedure, router } from "../_core/trpc";
 
 async function requireDb() {
@@ -209,6 +210,7 @@ export const portalRouter = router({
 
         // If we have a preferred slot on the originating instant quote, schedule a visit
         if (jobId) {
+          const safeJobId = jobId;
           const preferred = await db
             .select()
             .from(instantQuotes)
@@ -220,14 +222,25 @@ export const portalRouter = router({
             ? parsePreferredSlot(preferred.preferredSlot)
             : null;
           if (parsed) {
-            await createVisit({
-              jobId,
+            const visitId = await createVisit({
+              jobId: safeJobId,
               companyId: input.companyId,
               status: "scheduled",
               scheduledAt: parsed.start,
               scheduledEndAt: parsed.end,
             } as any);
-            await updateJob(jobId, input.companyId, { status: "scheduled" });
+            await updateJob(safeJobId, input.companyId, { status: "scheduled" });
+            // Fire to external scheduler if configured
+            if (visitId) {
+              pushExternalSchedule({
+                visitId,
+                jobId: safeJobId,
+                companyId: input.companyId,
+                start: parsed.start,
+                end: parsed.end,
+                address: quote.title ?? undefined,
+              }).catch(() => {});
+            }
           } else {
             // fallback to default visit window
             const { defaultVisitStartHour, defaultVisitEndHour } = portalSettings;
@@ -236,14 +249,24 @@ export const portalRouter = router({
             const dateStr = today.toISOString().split("T")[0];
             const start = new Date(`${dateStr}T${String(defaultVisitStartHour).padStart(2, "0")}:00:00Z`);
             const end = new Date(`${dateStr}T${String(defaultVisitEndHour).padStart(2, "0")}:00:00Z`);
-            await createVisit({
-              jobId,
+            const visitId = await createVisit({
+              jobId: safeJobId,
               companyId: input.companyId,
               status: "scheduled",
               scheduledAt: start,
               scheduledEndAt: end,
             } as any);
-            await updateJob(jobId, input.companyId, { status: "scheduled" });
+            await updateJob(safeJobId, input.companyId, { status: "scheduled" });
+            if (visitId) {
+              pushExternalSchedule({
+                visitId,
+                jobId: safeJobId,
+                companyId: input.companyId,
+                start,
+                end,
+                address: quote.title ?? undefined,
+              }).catch(() => {});
+            }
           }
         }
       }
@@ -268,6 +291,7 @@ export const portalRouter = router({
     )
     .mutation(async ({ input }) => {
       const db = await requireDb();
+      const portalSettings = await getPortalSettings(input.companyId);
 
       const [invoice] = await db
         .select()
@@ -289,15 +313,24 @@ export const portalRouter = router({
       const depositField = (invoice as any).depositAmount
         ? parseFloat(String((invoice as any).depositAmount))
         : null;
+      const company = await getCompany(input.companyId);
+      const payments = (company as any)?.settings?.payments ?? {};
+      const depositPercent =
+        payments.depositPercent !== undefined ? Number(payments.depositPercent) : null;
+      const percentDeposit =
+        depositPercent && balance > 0 ? (balance * depositPercent) / 100 : null;
+
       const defaultDepositDue =
-        depositField && parseFloat(String(invoice.amountPaid ?? "0")) <= 0 ? depositField : null;
+        depositField && parseFloat(String(invoice.amountPaid ?? "0")) <= 0
+          ? depositField
+          : percentDeposit ?? null;
       const amount = input.amount ?? defaultDepositDue ?? balance;
       if (amount <= 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Nothing to pay" });
       }
 
-      // Try external payment intent first for card/ach
-      if (["card", "ach"].includes(input.method)) {
+      // Try external payment intent first for card/ach when enabled
+      if (["card", "ach"].includes(input.method) && payments.useStripe) {
         try {
           const intent = await createPaymentIntent({
             amountCents: Math.round(amount * 100),
@@ -313,6 +346,7 @@ export const portalRouter = router({
               provider: "external" as const,
               clientSecret: intent.clientSecret ?? null,
               paymentUrl: intent.paymentUrl ?? null,
+              publishableKey: payments.publishableKey ?? null,
             };
           }
         } catch (err) {
@@ -395,6 +429,7 @@ export const portalRouter = router({
         } as any);
 
         if (jobId && input.preferredDate) {
+          const safeJobId = jobId;
           const { defaultVisitStartHour, defaultVisitEndHour } = portalSettings;
           const start = new Date(
             `${input.preferredDate}T${String(defaultVisitStartHour).padStart(2, "0")}:00:00Z`
@@ -403,14 +438,24 @@ export const portalRouter = router({
             `${input.preferredDate}T${String(defaultVisitEndHour).padStart(2, "0")}:00:00Z`
           );
           if (!isNaN(start.getTime())) {
-            await createVisit({
-              jobId,
+            const visitId = await createVisit({
+              jobId: safeJobId,
               companyId: input.companyId,
               status: "scheduled",
               scheduledAt: start,
               scheduledEndAt: end,
             } as any);
-            await updateJob(jobId, input.companyId, { status: "scheduled" });
+            await updateJob(safeJobId, input.companyId, { status: "scheduled" });
+            if (visitId) {
+              pushExternalSchedule({
+                visitId,
+                jobId: safeJobId,
+                companyId: input.companyId,
+                start,
+                end,
+                address: input.address ?? undefined,
+              }).catch(() => {});
+            }
           }
         }
       }

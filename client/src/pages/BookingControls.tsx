@@ -18,6 +18,7 @@ import {
   XCircle,
   Settings,
   Workflow,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -37,6 +38,9 @@ export default function BookingControls() {
   const [autoJobRequest, setAutoJobRequest] = useState(true);
   const [visitStart, setVisitStart] = useState(9);
   const [visitEnd, setVisitEnd] = useState(11);
+  const [useStripe, setUseStripe] = useState(false);
+  const [publishableKey, setPublishableKey] = useState("");
+  const [depositPercent, setDepositPercent] = useState(0);
   const maxServicesForInstantBooking = settings?.maxServicesForInstantBooking ?? 2;
   const blockedInstantServices = Array.isArray((settings as any)?.instantBookingBlockedServices)
     ? ((settings as any).instantBookingBlockedServices as string[])
@@ -53,6 +57,10 @@ export default function BookingControls() {
     setAutoJobRequest(portal.autoCreateJobOnRequest ?? true);
     setVisitStart(portal.defaultVisitStartHour ?? 9);
     setVisitEnd(portal.defaultVisitEndHour ?? 11);
+    const payments = (company as any)?.settings?.payments ?? {};
+    setUseStripe(payments.useStripe ?? false);
+    setPublishableKey(payments.publishableKey ?? "");
+    setDepositPercent(payments.depositPercent ?? 0);
     setSynced(true);
   }
 
@@ -358,6 +366,65 @@ export default function BookingControls() {
               }
             >
               Save portal automation
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payments */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="h-4 w-4" /> Payments
+          </CardTitle>
+          <CardDescription>
+            Stripe secret key stays in env; set publishable key and defaults here.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Use Stripe for portal payments</p>
+              <p className="text-xs text-muted-foreground">
+                Requires STRIPE_SECRET_KEY on the server. Client uses the publishable key below.
+              </p>
+            </div>
+            <Switch checked={useStripe} onCheckedChange={setUseStripe} />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Stripe publishable key</Label>
+            <Input
+              value={publishableKey}
+              onChange={(e) => setPublishableKey(e.target.value)}
+              placeholder="pk_live_..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Default deposit (% of total)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              value={depositPercent}
+              onChange={(e) => setDepositPercent(Number(e.target.value))}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              disabled={updateCompany.isPending}
+              onClick={() =>
+                updateCompany.mutate({
+                  settings: {
+                    payments: {
+                      useStripe,
+                      publishableKey,
+                      depositPercent,
+                    },
+                  },
+                })
+              }
+            >
+              Save payment settings
             </Button>
           </div>
         </CardContent>
