@@ -53,7 +53,7 @@ import {
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
 import { toast } from "sonner";
-import { mockAvailabilityProvider } from "@shared/availability";
+import { Slot } from "@shared/availability";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Home: HomeIcon,
@@ -407,17 +407,23 @@ export default function QuoteTool() {
     experienceConfig?.settings?.availabilityDaysAhead ?? 9
   );
 
-  const slots = useMemo(() => {
-    const totalMinutes = pricingResults.reduce((sum, r) => {
+  const totalDurationMinutes = useMemo(() => {
+    return pricingResults.reduce((sum, r) => {
       const cfg = pricingData?.[r.serviceType] as any;
       const minDur = Number(cfg?.minDuration ?? 60);
       return sum + minDur;
     }, 0);
-    return mockAvailabilityProvider.getSlots({
-      durationMinutes: totalMinutes || 90,
+  }, [pricingData, pricingResults]);
+
+  const slotsQuery = trpc.publicSite.quote.getSlots.useQuery(
+    {
+      durationMinutes: totalDurationMinutes || 90,
       daysAhead: availabilityHorizonDays,
-    });
-  }, [availabilityHorizonDays, pricingData, pricingResults]);
+    },
+    { enabled: step >= 5 && !pricingLoading }
+  );
+
+  const slots: Slot[] = slotsQuery.data ?? [];
 
   const selectedSlotLabel = useMemo(() => {
     return slots.find(slot => slot.id === selectedSlotId)?.display;
@@ -823,6 +829,16 @@ export default function QuoteTool() {
     toast.success("Great — we marked your scheduling handoff as completed.");
   };
 
+  useEffect(() => {
+    if (step !== 7 || slotsQuery.isFetching) return;
+    if (!sessionToken || slots.length > 0) return;
+    trackEventMutation.mutate({
+      sessionToken,
+      eventName: "schedule_blocked",
+      payload: { reasons: ["no_slots_from_scheduler"] },
+    });
+  }, [sessionToken, slots.length, slotsQuery.isFetching, step, trackEventMutation]);
+
   const canProceed = () => {
     switch (step) {
       case 0:
@@ -920,37 +936,54 @@ export default function QuoteTool() {
                   You're eligible for fast scheduling handoff right now. Pick a
                   time window or tap call if you prefer.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {slots.map((slot: any) => (
-                    <Button
-                      key={slot.id}
-                      variant={
-                        selectedSlotId === slot.id ? "default" : "outline"
-                      }
-                      className={`justify-start ${
-                        selectedSlotId === slot.id
-                          ? "border-primary bg-primary text-white"
-                          : ""
-                      }`}
-                      onClick={() => {
-                        setSelectedSlotId(slot.id);
-                        if (sessionToken) {
-                          trackEventMutation.mutate({
-                            sessionToken,
-                            eventName: "schedule_slot_selected",
-                            payload: {
-                              slotId: slot.id,
-                              date: slot.date,
-                              window: slot.window,
-                            },
-                          });
+                {slotsQuery.isFetching && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    Checking live availability…
+                  </div>
+                )}
+                {slotsQuery.isError && (
+                  <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                    We couldn't load live slots. You can still call to schedule.
+                  </div>
+                )}
+                {!slotsQuery.isFetching && slots.length === 0 ? (
+                  <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                    No instant slots available right now. We'll call/text with the next openings.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {slots.map((slot: any) => (
+                      <Button
+                        key={slot.id}
+                        variant={
+                          selectedSlotId === slot.id ? "default" : "outline"
                         }
-                      }}
-                    >
-                      {slot.display}
-                    </Button>
-                  ))}
-                </div>
+                        className={`justify-start ${
+                          selectedSlotId === slot.id
+                            ? "border-primary bg-primary text-white"
+                            : ""
+                        }`}
+                        onClick={() => {
+                          setSelectedSlotId(slot.id);
+                          if (sessionToken) {
+                            trackEventMutation.mutate({
+                              sessionToken,
+                              eventName: "schedule_slot_selected",
+                              payload: {
+                                slotId: slot.id,
+                                date: slot.date,
+                                window: slot.window,
+                              },
+                            });
+                          }
+                        }}
+                      >
+                        {slot.display}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 text-sm">
@@ -1135,6 +1168,9 @@ export default function QuoteTool() {
                   uploading={uploading}
                   handlePhotoUpload={handlePhotoUpload}
                   fileInputRef={fileInputRef}
+                  slots={slots}
+                  slotsLoading={slotsQuery.isFetching}
+                  slotsError={slotsQuery.isError}
                 />
               )}
               {step === 8 && (
@@ -1349,6 +1385,16 @@ function StepPropertyIntel({
         Pulled from public data to speed up your quote. Adjust anything that
         looks off.
       </p>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+        <Badge variant="outline" className="text-xs">
+          Source: {propertyIntel?.source ?? "Auto lookup"}
+        </Badge>
+        {propertyIntel?.fetchedAt ? (
+          <span>
+            Updated {new Date(propertyIntel.fetchedAt).toLocaleTimeString()}
+          </span>
+        ) : null}
+      </div>
 
       {lookupStatus === "loading" && (
         <div className="flex items-center gap-3 mb-4 text-sm text-muted-foreground">
@@ -2368,6 +2414,9 @@ function StepSchedule({
   uploading,
   handlePhotoUpload,
   fileInputRef,
+  slots,
+  slotsLoading,
+  slotsError,
 }: any) {
   return (
     <div>
@@ -2498,6 +2547,8 @@ type PropertyIntel = {
   yearBuilt?: number | null;
   roofAreaSqft?: number;
   drivewaySqft?: number;
+  source?: string;
+  fetchedAt?: string;
 };
 
 function getDefaultInputs(serviceId: string): PricingInput {

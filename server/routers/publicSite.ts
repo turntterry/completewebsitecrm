@@ -16,6 +16,7 @@ import { asc, desc, eq, and, inArray } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { SEED_GALLERY } from "@shared/data";
 import { nanoid } from "nanoid";
+import { mockAvailabilityProvider } from "@shared/availability";
 
 // ─── Public Quote Router ──────────────────────────────────────────────────────
 const quoteRouter = router({
@@ -172,27 +173,36 @@ const quoteRouter = router({
       })
     )
     .query(async ({ input }) => {
-      // Placeholder mock until external property intel is wired.
-      const seed = `${input.address}|${input.city}|${input.state}|${input.zip}`;
-      const hash = Array.from(seed).reduce(
-        (acc, ch) => (acc * 31 + ch.charCodeAt(0)) % 100000,
-        7
-      );
+      const maybeReal = await fetchPropertyIntel(input).catch(err => {
+        logger.warn("propertyLookup.fallback", { message: String(err) });
+        return null;
+      });
+      if (maybeReal) return maybeReal;
+      return mockPropertyIntel(input);
+    }),
 
-      const livingAreaSqft = 1400 + (hash % 1900); // 1400–3299
-      const stories = livingAreaSqft > 2300 ? 2 : 1;
-      const roofAreaSqft = Math.round(livingAreaSqft * 1.18);
-      const drivewaySqft = 300 + (hash % 900); // 300–1199
-      const yearBuilt = 1978 + (hash % 42); // 1978–2019
+  getSlots: publicProcedure
+    .input(
+      z.object({
+        durationMinutes: z.number().min(30).max(8 * 60).default(90),
+        daysAhead: z.number().min(1).max(21).default(9),
+        startHour: z.number().min(5).max(12).optional(),
+        endHour: z.number().min(13).max(22).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const external = await fetchSchedulerSlots(input).catch(err => {
+        logger.warn("quote.getSlots.fallback", { message: String(err) });
+        return null;
+      });
+      if (external?.length) return external;
 
-      return {
-        livingAreaSqft,
-        stories,
-        roofAreaSqft,
-        drivewaySqft,
-        yearBuilt,
-        source: "mock",
-      };
+      return mockAvailabilityProvider.getSlots({
+        durationMinutes: input.durationMinutes,
+        daysAhead: input.daysAhead,
+        startHour: input.startHour,
+        endHour: input.endHour,
+      });
     }),
 
   pricePreview: publicProcedure
@@ -806,6 +816,117 @@ const quoteRouter = router({
       }
     }),
 });
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+async function fetchPropertyIntel({
+  address,
+  city,
+  state,
+  zip,
+}: {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}) {
+  const url = process.env.PROPERTY_INTEL_URL;
+  const apiKey = process.env.PROPERTY_INTEL_KEY;
+  if (!url || !apiKey) return null;
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ address, city, state, zip }),
+  });
+  if (!resp.ok) throw new Error(`Property provider ${resp.status}`);
+  const data = await resp.json();
+  return {
+    livingAreaSqft: data.livingAreaSqft ?? data.squareFeet ?? null,
+    stories: data.stories ?? null,
+    yearBuilt: data.yearBuilt ?? null,
+    roofAreaSqft: data.roofAreaSqft ?? null,
+    drivewaySqft: data.drivewaySqft ?? null,
+    source: data.source ?? "provider",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+function mockPropertyIntel({
+  address,
+  city,
+  state,
+  zip,
+}: {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}) {
+  const seed = `${address}|${city}|${state}|${zip}`;
+  const hash = Array.from(seed).reduce(
+    (acc, ch) => (acc * 31 + ch.charCodeAt(0)) % 100000,
+    7
+  );
+
+  const livingAreaSqft = 1400 + (hash % 1900); // 1400–3299
+  const stories = livingAreaSqft > 2300 ? 2 : 1;
+  const roofAreaSqft = Math.round(livingAreaSqft * 1.18);
+  const drivewaySqft = 300 + (hash % 900); // 300–1199
+  const yearBuilt = 1978 + (hash % 42); // 1978–2019
+
+  return {
+    livingAreaSqft,
+    stories,
+    roofAreaSqft,
+    drivewaySqft,
+    yearBuilt,
+    source: "mock",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+async function fetchSchedulerSlots({
+  durationMinutes,
+  daysAhead,
+  startHour,
+  endHour,
+}: {
+  durationMinutes: number;
+  daysAhead: number;
+  startHour?: number;
+  endHour?: number;
+}) {
+  const url = process.env.SCHEDULER_URL;
+  const apiKey = process.env.SCHEDULER_KEY;
+  if (!url || !apiKey) return null;
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      durationMinutes,
+      daysAhead,
+      startHour,
+      endHour,
+    }),
+  });
+  if (!resp.ok) throw new Error(`Scheduler provider ${resp.status}`);
+  const data = await resp.json();
+  if (!Array.isArray(data?.slots)) return null;
+  return data.slots as {
+    id: string;
+    date: string;
+    window: string;
+    display: string;
+  }[];
+}
 
 // ─── Public Gallery Router ────────────────────────────────────────────────────
 const galleryRouter = router({

@@ -1053,6 +1053,7 @@ export default function QuoteTool() {
                               "Service marked manual review",
                             size_or_complexity: "Size/complexity threshold",
                             range_output: "Range / low confidence",
+                            no_slots_from_scheduler: "No live slots returned",
                             client_marked_ineligible: "Client marked ineligible",
                           } as Record<string, string>)[row.reason] ??
                             row.reason.replace(/_/g, " ")}
