@@ -993,6 +993,14 @@ export default function QuoteTool() {
                     label: "Schedule Blocked",
                     value: funnelSummary?.totals?.scheduleBlocked ?? 0,
                   },
+                  {
+                    label: "Slot Selected",
+                    value: funnelSummary?.slotSelected ?? 0,
+                  },
+                  {
+                    label: "Slot Confirmed",
+                    value: funnelSummary?.slotConfirmed ?? 0,
+                  },
                 ].map(metric => (
                   <div key={metric.label} className="rounded-md border p-2">
                     <p className="text-xs text-muted-foreground">

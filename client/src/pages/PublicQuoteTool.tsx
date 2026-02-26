@@ -286,6 +286,20 @@ export default function QuoteTool() {
       ),
     [experienceConfig?.services]
   );
+  const complexityThresholds = useMemo(
+    () => ({
+      maxSqft: Number(experienceConfig?.settings?.maxSqftAuto ?? 5000),
+      maxLinearFt: Number(experienceConfig?.settings?.maxLinearFtAuto ?? 800),
+      maxStories: Number(experienceConfig?.settings?.maxStoriesAuto ?? 3),
+      maxWindows: Number(experienceConfig?.settings?.maxWindowsAuto ?? 120),
+    }),
+    [
+      experienceConfig?.settings?.maxSqftAuto,
+      experienceConfig?.settings?.maxLinearFtAuto,
+      experienceConfig?.settings?.maxStoriesAuto,
+      experienceConfig?.settings?.maxWindowsAuto,
+    ]
+  );
 
   const upsellCatalog = useMemo(() => {
     const configured = experienceConfig?.settings?.upsellCatalog;
@@ -953,6 +967,7 @@ export default function QuoteTool() {
                   acceptedUpsellItems={acceptedUpsellItems}
                   upsellTotal={upsellTotal}
                   manualReviewServiceKeys={manualReviewServiceKeys}
+                  complexityThresholds={complexityThresholds}
                 />
               )}
               {step === 6 && (
@@ -1914,13 +1929,38 @@ function StepReview({
   acceptedUpsellItems,
   upsellTotal,
   manualReviewServiceKeys,
+  complexityThresholds,
 }: any) {
+  const complexityFlagged = useMemo(() => {
+    const { maxSqft, maxLinearFt, maxStories, maxWindows } =
+      complexityThresholds ?? {};
+    return pricingResults.some((r: PricingResult) => {
+      const inputs = serviceInputs[r.serviceType] ?? {};
+      const sqft = Number((inputs as any).sqft ?? 0);
+      const linearFeet = Number((inputs as any).linearFeet ?? 0);
+      const stories = Number((inputs as any).stories ?? 1);
+      const windowCount = Number((inputs as any).windowCount ?? 0);
+      return (
+        (maxSqft && sqft > maxSqft) ||
+        (maxLinearFt && linearFeet > maxLinearFt) ||
+        (maxStories && stories >= maxStories) ||
+        (maxWindows && windowCount > maxWindows)
+      );
+    });
+  }, [complexityThresholds, pricingResults, serviceInputs]);
+
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">Review Your Quote</h2>
       <p className="text-sm text-muted-foreground mb-6">
         Here's your detailed price breakdown.
       </p>
+      {complexityFlagged && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          This quote includes higher-complexity inputs (size/stories/windows).
+          We may provide a range and confirm exact pricing before scheduling.
+        </div>
+      )}
 
       <div className="space-y-3 mb-6">
         {pricingResults.map((r: PricingResult) => {
