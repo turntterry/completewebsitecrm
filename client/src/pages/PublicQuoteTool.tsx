@@ -348,6 +348,24 @@ export default function QuoteTool() {
     return results;
   }, [selectedServices, serviceInputs, getServiceConfig]);
 
+  const complexityFlagged = useMemo(() => {
+    const { maxSqft, maxLinearFt, maxStories, maxWindows } =
+      complexityThresholds ?? {};
+    return pricingResults.some(r => {
+      const inputs = serviceInputs[r.serviceType] ?? {};
+      const sqft = Number((inputs as any).sqft ?? 0);
+      const linearFeet = Number((inputs as any).linearFeet ?? 0);
+      const stories = Number((inputs as any).stories ?? 1);
+      const windowCount = Number((inputs as any).windowCount ?? 0);
+      return (
+        (maxSqft && sqft > maxSqft) ||
+        (maxLinearFt && linearFeet > maxLinearFt) ||
+        (maxStories && stories >= maxStories) ||
+        (maxWindows && windowCount > maxWindows)
+      );
+    });
+  }, [complexityThresholds, pricingResults, serviceInputs]);
+
   const slots = useMemo(() => {
     const totalMinutes = pricingResults.reduce((sum, r) => {
       const cfg = pricingData?.[r.serviceType] as any;
@@ -955,7 +973,7 @@ export default function QuoteTool() {
                   acceptedUpsellItems={acceptedUpsellItems}
                   upsellTotal={upsellTotal}
                   manualReviewServiceKeys={manualReviewServiceKeys}
-                  complexityThresholds={complexityThresholds}
+                  complexityFlagged={complexityFlagged}
                 />
               )}
               {step === 6 && (
@@ -984,9 +1002,22 @@ export default function QuoteTool() {
                   <p className="text-muted-foreground mb-4">
                     Your estimated total is{" "}
                     <span className="font-bold text-foreground text-lg">
-                      ${finalQuoteSummary.totalPrice.toFixed(2)}
+                      {complexityFlagged ? (
+                        <>
+                          ${Math.max(finalQuoteSummary.totalPrice - 75, 0).toFixed(2)} – $
+                          {(finalQuoteSummary.totalPrice + 125).toFixed(2)}
+                        </>
+                      ) : (
+                        <>${finalQuoteSummary.totalPrice.toFixed(2)}</>
+                      )}
                     </span>
                   </p>
+                  {complexityFlagged && (
+                    <p className="text-sm text-amber-800 mb-3">
+                      Size/complexity triggered a range. We'll confirm exact pricing before
+                      scheduling and honor the range shown here.
+                    </p>
+                  )}
                   <p className="text-sm text-muted-foreground max-w-md mx-auto">
                     By submitting, you'll receive a confirmation email with your
                     quote details. We'll reach out within 24 hours to confirm
@@ -1917,26 +1948,8 @@ function StepReview({
   acceptedUpsellItems,
   upsellTotal,
   manualReviewServiceKeys,
-  complexityThresholds,
+  complexityFlagged,
 }: any) {
-  const complexityFlagged = useMemo(() => {
-    const { maxSqft, maxLinearFt, maxStories, maxWindows } =
-      complexityThresholds ?? {};
-    return pricingResults.some((r: PricingResult) => {
-      const inputs = serviceInputs[r.serviceType] ?? {};
-      const sqft = Number((inputs as any).sqft ?? 0);
-      const linearFeet = Number((inputs as any).linearFeet ?? 0);
-      const stories = Number((inputs as any).stories ?? 1);
-      const windowCount = Number((inputs as any).windowCount ?? 0);
-      return (
-        (maxSqft && sqft > maxSqft) ||
-        (maxLinearFt && linearFeet > maxLinearFt) ||
-        (maxStories && stories >= maxStories) ||
-        (maxWindows && windowCount > maxWindows)
-      );
-    });
-  }, [complexityThresholds, pricingResults, serviceInputs]);
-
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">Review Your Quote</h2>
@@ -2054,6 +2067,12 @@ function StepReview({
         <p>
           <strong>Customer:</strong> {name}
         </p>
+        {complexityFlagged && (
+          <p className="mt-2 text-amber-800">
+            Estimate shown as a range due to size/complexity. We’ll confirm exact pricing
+            before scheduling.
+          </p>
+        )}
         <p className="mt-2">
           This is an estimate based on the measurements you provided. We'll
           verify all measurements on-site before starting any work, and your

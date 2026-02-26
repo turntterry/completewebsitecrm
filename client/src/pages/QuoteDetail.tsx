@@ -358,7 +358,18 @@ export default function QuoteDetail() {
             </>
           )}
           {q.status === "accepted" && (
-            <Button size="sm" onClick={() => navigate(`/admin/jobs/new?quoteId=${id}&customerId=${q.customerId}`)}>
+            <Button
+              size="sm"
+              onClick={() =>
+                navigate(
+                  `/admin/jobs/new?quoteId=${id}&customerId=${q.customerId}${
+                    q.preferredSlotLabel
+                      ? `&preferredSlotLabel=${encodeURIComponent(q.preferredSlotLabel)}`
+                      : ""
+                  }`
+                )
+              }
+            >
               <Briefcase className="h-4 w-4 mr-1.5" /> Convert to Job
             </Button>
           )}

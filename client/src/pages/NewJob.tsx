@@ -31,7 +31,7 @@ export default function NewJob() {
   const [instructions, setInstructions] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [scheduleNow, setScheduleNow] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState(preferredSlotLabel.split(" · ")[0] ? `${preferredSlotLabel.split(" · ")[0]}T09:00` : "");
+  const [scheduledAt, setScheduledAt] = useState("");
   const [scheduledEndAt, setScheduledEndAt] = useState("");
 
   const { data: customers = [] } = trpc.customers.list.useQuery({ search: "" });
@@ -50,6 +50,26 @@ export default function NewJob() {
       setPropertyId(undefined);
     }
   }, [customerId, properties.length]);
+
+  // Prefill from preferred slot if provided
+  useEffect(() => {
+    if (preferredSlotLabel && !instructions) {
+      setInstructions(`Customer preferred slot: ${preferredSlotLabel}`);
+    }
+    if (preferredSlotLabel && !scheduledAt) {
+      const [datePart, windowPart] = preferredSlotLabel.split(" · ");
+      if (datePart && windowPart && windowPart.includes("-")) {
+        const [start, end] = windowPart.split("-");
+        const parsedDate = new Date(datePart);
+        if (!isNaN(parsedDate.getTime())) {
+          const isoDate = parsedDate.toISOString().split("T")[0];
+          setScheduledAt(`${isoDate}T${start}`);
+          setScheduledEndAt(`${isoDate}T${end}`);
+          setScheduleNow(true);
+        }
+      }
+    }
+  }, [preferredSlotLabel, instructions, scheduledAt]);
 
   const createMutation = trpc.jobs.create.useMutation({
     onSuccess: (id) => {
