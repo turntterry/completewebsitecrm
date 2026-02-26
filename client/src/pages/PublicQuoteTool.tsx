@@ -406,6 +406,12 @@ export default function QuoteTool() {
   const availabilityHorizonDays = Number(
     experienceConfig?.settings?.availabilityDaysAhead ?? 9
   );
+  const availabilityStartHour = Number(
+    experienceConfig?.settings?.availabilityStartHour ?? 9
+  );
+  const availabilityEndHour = Number(
+    experienceConfig?.settings?.availabilityEndHour ?? 17
+  );
 
   const totalDurationMinutes = useMemo(() => {
     return pricingResults.reduce((sum, r) => {
@@ -419,6 +425,8 @@ export default function QuoteTool() {
     {
       durationMinutes: totalDurationMinutes || 90,
       daysAhead: availabilityHorizonDays,
+      startHour: availabilityStartHour,
+      endHour: availabilityEndHour,
     },
     { enabled: step >= 5 && !pricingLoading }
   );
