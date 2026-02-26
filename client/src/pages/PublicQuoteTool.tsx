@@ -264,6 +264,7 @@ export default function QuoteTool() {
   >({});
   const shownUpsellsRef = useRef<Set<string>>(new Set());
   const [scheduleHandoffStarted, setScheduleHandoffStarted] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -625,6 +626,14 @@ export default function QuoteTool() {
   const handleScheduleHandoffComplete = () => {
     if (!sessionToken || !quoteResult?.schedulingEligible) return;
 
+    if (selectedSlotId) {
+      trackEventMutation.mutate({
+        sessionToken,
+        eventName: "schedule_slot_confirmed",
+        payload: { slotId: selectedSlotId },
+      });
+    }
+
     trackEventMutation.mutate({
       sessionToken,
       eventName: "schedule_completed",
@@ -673,6 +682,32 @@ export default function QuoteTool() {
   }
 
   if (submitted && quoteResult) {
+    const slots = useMemo(() => {
+      const now = new Date();
+      const days = Array.from({ length: 5 }).map((_, i) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() + i + 1);
+        const dateStr = d.toISOString().split("T")[0];
+        return {
+          date: dateStr,
+          label: d.toLocaleDateString(undefined, {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          }),
+          times: ["09:00-11:00", "13:00-15:00", "15:00-17:00"],
+        };
+      });
+      return days.flatMap(day =>
+        day.times.map((t, idx) => ({
+          id: `${day.date}_${idx}`,
+          date: day.date,
+          window: t,
+          display: `${day.label} · ${t}`,
+        }))
+      );
+    }, []);
+
     const readableSchedulingReasons: Record<string, string> = {
       too_many_services:
         "Instant booking is off for quotes with three or more services.",
@@ -680,6 +715,12 @@ export default function QuoteTool() {
         "One or more selected services always require manual scheduling.",
       client_marked_ineligible:
         "Customer marked scheduling as not eligible during submission.",
+      size_or_complexity:
+        "Size or complexity requires manual confirmation (oversize, steep roof, high stories, or large window count).",
+      range_output:
+        "Quote is provided as a range; a team member will confirm exact pricing.",
+      service_requires_manual_review:
+        "Selected service requires manual review before scheduling.",
     };
 
     return (
@@ -721,10 +762,43 @@ export default function QuoteTool() {
                 ) : null}
               </>
             ) : quoteResult.schedulingEligible ? (
-              <p className="text-muted-foreground mb-8">
-                You're eligible for fast scheduling handoff right now. Use the
-                buttons below to start and complete scheduling.
-              </p>
+              <div className="space-y-4 mb-8">
+                <p className="text-muted-foreground">
+                  You're eligible for fast scheduling handoff right now. Pick a
+                  time window or tap call if you prefer.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {slots.map(slot => (
+                    <Button
+                      key={slot.id}
+                      variant={
+                        selectedSlotId === slot.id ? "default" : "outline"
+                      }
+                      className={`justify-start ${
+                        selectedSlotId === slot.id
+                          ? "border-primary bg-primary text-white"
+                          : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedSlotId(slot.id);
+                        if (sessionToken) {
+                          trackEventMutation.mutate({
+                            sessionToken,
+                            eventName: "schedule_slot_selected",
+                            payload: {
+                              slotId: slot.id,
+                              date: slot.date,
+                              window: slot.window,
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      {slot.display}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 text-sm">
                 Instant booking is disabled for this quote. We'll confirm the

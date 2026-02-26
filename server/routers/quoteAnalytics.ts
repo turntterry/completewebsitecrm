@@ -89,10 +89,10 @@ export const quoteAnalyticsRouter = router({
           upsellShown: boolean;
           upsellAccepted: boolean;
           submitted: boolean;
-        scheduleStarted: boolean;
-        scheduleCompleted: boolean;
-        scheduleBlocked: boolean;
-      }
+          scheduleStarted: boolean;
+          scheduleCompleted: boolean;
+          scheduleBlocked: boolean;
+        }
       >();
 
       for (const session of sessions) {
@@ -109,6 +109,8 @@ export const quoteAnalyticsRouter = router({
       }
 
       const scheduleBlockedReasons = new Map<string, number>();
+      let slotSelected = 0;
+      let slotConfirmed = 0;
 
       for (const event of events) {
         const row = stageMap.get(event.sessionId);
@@ -128,6 +130,8 @@ export const quoteAnalyticsRouter = router({
             scheduleBlockedReasons.set(r, (scheduleBlockedReasons.get(r) ?? 0) + 1);
           }
         }
+        if (event.eventName === "schedule_slot_selected") slotSelected += 1;
+        if (event.eventName === "schedule_slot_confirmed") slotConfirmed += 1;
         if (event.eventName === "schedule_started") row.scheduleStarted = true;
         if (event.eventName === "schedule_completed")
           row.scheduleCompleted = true;
@@ -174,6 +178,8 @@ export const quoteAnalyticsRouter = router({
         scheduleBlockedReasons: Array.from(scheduleBlockedReasons.entries()).map(
           ([reason, count]) => ({ reason, count })
         ),
+        slotSelected,
+        slotConfirmed,
       };
     }),
 

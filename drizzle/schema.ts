@@ -671,6 +671,14 @@ export const quoteToolSettings = mysqlTable("quote_tool_settings", {
     .$type<string[]>()
     .notNull()
     .default([]),
+  maxSqftAuto: decimal("maxSqftAuto", { precision: 10, scale: 2 })
+    .notNull()
+    .default("5000"),
+  maxLinearFtAuto: decimal("maxLinearFtAuto", { precision: 10, scale: 2 })
+    .notNull()
+    .default("800"),
+  maxStoriesAuto: int("maxStoriesAuto").notNull().default(3),
+  maxWindowsAuto: int("maxWindowsAuto").notNull().default(120),
   customerTierLabels: json("customerTierLabels").$type<{
     good: string;
     better: string;

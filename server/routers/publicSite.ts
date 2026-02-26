@@ -93,6 +93,8 @@ const quoteRouter = router({
           "schedule_blocked",
           "schedule_started",
           "schedule_completed",
+          "schedule_slot_selected",
+          "schedule_slot_confirmed",
         ]),
         payload: z.record(z.string(), z.unknown()).optional(),
       })
@@ -390,6 +392,10 @@ const quoteRouter = router({
         settings?.maxServicesForInstantBooking ?? 2;
       const blockedServices =
         (settings?.instantBookingBlockedServices as string[]) ?? [];
+      const maxSqftAuto = Number(settings?.maxSqftAuto ?? 5000);
+      const maxLinearFtAuto = Number(settings?.maxLinearFtAuto ?? 800);
+      const maxStoriesAuto = Number(settings?.maxStoriesAuto ?? 3);
+      const maxWindowsAuto = Number(settings?.maxWindowsAuto ?? 120);
 
       const nonUpsellServiceTypes = input.items
         .map(item => item.serviceType)
@@ -445,10 +451,10 @@ const quoteRouter = router({
           const windowCount = Number((inputs as any).windowCount ?? 0);
           const roofPitch = String((inputs as any).roofPitch ?? "");
           return (
-            sqft > 5000 ||
-            linearFeet > 800 ||
-            stories >= 3 ||
-            windowCount > 120 ||
+            sqft > maxSqftAuto ||
+            linearFeet > maxLinearFtAuto ||
+            stories >= maxStoriesAuto ||
+            windowCount > maxWindowsAuto ||
             roofPitch === "steep"
           );
         });
