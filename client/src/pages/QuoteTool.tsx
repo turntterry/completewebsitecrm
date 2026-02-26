@@ -1046,7 +1046,16 @@ export default function QuoteTool() {
                         className="flex items-center justify-between rounded-md border p-2 text-sm"
                       >
                         <span className="text-muted-foreground">
-                          {row.reason.replace(/_/g, " ")}
+                          {( {
+                            too_many_services: "Too many services (3+)",
+                            blocked_service_type: "Blocked service type",
+                            service_requires_manual_review:
+                              "Service marked manual review",
+                            size_or_complexity: "Size/complexity threshold",
+                            range_output: "Range / low confidence",
+                            client_marked_ineligible: "Client marked ineligible",
+                          } as Record<string, string>)[row.reason] ??
+                            row.reason.replace(/_/g, " ")}
                         </span>
                         <span className="font-semibold">{row.count}</span>
                       </div>

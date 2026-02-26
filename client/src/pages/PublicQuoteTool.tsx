@@ -266,6 +266,12 @@ export default function QuoteTool() {
   const [scheduleHandoffStarted, setScheduleHandoffStarted] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const slots = useMemo(() => {
+    const totalMinutes = pricingResults.reduce((sum, r) => {
+      const cfg = pricingData?.[r.serviceType] as any;
+      const minDur = Number(cfg?.minDuration ?? 60);
+      return sum + minDur;
+    }, 0);
+    const windowMinutes = Math.min(180, Math.max(60, totalMinutes + 30));
     const now = new Date();
     const days = Array.from({ length: 5 }).map((_, i) => {
       const d = new Date(now);
@@ -278,7 +284,12 @@ export default function QuoteTool() {
           month: "short",
           day: "numeric",
         }),
-        times: ["09:00-11:00", "13:00-15:00", "15:00-17:00"],
+        times:
+          windowMinutes <= 90
+            ? ["09:00-10:30", "11:00-12:30", "13:00-14:30", "15:00-16:30"]
+            : windowMinutes <= 120
+              ? ["09:00-11:00", "12:00-14:00", "15:00-17:00"]
+              : ["09:00-12:00", "13:00-16:00"],
       };
     });
     return days.flatMap(day =>

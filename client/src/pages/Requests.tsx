@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, ClipboardList, Phone, Mail, Zap, MapPin, DollarSign, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Plus, ClipboardList, Phone, Mail, Zap, MapPin, DollarSign, ChevronDown, ChevronUp, ExternalLink, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
@@ -83,6 +83,11 @@ function InstantQuoteCard({ quote }: { quote: any }) {
               <span className="text-xs text-muted-foreground">{services.length} service{services.length !== 1 ? "s" : ""}</span>
               {parseFloat(quote.discountPercent || "0") > 0 && (
                 <span className="text-xs text-emerald-600">{quote.discountPercent}% discount applied</span>
+              )}
+              {quote.preferredSlotLabel && (
+                <span className="text-xs flex items-center gap-1 text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                  <Calendar className="h-3 w-3" /> {quote.preferredSlotLabel}
+                </span>
               )}
             </div>
           </div>
