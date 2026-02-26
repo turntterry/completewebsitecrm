@@ -254,6 +254,8 @@ export default function QuoteTool() {
     totalPrice: number;
     confidenceMode: "exact" | "range" | "manual_review";
     schedulingEligible: boolean;
+    manualReviewLeadId?: number | null;
+    lowConfidenceReasons?: string[];
   } | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [acceptedUpsells, setAcceptedUpsells] = useState<
@@ -681,11 +683,24 @@ export default function QuoteTool() {
               Quote #{quoteResult.quoteId} has been sent to {BUSINESS.owner}.
             </p>
             {quoteResult.confidenceMode === "manual_review" ? (
-              <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 text-sm">
-                This quote is in <strong>manual review</strong> mode due to job
-                minimum or complexity. Our team will verify details and confirm
-                exact scheduling options within 24 hours.
-              </p>
+              <>
+                <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 text-sm">
+                  This quote is in <strong>manual review</strong> mode due to
+                  job minimum or complexity. Our team will verify details and
+                  confirm exact scheduling options within 24 hours.
+                </p>
+                {quoteResult.manualReviewLeadId ? (
+                  <p className="text-xs text-amber-800 mt-2">
+                    Internal follow-up lead created: #
+                    {quoteResult.manualReviewLeadId}
+                  </p>
+                ) : null}
+                {quoteResult.lowConfidenceReasons?.length ? (
+                  <p className="text-xs text-amber-800 mt-1">
+                    Reason codes: {quoteResult.lowConfidenceReasons.join(", ")}
+                  </p>
+                ) : null}
+              </>
             ) : (
               <p className="text-muted-foreground mb-8">
                 You're eligible for fast scheduling handoff right now. Use the

@@ -340,6 +340,30 @@ const quoteRouter = router({
       const services = [...baseServices, ...upsellServices];
 
       const bundleDiscount = input.bundleDiscount ?? 0;
+      const lowConfidenceReasons: string[] = [];
+      if (input.confidenceMode === "manual_review") {
+        lowConfidenceReasons.push("client_requested_manual_review");
+      }
+      if (!input.schedulingEligible) {
+        lowConfidenceReasons.push("scheduling_not_eligible");
+      }
+      if (input.totalPrice <= 0) {
+        lowConfidenceReasons.push("non_positive_total");
+      }
+      if (input.items.length === 0) {
+        lowConfidenceReasons.push("no_services_selected");
+      }
+
+      const finalConfidenceMode: "exact" | "range" | "manual_review" =
+        lowConfidenceReasons.length > 0
+          ? "manual_review"
+          : input.confidenceMode === "range"
+            ? "range"
+            : "exact";
+
+      const finalSchedulingEligible =
+        input.schedulingEligible && finalConfidenceMode !== "manual_review";
+
       const [result] = await db.insert(instantQuotes).values([
         {
           firstName,
@@ -363,13 +387,13 @@ const quoteRouter = router({
           discountPercent: "0",
           discountAmount: String(bundleDiscount.toFixed(2)),
           total: String(input.totalPrice.toFixed(2)),
-          status:
-            input.confidenceMode === "manual_review" ? "pending" : "pending",
+          status: "pending",
         },
       ]);
 
       const quoteId = (result as any).insertId as number;
 
+      let sessionCompanyId = 1;
       if (input.sessionToken) {
         const [session] = await db
           .select()
@@ -378,6 +402,7 @@ const quoteRouter = router({
           .limit(1);
 
         if (session) {
+          sessionCompanyId = Number(session.companyId ?? 1);
           await db
             .update(quoteSessions)
             .set({ submittedAt: new Date() })
@@ -391,17 +416,46 @@ const quoteRouter = router({
               totalPrice: input.totalPrice,
               services: input.items.length,
               upsells: input.acceptedUpsells.length,
-              confidenceMode: input.confidenceMode,
+              confidenceMode: finalConfidenceMode,
+              schedulingEligible: finalSchedulingEligible,
+              lowConfidenceReasons,
             },
           });
         }
       }
 
+      let manualReviewLeadId: number | null = null;
+      if (finalConfidenceMode === "manual_review") {
+        const [leadResult] = await db.insert(leads).values({
+          companyId: sessionCompanyId,
+          firstName,
+          lastName,
+          email: input.customerEmail,
+          phone: input.customerPhone,
+          address: input.address,
+          city: input.city ?? null,
+          state: input.state ?? null,
+          zip: input.zip ?? null,
+          services: input.items.map(item => item.serviceType),
+          source: "instant_quote_manual_review",
+          status: "follow_up",
+          notes: `Manual review required for instant quote #${quoteId}. Reasons: ${lowConfidenceReasons.join(", ") || "n/a"}`,
+        });
+        manualReviewLeadId = (leadResult as any).insertId as number;
+
+        notifyOwner({
+          title: "Manual Review Quote Needs Follow-up",
+          content: `Quote #${quoteId} from ${input.customerName} requires manual review. Lead #${manualReviewLeadId}. Reasons: ${lowConfidenceReasons.join(", ") || "n/a"}`,
+        }).catch(() => {});
+      }
+
       return {
         quoteId,
         totalPrice: input.totalPrice,
-        confidenceMode: input.confidenceMode,
-        schedulingEligible: input.schedulingEligible,
+        confidenceMode: finalConfidenceMode,
+        schedulingEligible: finalSchedulingEligible,
+        manualReviewLeadId,
+        lowConfidenceReasons,
       };
     }),
 
@@ -465,6 +519,7 @@ const quoteRouter = router({
       }));
 
       const bundleDiscount = input.bundleDiscount ?? 0;
+
       const [result] = await db.insert(instantQuotes).values([
         {
           firstName,

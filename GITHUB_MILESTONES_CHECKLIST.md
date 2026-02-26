@@ -4,8 +4,8 @@
 
 ## Overall Progress
 
-- **Progress:** `5 / 7 milestones complete` (71%)
-- **Current phase:** `Phase 5 — Scheduling handoff + confidence guardrails`
+- **Progress:** `6 / 7 milestones complete` (86%)
+- **Current phase:** `Phase 6 — Hardening + launch`
 
 ---
 
@@ -36,10 +36,10 @@
   - [x] Analytics router added (`funnelSummary`, `servicePerformance`, `upsellPerformance`, `attribution`)
   - [x] Admin analytics card added in Quote Tool
 
-- [ ] **Phase 5 — Scheduling handoff + confidence guardrails** _(In Progress)_
-  - [ ] Confidence modes finalized (`exact`, `range`, `manual review`)
+- [x] **Phase 5 — Scheduling handoff + confidence guardrails**
+  - [x] Confidence modes finalized (`exact`, `range`, `manual review`)
   - [x] Scheduling eligibility + handoff UX complete
-  - [ ] Low-confidence routing workflow implemented
+  - [x] Low-confidence routing workflow implemented
 
 - [ ] **Phase 6 — Hardening + launch**
   - [ ] E2E smoke suite for quote funnel and upsells
@@ -50,7 +50,7 @@
 
 ## Next Up (Immediate)
 
-- [ ] Complete **Phase 5 confidence modes + manual review routing**
+- [ ] Begin **Phase 6 hardening: e2e smoke + launch checklist**
 
 ---
 
