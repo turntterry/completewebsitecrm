@@ -535,6 +535,8 @@ export const instantQuotes = mysqlTable("instant_quotes", {
   status: mysqlEnum("status", ["pending", "booked", "declined", "converted"])
     .default("pending")
     .notNull(),
+  preferredSlot: varchar("preferredSlot", { length: 120 }),
+  preferredSlotLabel: varchar("preferredSlotLabel", { length: 200 }),
   // Marketing consent
   emailConsent: boolean("emailConsent").default(false),
   smsConsent: boolean("smsConsent").default(false),

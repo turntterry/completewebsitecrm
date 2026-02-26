@@ -276,6 +276,8 @@ const quoteRouter = router({
         totalPrice: z.number(),
         preferredDate: z.string().optional(),
         preferredTime: z.string().optional(),
+        preferredSlot: z.string().optional(),
+        preferredSlotLabel: z.string().optional(),
         referralSource: z.string().optional(),
         customerPhotos: z.array(z.string()).optional(),
         confidenceMode: z
@@ -495,6 +497,8 @@ const quoteRouter = router({
           discountAmount: String(bundleDiscount.toFixed(2)),
           total: String(input.totalPrice.toFixed(2)),
           status: "pending",
+          preferredSlot: (input as any).preferredSlot ?? null,
+          preferredSlotLabel: (input as any).preferredSlotLabel ?? null,
         },
       ]);
 
@@ -665,6 +669,8 @@ const quoteRouter = router({
           discountAmount: String(bundleDiscount.toFixed(2)),
           total: String(input.totalPrice.toFixed(2)),
           status: "pending",
+          preferredSlot: (input as any).preferredSlot ?? null,
+          preferredSlotLabel: (input as any).preferredSlotLabel ?? null,
         },
       ]);
 

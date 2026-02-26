@@ -265,6 +265,31 @@ export default function QuoteTool() {
   const shownUpsellsRef = useRef<Set<string>>(new Set());
   const [scheduleHandoffStarted, setScheduleHandoffStarted] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const slots = useMemo(() => {
+    const now = new Date();
+    const days = Array.from({ length: 5 }).map((_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i + 1);
+      const dateStr = d.toISOString().split("T")[0];
+      return {
+        date: dateStr,
+        label: d.toLocaleDateString(undefined, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
+        times: ["09:00-11:00", "13:00-15:00", "15:00-17:00"],
+      };
+    });
+    return days.flatMap(day =>
+      day.times.map((t, idx) => ({
+        id: `${day.date}_${idx}`,
+        date: day.date,
+        window: t,
+        display: `${day.label} · ${t}`,
+      }))
+    );
+  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -532,6 +557,9 @@ export default function QuoteTool() {
         preferredDate: preferredDate || undefined,
         preferredTime: preferredTime || undefined,
         referralSource: referralSource || undefined,
+        preferredSlot: selectedSlotId || undefined,
+        preferredSlotLabel:
+          slots.find(s => s.id === selectedSlotId)?.display || undefined,
         customerPhotos: photos.length > 0 ? photos : undefined,
         items: [
           ...pricingResults.map(r => ({
@@ -696,32 +724,6 @@ export default function QuoteTool() {
   }
 
   if (submitted && quoteResult) {
-    const slots = useMemo(() => {
-      const now = new Date();
-      const days = Array.from({ length: 5 }).map((_, i) => {
-        const d = new Date(now);
-        d.setDate(d.getDate() + i + 1);
-        const dateStr = d.toISOString().split("T")[0];
-        return {
-          date: dateStr,
-          label: d.toLocaleDateString(undefined, {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          }),
-          times: ["09:00-11:00", "13:00-15:00", "15:00-17:00"],
-        };
-      });
-      return days.flatMap(day =>
-        day.times.map((t, idx) => ({
-          id: `${day.date}_${idx}`,
-          date: day.date,
-          window: t,
-          display: `${day.label} · ${t}`,
-        }))
-      );
-    }, []);
-
     const readableSchedulingReasons: Record<string, string> = {
       too_many_services:
         "Instant booking is off for quotes with three or more services.",
