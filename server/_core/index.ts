@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerSmsWebhook } from "../webhooks/twilioWebhook";
+import { mockAvailabilityProvider } from "@shared/availability";
 import { trpcOnError } from "./observability";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -39,6 +40,30 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Twilio inbound SMS webhook
   registerSmsWebhook(app);
+  // Local-only mock scheduler endpoint for development
+  app.post("/api/mock/scheduler", (req, res) => {
+    try {
+      const {
+        durationMinutes = 90,
+        daysAhead = 7,
+        startHour,
+        endHour,
+        paddingMinutes = 0,
+      } = req.body ?? {};
+
+      const slots = mockAvailabilityProvider.getSlots({
+        durationMinutes: Number(durationMinutes) || 90,
+        daysAhead: Number(daysAhead) || 7,
+        startHour: startHour !== undefined ? Number(startHour) : undefined,
+        endHour: endHour !== undefined ? Number(endHour) : undefined,
+        paddingMinutes: Number(paddingMinutes) || 0,
+      });
+
+      res.json({ slots });
+    } catch (err) {
+      res.status(400).json({ error: "Failed to generate mock slots", detail: String(err) });
+    }
+  });
   // tRPC API
   app.use(
     "/api/trpc",

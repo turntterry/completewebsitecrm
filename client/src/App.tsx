@@ -48,6 +48,7 @@ import StandaloneQuoteLink from "./pages/StandaloneQuoteLink";
 import FieldTimer from "./pages/FieldTimer";
 import AiReceptionist from "./pages/AiReceptionist";
 import Messages from "./pages/Messages";
+import Portal from "./pages/Portal";
 
 function Router() {
   return (
@@ -70,6 +71,7 @@ function Router() {
       <Route path="/field" component={FieldTimer} />
       <Route path="/field/:visitId" component={FieldTimer} />
       <Route path="/client" component={ClientHub} />
+      <Route path="/portal" component={Portal} />
       <Route path="/login" component={LoginPage} />
 
       {/* ── CRM admin routes (all under /admin) ── */}

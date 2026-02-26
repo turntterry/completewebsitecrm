@@ -22,6 +22,7 @@ import { smsRouter } from "./routers/sms";
 import { aiReceptionistRouter } from "./routers/aiReceptionist";
 import { publicSiteRouter } from "./routers/publicSite";
 import { quoteAnalyticsRouter } from "./routers/quoteAnalytics";
+import { portalRouter } from "./routers/portal";
 
 export const appRouter = router({
   publicSite: publicSiteRouter,
@@ -53,6 +54,7 @@ export const appRouter = router({
   marketing: marketingRouter,
   sms: smsRouter,
   aiReceptionist: aiReceptionistRouter,
+  portal: portalRouter,
 });
 
 export type AppRouter = typeof appRouter;
