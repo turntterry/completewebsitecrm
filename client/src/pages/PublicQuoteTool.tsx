@@ -831,6 +831,7 @@ export default function QuoteTool() {
                   acceptedUpsells={acceptedUpsells}
                   toggleUpsell={toggleUpsell}
                   upsellTotal={upsellTotal}
+                  selectedServices={selectedServices}
                 />
               )}
               {step === 5 && (
@@ -1653,58 +1654,117 @@ function WindowPackageSelector({
   );
 }
 
+// Human-readable labels for each service key used in the upsell context subtitle
+const SERVICE_LABELS: Record<string, string> = {
+  house_washing: "house washing",
+  window_cleaning: "window cleaning",
+  driveway_cleaning: "driveway cleaning",
+  roof_cleaning: "roof cleaning",
+  gutter_cleaning: "gutter cleaning",
+  patio_cleaning: "patio cleaning",
+  walkway_cleaning: "walkway cleaning",
+  deck_cleaning: "deck cleaning",
+  fence_cleaning: "fence cleaning",
+  detached_structure: "detached structure",
+};
+
 function StepUpsells({
   eligibleUpsells,
   acceptedUpsells,
   toggleUpsell,
   upsellTotal,
+  selectedServices,
 }: any) {
+  const acceptedCount = Object.values(acceptedUpsells).filter(Boolean).length;
+
+  // Build a readable list of selected service names for the subtitle
+  const serviceNames = useMemo(() => {
+    const names = Array.from(selectedServices as Set<string>)
+      .map((key: string) => SERVICE_LABELS[key] ?? key)
+      .slice(0, 3);
+    if (names.length === 0) return "";
+    if (names.length === 1) return names[0];
+    return names.slice(0, -1).join(", ") + " & " + names[names.length - 1];
+  }, [selectedServices]);
+
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">
-        Enhance Your Quote
+        Commonly paired with your services
       </h2>
-      <p className="text-sm text-muted-foreground mb-6">
-        Add premium options with one tap. You can keep, change, or skip any of
-        these.
+      <p className="text-sm text-muted-foreground mb-4">
+        Customers who book{serviceNames ? ` ${serviceNames}` : " these services"} frequently add one or more of these. One tap to include — skip anything that doesn't apply.
       </p>
 
       {eligibleUpsells.length === 0 ? (
         <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-          Select at least one service to unlock personalized add-on
-          recommendations.
+          Select at least one service to see personalized add-on pairings.
         </div>
       ) : (
         <div className="space-y-3 mb-5">
           {eligibleUpsells.map((upsell: any) => {
             const active = !!acceptedUpsells[upsell.id];
+            const isFree = upsell.price === 0;
             return (
               <button
                 key={upsell.id}
                 type="button"
                 onClick={() => toggleUpsell(upsell.id)}
-                className={`w-full text-left rounded-xl border p-4 transition ${
+                className={`w-full text-left rounded-xl border p-4 transition-all ${
                   active
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border hover:border-primary/40"
+                    ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                    : "border-border hover:border-primary/40 hover:bg-muted/30"
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-sm flex items-center gap-2">
+                  {/* Checkmark indicator */}
+                  <div
+                    className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      active
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground/30"
+                    }`}
+                  >
+                    {active && (
+                      <svg
+                        className="w-3 h-3 text-white"
+                        fill="none"
+                        viewBox="0 0 12 12"
+                      >
+                        <path
+                          d="M2 6l3 3 5-5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm flex flex-wrap items-center gap-1.5">
                       {upsell.title}
                       {upsell.badge && (
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge
+                          variant={active ? "default" : "secondary"}
+                          className="text-[10px] px-1.5"
+                        >
                           {upsell.badge}
                         </Badge>
                       )}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                       {upsell.description}
                     </p>
                   </div>
-                  <p className="font-semibold text-sm">
-                    +${upsell.price.toFixed(2)}
+
+                  <p
+                    className={`font-semibold text-sm flex-shrink-0 ${
+                      isFree ? "text-green-600" : ""
+                    }`}
+                  >
+                    {isFree ? "Free" : `+$${upsell.price.toFixed(2)}`}
                   </p>
                 </div>
               </button>
@@ -1713,10 +1773,22 @@ function StepUpsells({
         </div>
       )}
 
+      {/* Summary bar */}
       <div className="rounded-lg bg-secondary p-4 flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Upsell total</p>
+        <div>
+          <p className="text-sm font-medium">
+            {acceptedCount === 0
+              ? "No extras added — that's fine"
+              : `${acceptedCount} extra${acceptedCount > 1 ? "s" : ""} added`}
+          </p>
+          {acceptedCount === 0 && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Tap any item above to include it
+            </p>
+          )}
+        </div>
         <p className="font-heading font-bold text-lg text-primary">
-          +${upsellTotal.toFixed(2)}
+          {upsellTotal > 0 ? `+$${upsellTotal.toFixed(2)}` : "$0"}
         </p>
       </div>
     </div>
