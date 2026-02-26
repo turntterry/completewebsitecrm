@@ -677,6 +677,8 @@ export const quoteToolSettings = mysqlTable("quote_tool_settings", {
   availabilityStartHour: int("availabilityStartHour").notNull().default(9),
   availabilityEndHour: int("availabilityEndHour").notNull().default(17),
   availabilityDaysAhead: int("availabilityDaysAhead").notNull().default(9),
+  availabilityPreferExternal: boolean("availabilityPreferExternal").default(true),
+  slotPaddingMinutes: int("slotPaddingMinutes").notNull().default(0),
   maxSqftAuto: decimal("maxSqftAuto", { precision: 10, scale: 2 })
     .notNull()
     .default("5000"),

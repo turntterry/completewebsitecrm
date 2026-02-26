@@ -136,6 +136,9 @@ export default function QuoteTool() {
   const [availabilityStartHour, setAvailabilityStartHour] = useState(9);
   const [availabilityEndHour, setAvailabilityEndHour] = useState(17);
   const [availabilityDaysAhead, setAvailabilityDaysAhead] = useState(9);
+  const [availabilityPreferExternal, setAvailabilityPreferExternal] =
+    useState(true);
+  const [slotPaddingMinutes, setSlotPaddingMinutes] = useState(0);
   const [maxServicesForInstantBooking, setMaxServicesForInstantBooking] =
     useState(2);
   const [blockedInstantServices, setBlockedInstantServices] = useState<
@@ -208,6 +211,10 @@ export default function QuoteTool() {
     );
     setAvailabilityEndHour((settings as any).availabilityEndHour ?? 17);
     setAvailabilityDaysAhead((settings as any).availabilityDaysAhead ?? 9);
+    setAvailabilityPreferExternal(
+      (settings as any).availabilityPreferExternal ?? true
+    );
+    setSlotPaddingMinutes((settings as any).slotPaddingMinutes ?? 0);
     setMaxServicesForInstantBooking(
       settings.maxServicesForInstantBooking ?? 2
     );
@@ -286,6 +293,8 @@ export default function QuoteTool() {
     availabilityStartHour?: number;
     availabilityEndHour?: number;
     availabilityDaysAhead?: number;
+    availabilityPreferExternal?: boolean;
+    slotPaddingMinutes?: number;
     maxSqftAuto?: number;
     maxLinearFtAuto?: number;
     maxStoriesAuto?: number;
@@ -312,6 +321,10 @@ export default function QuoteTool() {
         partial.availabilityEndHour ?? availabilityEndHour,
       availabilityDaysAhead:
         partial.availabilityDaysAhead ?? availabilityDaysAhead,
+      availabilityPreferExternal:
+        partial.availabilityPreferExternal ?? availabilityPreferExternal,
+      slotPaddingMinutes:
+        partial.slotPaddingMinutes ?? slotPaddingMinutes,
       maxSqftAuto: partial.maxSqftAuto ?? maxSqftAuto,
       maxLinearFtAuto: partial.maxLinearFtAuto ?? maxLinearFtAuto,
       maxStoriesAuto: partial.maxStoriesAuto ?? maxStoriesAuto,
@@ -1845,6 +1858,48 @@ export default function QuoteTool() {
                     }}
                   />
                   <span className="text-xs text-muted-foreground">days</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium">Use external scheduler</p>
+                    <p className="text-xs text-muted-foreground">
+                      When enabled, the quote tool will request live slots from
+                      your scheduler API (falls back to mock if unavailable).
+                    </p>
+                  </div>
+                  <Switch
+                    checked={availabilityPreferExternal}
+                    onCheckedChange={v => {
+                      setAvailabilityPreferExternal(v);
+                      pushDeployUpdate({ availabilityPreferExternal: v });
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Label className="text-xs text-muted-foreground w-32">
+                    Slot padding (mins)
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={240}
+                    className="w-24 h-8 text-sm"
+                    value={slotPaddingMinutes}
+                    onChange={e => {
+                      const v = Math.max(
+                        0,
+                        Math.min(240, parseInt(e.target.value) || 0)
+                      );
+                      setSlotPaddingMinutes(v);
+                      pushDeployUpdate({ slotPaddingMinutes: v });
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    buffer per job
+                  </span>
                 </div>
               </div>
             </CardContent>

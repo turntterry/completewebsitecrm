@@ -10,6 +10,7 @@ export interface AvailabilityProviderOptions {
   daysAhead?: number;
   startHour?: number; // 24h format; default 9
   endHour?: number; // default 17
+  paddingMinutes?: number; // buffer added to duration
 }
 
 export interface AvailabilityProvider {
@@ -18,9 +19,18 @@ export interface AvailabilityProvider {
 
 // Mock provider: duration-aware windows generated locally.
 export const mockAvailabilityProvider: AvailabilityProvider = {
-  getSlots({ durationMinutes, daysAhead = 7, startHour = 9, endHour = 17 }) {
+  getSlots({
+    durationMinutes,
+    daysAhead = 7,
+    startHour = 9,
+    endHour = 17,
+    paddingMinutes = 0,
+  }) {
     const now = new Date();
-    const windowMinutes = Math.min(180, Math.max(60, durationMinutes + 30));
+    const windowMinutes = Math.min(
+      180,
+      Math.max(60, durationMinutes + 30 + paddingMinutes)
+    );
 
     const slots: Slot[] = [];
     for (let i = 1; i <= daysAhead; i++) {

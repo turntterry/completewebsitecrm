@@ -188,20 +188,27 @@ const quoteRouter = router({
         daysAhead: z.number().min(1).max(21).default(9),
         startHour: z.number().min(5).max(12).optional(),
         endHour: z.number().min(13).max(22).optional(),
+        preferExternal: z.boolean().optional(),
+        slotPaddingMinutes: z.number().int().min(0).max(240).default(0),
       })
     )
     .query(async ({ input }) => {
-      const external = await fetchSchedulerSlots(input).catch(err => {
-        logger.warn("quote.getSlots.fallback", { message: String(err) });
-        return null;
-      });
-      if (external?.length) return external;
+      const preferExternal =
+        input.preferExternal === undefined ? true : input.preferExternal;
+      if (preferExternal) {
+        const external = await fetchSchedulerSlots(input).catch(err => {
+          logger.warn("quote.getSlots.fallback", { message: String(err) });
+          return null;
+        });
+        if (external?.length) return external;
+      }
 
       return mockAvailabilityProvider.getSlots({
         durationMinutes: input.durationMinutes,
         daysAhead: input.daysAhead,
         startHour: input.startHour,
         endHour: input.endHour,
+        paddingMinutes: input.slotPaddingMinutes,
       });
     }),
 
@@ -759,10 +766,17 @@ const quoteRouter = router({
           zip: input.zip ?? null,
           lat: input.lat !== undefined ? String(input.lat) : null,
           lng: input.lng !== undefined ? String(input.lng) : null,
-          squareFootage: null,
-          stories: null,
+          squareFootage:
+            input.propertyIntel?.livingAreaSqft !== undefined
+              ? Number(input.propertyIntel.livingAreaSqft)
+              : null,
+          stories:
+            input.propertyIntel?.stories !== undefined
+              ? Number(input.propertyIntel.stories)
+              : null,
           exteriorMaterial: null,
           propertyType: null,
+          propertyIntel: input.propertyIntel ?? null,
           services: services as any,
           subtotal: String(input.subtotal.toFixed(2)),
           discountPercent: "0",
@@ -809,6 +823,10 @@ const quoteRouter = router({
         title: `New Quote: $${input.totalPrice.toFixed(2)} from ${input.customerName}`,
         content: `Name: ${input.customerName}\nPhone: ${input.customerPhone}\nEmail: ${input.customerEmail}\nAddress: ${input.address}\nServices: ${serviceList}\nTotal: $${input.totalPrice.toFixed(2)}${input.preferredDate ? `\nPreferred date: ${input.preferredDate}` : ""}${(input as any).preferredSlotLabel ? `\nPreferred slot: ${(input as any).preferredSlotLabel}` : ""}${
           (input as any).confidenceMode === "range" ? `\nPresented as range: yes` : ""
+        }${
+          input.propertyIntel
+            ? `\nProperty intel: ${JSON.stringify(input.propertyIntel)}`
+            : ""
         }`,
       }).catch(() => {});
 

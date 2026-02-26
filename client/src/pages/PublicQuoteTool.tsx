@@ -412,6 +412,12 @@ export default function QuoteTool() {
   const availabilityEndHour = Number(
     experienceConfig?.settings?.availabilityEndHour ?? 17
   );
+  const availabilityPreferExternal = Boolean(
+    experienceConfig?.settings?.availabilityPreferExternal ?? true
+  );
+  const slotPaddingMinutes = Number(
+    experienceConfig?.settings?.slotPaddingMinutes ?? 0
+  );
 
   const totalDurationMinutes = useMemo(() => {
     return pricingResults.reduce((sum, r) => {
@@ -427,6 +433,8 @@ export default function QuoteTool() {
       daysAhead: availabilityHorizonDays,
       startHour: availabilityStartHour,
       endHour: availabilityEndHour,
+      preferExternal: availabilityPreferExternal,
+      slotPaddingMinutes,
     },
     { enabled: step >= 5 && !pricingLoading }
   );
