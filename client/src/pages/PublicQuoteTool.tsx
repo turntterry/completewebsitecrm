@@ -627,6 +627,8 @@ export default function QuoteTool() {
         preferredSlot: selectedSlotId || undefined,
         preferredSlotLabel: selectedSlotLabel || undefined,
         customerPhotos: photos.length > 0 ? photos : undefined,
+        propertyIntel:
+          propertyIntel || undefined,
         items: [
           ...pricingResults.map(r => ({
             serviceType: r.serviceType,

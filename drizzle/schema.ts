@@ -508,6 +508,7 @@ export const instantQuotes = mysqlTable("instant_quotes", {
   stories: int("stories"),
   exteriorMaterial: varchar("exteriorMaterial", { length: 64 }),
   propertyType: varchar("propertyType", { length: 64 }),
+  propertyIntel: json("propertyIntel").$type<Record<string, unknown>>(),
   // Quote details
   services: json("services")
     .$type<
@@ -673,6 +674,9 @@ export const quoteToolSettings = mysqlTable("quote_tool_settings", {
     .$type<string[]>()
     .notNull()
     .default([]),
+  availabilityStartHour: int("availabilityStartHour").notNull().default(9),
+  availabilityEndHour: int("availabilityEndHour").notNull().default(17),
+  availabilityDaysAhead: int("availabilityDaysAhead").notNull().default(9),
   maxSqftAuto: decimal("maxSqftAuto", { precision: 10, scale: 2 })
     .notNull()
     .default("5000"),

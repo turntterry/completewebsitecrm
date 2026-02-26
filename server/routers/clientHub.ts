@@ -313,6 +313,10 @@ export const clientHubRouter = router({
         property,
         preferredSlot: iqRow?.preferredSlot ?? null,
         preferredSlotLabel: iqRow?.preferredSlotLabel ?? null,
+        propertyIntel: iqRow?.propertyIntel ?? {
+          squareFootage: iqRow?.squareFootage,
+          stories: iqRow?.stories,
+        },
       };
     }),
 

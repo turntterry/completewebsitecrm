@@ -309,6 +309,7 @@ export default function QuoteDetail() {
 
   const q = quote as any;
   const lineItems = q.lineItems as any[] ?? [];
+  const propertyIntel = (q as any).propertyIntel ?? {};
 
   return (
     <div className="p-6 space-y-6">
@@ -408,6 +409,74 @@ export default function QuoteDetail() {
                 <p className="text-muted-foreground">
                   {[q.property.address, q.property.city, q.property.state, q.property.zip].filter(Boolean).join(", ")}
                 </p>
+              </div>
+            )}
+            {(propertyIntel.livingAreaSqft ||
+              propertyIntel.squareFootage ||
+              propertyIntel.stories ||
+              propertyIntel.yearBuilt) && (
+              <div className="pt-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">
+                  Property Intel
+                </p>
+                <div className="text-xs space-y-0.5 text-muted-foreground">
+                  {propertyIntel.livingAreaSqft || propertyIntel.squareFootage ? (
+                    <div className="flex justify-between">
+                      <span>Living area</span>
+                      <span className="font-medium text-foreground">
+                        {Math.round(
+                          propertyIntel.livingAreaSqft ??
+                            propertyIntel.squareFootage
+                        ).toLocaleString()}{" "}
+                        sqft
+                      </span>
+                    </div>
+                  ) : null}
+                  {propertyIntel.stories && (
+                    <div className="flex justify-between">
+                      <span>Stories</span>
+                      <span className="font-medium text-foreground">
+                        {propertyIntel.stories}
+                      </span>
+                    </div>
+                  )}
+                  {propertyIntel.yearBuilt && (
+                    <div className="flex justify-between">
+                      <span>Year built</span>
+                      <span className="font-medium text-foreground">
+                        {propertyIntel.yearBuilt}
+                      </span>
+                    </div>
+                  )}
+                  {(propertyIntel.roofAreaSqft || propertyIntel.drivewaySqft) && (
+                    <div className="flex justify-between">
+                      <span>Roof / Drive</span>
+                      <span className="font-medium text-foreground">
+                        {propertyIntel.roofAreaSqft
+                          ? `${Math.round(
+                              propertyIntel.roofAreaSqft
+                            ).toLocaleString()} roof`
+                          : ""}
+                        {propertyIntel.roofAreaSqft && propertyIntel.drivewaySqft
+                          ? " · "
+                          : ""}
+                        {propertyIntel.drivewaySqft
+                          ? `${Math.round(
+                              propertyIntel.drivewaySqft
+                            ).toLocaleString()} drive`
+                          : ""}
+                      </span>
+                    </div>
+                  )}
+                  {propertyIntel.source && (
+                    <div className="flex justify-between">
+                      <span>Source</span>
+                      <span className="text-foreground">
+                        {propertyIntel.source}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {q.customer?.phone && (

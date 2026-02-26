@@ -133,6 +133,9 @@ export default function QuoteTool() {
   const [advanceDays, setAdvanceDays] = useState(1);
   const [commercialRouting, setCommercialRouting] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [availabilityStartHour, setAvailabilityStartHour] = useState(9);
+  const [availabilityEndHour, setAvailabilityEndHour] = useState(17);
+  const [availabilityDaysAhead, setAvailabilityDaysAhead] = useState(9);
   const [maxServicesForInstantBooking, setMaxServicesForInstantBooking] =
     useState(2);
   const [blockedInstantServices, setBlockedInstantServices] = useState<
@@ -200,6 +203,11 @@ export default function QuoteTool() {
     setRequireAdvance(settings.requireAdvanceBooking ?? false);
     setAdvanceDays(settings.advanceBookingDays ?? 1);
     setCommercialRouting(settings.commercialRoutingEnabled ?? false);
+    setAvailabilityStartHour(
+      (settings as any).availabilityStartHour ?? 9
+    );
+    setAvailabilityEndHour((settings as any).availabilityEndHour ?? 17);
+    setAvailabilityDaysAhead((settings as any).availabilityDaysAhead ?? 9);
     setMaxServicesForInstantBooking(
       settings.maxServicesForInstantBooking ?? 2
     );
@@ -275,6 +283,9 @@ export default function QuoteTool() {
     commercialRoutingEnabled?: boolean;
     maxServicesForInstantBooking?: number;
     instantBookingBlockedServices?: string[];
+    availabilityStartHour?: number;
+    availabilityEndHour?: number;
+    availabilityDaysAhead?: number;
     maxSqftAuto?: number;
     maxLinearFtAuto?: number;
     maxStoriesAuto?: number;
@@ -295,6 +306,12 @@ export default function QuoteTool() {
       instantBookingBlockedServices:
         partial.instantBookingBlockedServices ??
         blockedInstantServices,
+      availabilityStartHour:
+        partial.availabilityStartHour ?? availabilityStartHour,
+      availabilityEndHour:
+        partial.availabilityEndHour ?? availabilityEndHour,
+      availabilityDaysAhead:
+        partial.availabilityDaysAhead ?? availabilityDaysAhead,
       maxSqftAuto: partial.maxSqftAuto ?? maxSqftAuto,
       maxLinearFtAuto: partial.maxLinearFtAuto ?? maxLinearFtAuto,
       maxStoriesAuto: partial.maxStoriesAuto ?? maxStoriesAuto,
@@ -1762,6 +1779,74 @@ export default function QuoteTool() {
                   </span>
                 </div>
               )}
+
+              <Separator className="my-4" />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground w-28">
+                    Start hour
+                  </Label>
+                  <Input
+                    type="number"
+                    min={5}
+                    max={12}
+                    className="w-20 h-8 text-sm"
+                    value={availabilityStartHour}
+                    onChange={e => {
+                      const v = Math.max(
+                        5,
+                        Math.min(12, parseInt(e.target.value) || 9)
+                      );
+                      setAvailabilityStartHour(v);
+                      pushDeployUpdate({ availabilityStartHour: v });
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground">AM</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground w-28">
+                    End hour
+                  </Label>
+                  <Input
+                    type="number"
+                    min={13}
+                    max={22}
+                    className="w-20 h-8 text-sm"
+                    value={availabilityEndHour}
+                    onChange={e => {
+                      const v = Math.max(
+                        13,
+                        Math.min(22, parseInt(e.target.value) || 17)
+                      );
+                      setAvailabilityEndHour(v);
+                      pushDeployUpdate({ availabilityEndHour: v });
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground">24h</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground w-28">
+                    Days ahead
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={21}
+                    className="w-20 h-8 text-sm"
+                    value={availabilityDaysAhead}
+                    onChange={e => {
+                      const v = Math.max(
+                        1,
+                        Math.min(21, parseInt(e.target.value) || 9)
+                      );
+                      setAvailabilityDaysAhead(v);
+                      pushDeployUpdate({ availabilityDaysAhead: v });
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground">days</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
