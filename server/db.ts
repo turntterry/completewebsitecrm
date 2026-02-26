@@ -383,11 +383,12 @@ export async function listVisitsWithJob(companyId: number, from?: Date, to?: Dat
       jobTitle: jobs.title,
       customerFirstName: customers.firstName,
       customerLastName: customers.lastName,
-      propertyAddress: customers.address,
+      propertyAddress: properties.address,
     })
     .from(visits)
     .leftJoin(jobs, eq(jobs.id, visits.jobId))
     .leftJoin(customers, eq(customers.id, jobs.customerId))
+    .leftJoin(properties, eq(properties.id, jobs.propertyId))
     .where(and(...conditions))
     .orderBy(visits.scheduledAt);
   return rows.map((r) => ({

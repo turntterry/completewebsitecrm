@@ -66,7 +66,7 @@ export function trpcOnError({
 }: {
   error: { code: string; message: string; cause?: unknown };
   path?: string;
-  ctx?: { user?: { id?: number; companyId?: number } | null };
+  ctx?: { user?: { id?: number; companyId?: number | null } | null };
 }) {
   // Skip client errors (BAD_REQUEST, UNAUTHORIZED) — those are expected validation failures
   const serverErrors = ["INTERNAL_SERVER_ERROR", "TIMEOUT", "SERVICE_UNAVAILABLE"];
