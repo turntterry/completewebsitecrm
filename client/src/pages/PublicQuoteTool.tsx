@@ -621,7 +621,8 @@ export default function QuoteTool() {
           : quotePreviewSummary.jobMinimumApplied
             ? "manual_review"
             : "exact",
-        schedulingEligible: !quotePreviewSummary.jobMinimumApplied,
+        schedulingEligible:
+          !quotePreviewSummary.jobMinimumApplied && !complexityFlagged,
         sessionToken: sessionToken || undefined,
       });
       setQuoteResult(result);
