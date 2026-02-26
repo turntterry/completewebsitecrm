@@ -53,6 +53,7 @@ import {
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
 import { toast } from "sonner";
+import { mockAvailabilityProvider } from "@shared/availability";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Home: HomeIcon,
@@ -233,7 +234,7 @@ export default function QuoteTool() {
   const [outOfRange, setOutOfRange] = useState(false);
 
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("randall@exteriorexperts.co");
   const [phone, setPhone] = useState("");
 
   const [selectedServices, setSelectedServices] = useState<Set<string>>(
@@ -265,42 +266,6 @@ export default function QuoteTool() {
   const shownUpsellsRef = useRef<Set<string>>(new Set());
   const [scheduleHandoffStarted, setScheduleHandoffStarted] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-  const slots = useMemo(() => {
-    const totalMinutes = pricingResults.reduce((sum, r) => {
-      const cfg = pricingData?.[r.serviceType] as any;
-      const minDur = Number(cfg?.minDuration ?? 60);
-      return sum + minDur;
-    }, 0);
-    const windowMinutes = Math.min(180, Math.max(60, totalMinutes + 30));
-    const now = new Date();
-    const days = Array.from({ length: 5 }).map((_, i) => {
-      const d = new Date(now);
-      d.setDate(d.getDate() + i + 1);
-      const dateStr = d.toISOString().split("T")[0];
-      return {
-        date: dateStr,
-        label: d.toLocaleDateString(undefined, {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-        }),
-        times:
-          windowMinutes <= 90
-            ? ["09:00-10:30", "11:00-12:30", "13:00-14:30", "15:00-16:30"]
-            : windowMinutes <= 120
-              ? ["09:00-11:00", "12:00-14:00", "15:00-17:00"]
-              : ["09:00-12:00", "13:00-16:00"],
-      };
-    });
-    return days.flatMap(day =>
-      day.times.map((t, idx) => ({
-        id: `${day.date}_${idx}`,
-        date: day.date,
-        window: t,
-        display: `${day.label} · ${t}`,
-      }))
-    );
-  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -382,6 +347,17 @@ export default function QuoteTool() {
     });
     return results;
   }, [selectedServices, serviceInputs, getServiceConfig]);
+
+  const slots = useMemo(() => {
+    const totalMinutes = pricingResults.reduce((sum, r) => {
+      const cfg = pricingData?.[r.serviceType] as any;
+      const minDur = Number(cfg?.minDuration ?? 60);
+      return sum + minDur;
+    }, 0);
+    return mockAvailabilityProvider.getSlots({
+      durationMinutes: totalMinutes || 90,
+    });
+  }, [pricingData, pricingResults]);
 
   const quoteSummary = useMemo(() => {
     return calculateQuoteTotal(pricingResults, distanceMiles, globalConfig);
@@ -569,8 +545,7 @@ export default function QuoteTool() {
         preferredTime: preferredTime || undefined,
         referralSource: referralSource || undefined,
         preferredSlot: selectedSlotId || undefined,
-        preferredSlotLabel:
-          slots.find(s => s.id === selectedSlotId)?.display || undefined,
+        preferredSlotLabel: undefined,
         customerPhotos: photos.length > 0 ? photos : undefined,
         items: [
           ...pricingResults.map(r => ({
@@ -795,7 +770,7 @@ export default function QuoteTool() {
                   time window or tap call if you prefer.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {slots.map(slot => (
+                  {slots.map((slot: any) => (
                     <Button
                       key={slot.id}
                       variant={
@@ -1978,11 +1953,11 @@ function StepReview({
       <div className="space-y-3 mb-6">
         {pricingResults.map((r: PricingResult) => {
           const svc = QUOTABLE_SERVICES.find(s => s.id === r.serviceType);
-          return (
-            <div
-              key={r.serviceType}
-              className="flex justify-between items-center py-3 border-b"
-            >
+      return (
+        <div
+          key={r.serviceType}
+          className="flex justify-between items-center py-3 border-b"
+        >
               <div>
                 <p className="font-semibold">{svc?.name || r.serviceType}</p>
                 {r.serviceType === "window_cleaning" &&
@@ -2008,7 +1983,14 @@ function StepReview({
                 )}
               </div>
               <span className="font-heading font-bold">
-                ${r.finalPrice.toFixed(2)}
+                {complexityFlagged ? (
+                  <span className="text-amber-700">
+                    ${Math.max(r.finalPrice - 50, 0).toFixed(2)} – $
+                    {(r.finalPrice + 75).toFixed(2)}
+                  </span>
+                ) : (
+                  `$${r.finalPrice.toFixed(2)}`
+                )}
               </span>
             </div>
           );

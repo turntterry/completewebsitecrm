@@ -336,7 +336,12 @@ export default function QuoteDetail() {
             </span>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {q.preferredSlotLabel && (
+            <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
+              Preferred Slot: {q.preferredSlotLabel}
+            </Badge>
+          )}
           {q.status === "draft" && (
             <Button size="sm" onClick={() => updateMutation.mutate({ id, status: "sent" })} disabled={updateMutation.isPending}>
               <Send className="h-4 w-4 mr-1.5" /> Send Quote

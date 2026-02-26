@@ -23,6 +23,7 @@ export default function NewJob() {
 
   const params = new URLSearchParams(window.location.search);
   const prefilledCustomerId = params.get("customerId") ? parseInt(params.get("customerId")!) : undefined;
+  const preferredSlotLabel = params.get("preferredSlotLabel") || "";
 
   const [customerId, setCustomerId] = useState<number | undefined>(prefilledCustomerId);
   const [propertyId, setPropertyId] = useState<number | undefined>();
@@ -30,7 +31,7 @@ export default function NewJob() {
   const [instructions, setInstructions] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [scheduleNow, setScheduleNow] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(preferredSlotLabel.split(" · ")[0] ? `${preferredSlotLabel.split(" · ")[0]}T09:00` : "");
   const [scheduledEndAt, setScheduledEndAt] = useState("");
 
   const { data: customers = [] } = trpc.customers.list.useQuery({ search: "" });
