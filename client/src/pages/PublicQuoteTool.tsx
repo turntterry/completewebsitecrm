@@ -219,25 +219,6 @@ export default function QuoteTool() {
     trpc.publicSite.quote.getPricing.useQuery();
   const { data: experienceConfig } =
     trpc.publicSite.quote.getExperienceConfig.useQuery();
-  const propertyLookup = trpc.publicSite.quote.lookupProperty.useQuery(
-    {
-      address,
-      city,
-      state: stateVal,
-      zip,
-      lat: lat || undefined,
-      lng: lng || undefined,
-    },
-    {
-      enabled:
-        Boolean(address && city && stateVal && zip) &&
-        !pricingLoading &&
-        !submitted,
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000,
-    }
-  );
   const submitMutation = trpc.publicSite.quote.submitV2.useMutation();
   const startSessionMutation = trpc.publicSite.quote.startSession.useMutation();
   const trackEventMutation = trpc.publicSite.quote.trackEvent.useMutation();
@@ -293,6 +274,25 @@ export default function QuoteTool() {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const propertyLookup = trpc.publicSite.quote.lookupProperty.useQuery(
+    {
+      address,
+      city,
+      state: stateVal,
+      zip,
+      lat: lat || undefined,
+      lng: lng || undefined,
+    },
+    {
+      enabled:
+        Boolean(address && city && stateVal && zip) &&
+        !pricingLoading &&
+        !submitted,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
+    }
+  );
 
   const tierLabels = useMemo(
     () =>
@@ -635,8 +635,15 @@ export default function QuoteTool() {
         preferredSlot: selectedSlotId || undefined,
         preferredSlotLabel: selectedSlotLabel || undefined,
         customerPhotos: photos.length > 0 ? photos : undefined,
-        propertyIntel:
-          propertyIntel || undefined,
+        propertyIntel: propertyIntel
+          ? {
+              ...propertyIntel,
+              yearBuilt:
+                propertyIntel.yearBuilt === null
+                  ? undefined
+                  : propertyIntel.yearBuilt,
+            }
+          : undefined,
         items: [
           ...pricingResults.map(r => ({
             serviceType: r.serviceType,
@@ -718,7 +725,16 @@ export default function QuoteTool() {
     if (!address || !city || !stateVal || !zip) return;
 
     if (propertyLookup.data && lastLookupKeyRef.current !== key) {
-      setPropertyIntel(propertyLookup.data);
+      const data = propertyLookup.data as any;
+      setPropertyIntel({
+        livingAreaSqft: data.livingAreaSqft ? Number(data.livingAreaSqft) : undefined,
+        stories: data.stories ? Number(data.stories) : undefined,
+        yearBuilt: data.yearBuilt !== undefined && data.yearBuilt !== null ? Number(data.yearBuilt) : null,
+        roofAreaSqft: data.roofAreaSqft ? Number(data.roofAreaSqft) : undefined,
+        drivewaySqft: data.drivewaySqft ? Number(data.drivewaySqft) : undefined,
+        source: data.source,
+        fetchedAt: data.fetchedAt,
+      });
       lastLookupKeyRef.current = key;
     }
 
@@ -1386,12 +1402,12 @@ function StepPropertyIntel({
   lookupError?: string | null;
   onRetry: () => void;
 }) {
-  const editableIntel = propertyIntel ?? {
-    livingAreaSqft: "",
+  const editableIntel: PropertyIntel = propertyIntel ?? {
+    livingAreaSqft: undefined,
     stories: 1,
-    yearBuilt: "",
-    roofAreaSqft: "",
-    drivewaySqft: "",
+    yearBuilt: undefined,
+    roofAreaSqft: undefined,
+    drivewaySqft: undefined,
   };
 
   return (

@@ -65,6 +65,11 @@ export default function BookingControls() {
     commercialRoutingEnabled: boolean;
     maxServicesForInstantBooking: number;
     instantBookingBlockedServices: string[];
+    availabilityStartHour: number;
+    availabilityEndHour: number;
+    availabilityDaysAhead: number;
+    availabilityPreferExternal: boolean;
+    slotPaddingMinutes: number;
     maxSqftAuto: number;
     maxLinearFtAuto: number;
     maxStoriesAuto: number;
@@ -79,6 +84,16 @@ export default function BookingControls() {
         overrides?.maxServicesForInstantBooking ?? maxServicesForInstantBooking,
       instantBookingBlockedServices:
         overrides?.instantBookingBlockedServices ?? blockedInstantServices,
+      availabilityStartHour:
+        overrides?.availabilityStartHour ?? (settings as any)?.availabilityStartHour ?? 9,
+      availabilityEndHour:
+        overrides?.availabilityEndHour ?? (settings as any)?.availabilityEndHour ?? 17,
+      availabilityDaysAhead:
+        overrides?.availabilityDaysAhead ?? (settings as any)?.availabilityDaysAhead ?? 9,
+      availabilityPreferExternal:
+        overrides?.availabilityPreferExternal ?? (settings as any)?.availabilityPreferExternal ?? true,
+      slotPaddingMinutes:
+        overrides?.slotPaddingMinutes ?? (settings as any)?.slotPaddingMinutes ?? 0,
       maxSqftAuto: overrides?.maxSqftAuto ?? 5000,
       maxLinearFtAuto: overrides?.maxLinearFtAuto ?? 800,
       maxStoriesAuto: overrides?.maxStoriesAuto ?? 3,

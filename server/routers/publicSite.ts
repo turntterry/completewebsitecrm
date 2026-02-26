@@ -713,6 +713,17 @@ const quoteRouter = router({
         preferredTime: z.string().optional(),
         referralSource: z.string().optional(),
         customerPhotos: z.array(z.string()).optional(),
+        propertyIntel: z
+          .object({
+            livingAreaSqft: z.number().optional(),
+            stories: z.number().optional(),
+            yearBuilt: z.number().optional(),
+            roofAreaSqft: z.number().optional(),
+            drivewaySqft: z.number().optional(),
+            source: z.string().optional(),
+            fetchedAt: z.string().optional(),
+          })
+          .optional(),
         items: z.array(
           z.object({
             serviceType: z.string(),
