@@ -12,7 +12,7 @@ import {
   quoteToolSettings,
   serviceConfigs,
 } from "../../drizzle/schema";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, and, inArray } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { SEED_GALLERY } from "@shared/data";
 import { nanoid } from "nanoid";
@@ -394,6 +394,27 @@ const quoteRouter = router({
       const nonUpsellServiceTypes = input.items
         .map(item => item.serviceType)
         .filter(type => !type.startsWith("upsell_"));
+
+      let manualReviewServiceKeys: string[] = [];
+      if (db && nonUpsellServiceTypes.length > 0) {
+        const services = await db
+          .select()
+          .from(quoteToolServices)
+          .where(
+            and(
+              eq(quoteToolServices.companyId, sessionCompanyId),
+              inArray(quoteToolServices.serviceKey, nonUpsellServiceTypes)
+            )
+          );
+        manualReviewServiceKeys = services
+          .filter(s => s.manualReviewRequired)
+          .map(s => s.serviceKey ?? s.name);
+      }
+
+      if (manualReviewServiceKeys.length > 0) {
+        lowConfidenceReasons.push("service_requires_manual_review");
+        schedulingBlockedReasons.push("service_requires_manual_review");
+      }
 
       if (
         maxServicesForInstantBooking > 0 &&

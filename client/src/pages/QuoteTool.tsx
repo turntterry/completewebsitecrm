@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Home,
@@ -515,13 +516,39 @@ export default function QuoteTool() {
                       <Droplets className="w-5 h-5" />
                     )}
                   </div>
-                  <span className="flex-1 text-sm font-medium">{svc.name}</span>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium flex items-center gap-2">
+                      {svc.name}
+                      {svc.manualReviewRequired ? (
+                        <Badge className="bg-amber-100 text-amber-800 border border-amber-200">
+                          Manual review
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {svc.serviceKey || "no key set"}
+                    </div>
+                  </div>
                   <Switch
                     checked={svc.enabled ?? true}
                     onCheckedChange={v =>
                       updateService.mutate({ id: svc.id, enabled: v })
                     }
                   />
+                  <div className="flex items-center gap-2 pl-2 border-l border-border">
+                    <Label className="text-xs text-muted-foreground">
+                      Manual review
+                    </Label>
+                    <Switch
+                      checked={svc.manualReviewRequired ?? false}
+                      onCheckedChange={v =>
+                        updateService.mutate({
+                          id: svc.id,
+                          manualReviewRequired: v,
+                        })
+                      }
+                    />
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"

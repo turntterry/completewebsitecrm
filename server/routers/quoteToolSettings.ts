@@ -159,6 +159,7 @@ export const quoteToolSettingsRouter = router({
         enabled: z.boolean().optional(),
         sortOrder: z.number().optional(),
         pricingConfig: z.any().optional(),
+        manualReviewRequired: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

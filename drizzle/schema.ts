@@ -746,6 +746,7 @@ export const quoteToolServices = mysqlTable("quote_tool_services", {
       { name: string; price: number; description?: string }[]
     >(),
   pricingConfig: json("pricingConfig"),
+  manualReviewRequired: boolean("manualReviewRequired").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
