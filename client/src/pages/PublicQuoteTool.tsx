@@ -664,6 +664,15 @@ export default function QuoteTool() {
   }
 
   if (submitted && quoteResult) {
+    const readableSchedulingReasons: Record<string, string> = {
+      too_many_services:
+        "Instant booking is off for quotes with three or more services.",
+      blocked_service_type:
+        "One or more selected services always require manual scheduling.",
+      client_marked_ineligible:
+        "Customer marked scheduling as not eligible during submission.",
+    };
+
     return (
       <SiteLayout>
         <section className="py-16 md:py-24 bg-white">
@@ -712,9 +721,13 @@ export default function QuoteTool() {
                 Instant booking is disabled for this quote. We'll confirm the
                 best time with you directly.
                 {quoteResult.schedulingBlockedReasons?.length ? (
-                  <div className="text-xs mt-2">
-                    Reasons: {quoteResult.schedulingBlockedReasons.join(", ")}
-                  </div>
+                  <ul className="text-xs mt-2 space-y-1 text-amber-800 text-left">
+                    {quoteResult.schedulingBlockedReasons.map(reason => (
+                      <li key={reason}>
+                        • {readableSchedulingReasons[reason] ?? reason}
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
               </div>
             )}

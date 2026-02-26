@@ -90,6 +90,7 @@ const quoteRouter = router({
           "upsell_shown",
           "upsell_accepted",
           "quote_submitted",
+          "schedule_blocked",
           "schedule_started",
           "schedule_completed",
         ]),
@@ -465,6 +466,17 @@ const quoteRouter = router({
             schedulingBlockedReasons,
           },
         });
+
+        if (!finalSchedulingEligible) {
+          await db.insert(quoteSessionEvents).values({
+            sessionId: sessionRow.id,
+            eventName: "schedule_blocked",
+            payload: {
+              quoteId,
+              reasons: schedulingBlockedReasons,
+            },
+          });
+        }
       }
 
       let manualReviewLeadId: number | null = null;
