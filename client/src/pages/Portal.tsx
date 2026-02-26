@@ -1,11 +1,46 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, CheckCircle2, XCircle, Send, CreditCard } from "lucide-react";
-import { useState } from "react";
+import { Loader2, CheckCircle2, XCircle, Send, CreditCard, Home, AlertCircle } from "lucide-react";
+
+// ─── Session helpers (share key with ClientHub magic link) ───────────────────
+
+interface ClientSession {
+  customerId: number;
+  companyId: number;
+  quoteId: number | null;
+  invoiceId: number | null;
+  sessionToken: string;
+  sessionExpires: string;
+}
+
+const SESSION_KEY = "exterior_client_hub_session";
+
+function saveSession(session: ClientSession) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function loadSession(): ClientSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as ClientSession;
+    if (new Date(s.sessionExpires) < new Date()) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
 
 function parseIds() {
   const params = new URLSearchParams(window.location.search);
@@ -18,11 +53,22 @@ function parseIds() {
 }
 
 export default function Portal() {
-  const { customerId, companyId } = useMemo(parseIds, []);
+  const { customerId: debugCustomerId, companyId: debugCompanyId } = useMemo(parseIds, []);
+
+  const [session, setSession] = useState<ClientSession | null>(() => loadSession());
+  const token = useMemo(() => new URLSearchParams(window.location.search).get("token"), []);
 
   const snapshot = trpc.portal.getSnapshot.useQuery(
-    { customerId: customerId ?? 0, companyId: companyId ?? 0, limit: 50 },
-    { enabled: !!customerId && !!companyId }
+    {
+      customerId: (session?.customerId ?? debugCustomerId) || 0,
+      companyId: (session?.companyId ?? debugCompanyId) || 0,
+      limit: 50,
+    },
+    {
+      enabled:
+        !!(session?.customerId && session.companyId) ||
+        (!!debugCustomerId && !!debugCompanyId),
+    }
   );
 
   const utils = trpc.useUtils();
@@ -34,22 +80,81 @@ export default function Portal() {
   });
   const requestWork = trpc.portal.requestWork.useMutation();
 
+  const validateToken = trpc.clientHub.validateToken.useMutation({
+    onSuccess: data => {
+      const s: ClientSession = {
+        customerId: data.customerId,
+        companyId: data.companyId,
+        quoteId: data.quoteId,
+        invoiceId: data.invoiceId,
+        sessionToken: data.sessionToken,
+        sessionExpires: data.sessionExpires,
+      };
+      saveSession(s);
+      setSession(s);
+      // strip token from URL
+      window.history.replaceState({}, "", "/portal");
+    },
+  });
+
+  useEffect(() => {
+    if (token) {
+      validateToken.mutate({ token });
+    }
+  }, [token, validateToken]);
+
+  const handleLogout = useCallback(() => {
+    clearSession();
+    setSession(null);
+    window.history.replaceState({}, "", "/portal");
+  }, []);
+
   const [requestMessage, setRequestMessage] = useState("");
   const [requestServices, setRequestServices] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
 
-  if (!customerId || !companyId) {
+  useEffect(() => {
+    if (pay.data) {
+      if (pay.data.requiresAction && (pay.data.paymentUrl || pay.data.clientSecret)) {
+        setPaymentNotice(
+          pay.data.paymentUrl
+            ? `Continue payment here: ${pay.data.paymentUrl}`
+            : "Complete payment with the provided client secret."
+        );
+        if (pay.data.paymentUrl) {
+          window.open(pay.data.paymentUrl, "_blank");
+        }
+      } else if (pay.data.remainingBalance !== undefined) {
+        setPaymentNotice(`Payment recorded. Remaining balance: $${pay.data.remainingBalance?.toFixed?.(2) ?? pay.data.remainingBalance}`);
+      }
+    }
+  }, [pay.data]);
+
+  const resolvedCustomerId = session?.customerId ?? debugCustomerId ?? 0;
+  const resolvedCompanyId = session?.companyId ?? debugCompanyId ?? 0;
+
+  // Magic-link validation in progress
+  if (validateToken.isPending) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+  }
+
+  // No session, no debug IDs — prompt for link
+  if (!session && (!debugCustomerId || !debugCompanyId)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-        <Card className="max-w-lg w-full">
-          <CardHeader>
-            <CardTitle>Portal preview</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-slate-600 text-sm">
-            <p>Add <code>?customerId=ID&companyId=ID</code> to the URL to load a client.</p>
-            <p>This thin page calls the new <code>portal.getSnapshot</code> + <code>approveQuote</code> endpoints.</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+          <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <Home className="w-8 h-8 text-blue-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Client Portal</h2>
+          <p className="text-slate-500 text-sm mb-6">
+            Open the secure link from your email to access your portal.
+          </p>
+          {validateToken.error && (
+            <p className="text-sm text-red-500">{validateToken.error.message}</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -98,7 +203,14 @@ export default function Portal() {
               <p className="text-sm text-slate-500">Preferred slot: {preferredSlotLabel}</p>
             ) : null}
           </div>
-          <Badge variant="outline">Company #{companyId}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">Company #{session?.companyId ?? resolvedCompanyId}</Badge>
+            {session && (
+              <Button size="sm" variant="outline" onClick={handleLogout}>
+                Sign out
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -128,8 +240,8 @@ export default function Portal() {
                       onClick={() =>
                         approve.mutate({
                           quoteId: q.id,
-                          customerId,
-                          companyId,
+                          customerId: resolvedCustomerId,
+                          companyId: resolvedCompanyId,
                         })
                       }
                     >
@@ -175,8 +287,8 @@ export default function Portal() {
                       onClick={() =>
                         pay.mutate({
                           invoiceId: inv.id,
-                          customerId,
-                          companyId,
+                          customerId: resolvedCustomerId,
+                          companyId: resolvedCompanyId,
                         })
                       }
                     >
@@ -187,6 +299,9 @@ export default function Portal() {
                       )}
                       <span className="ml-2">Pay now</span>
                     </Button>
+                  )}
+                  {paymentNotice && pay.isSuccess && (
+                    <p className="text-xs text-emerald-600 mt-1">{paymentNotice}</p>
                   )}
                 </div>
               ))}
@@ -277,8 +392,8 @@ export default function Portal() {
               disabled={requestWork.isPending}
               onClick={() =>
                 requestWork.mutate({
-                  customerId,
-                  companyId,
+                  customerId: resolvedCustomerId,
+                  companyId: resolvedCompanyId,
                   message: requestMessage || undefined,
                   services: requestServices
                     ? requestServices.split(",").map(s => s.trim()).filter(Boolean)

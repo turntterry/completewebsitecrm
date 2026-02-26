@@ -10,7 +10,8 @@ import {
   quotes,
   visits,
 } from "../../drizzle/schema";
-import { createPayment, getDb } from "../db";
+import { createPayment, getDb, getNextJobNumber, createJob, createVisit, updateJob } from "../db";
+import { createPaymentIntent } from "../services/payments";
 import { publicProcedure, router } from "../_core/trpc";
 
 async function requireDb() {
@@ -135,6 +136,7 @@ export const portalRouter = router({
         customerId: z.number().int().positive(),
         companyId: z.number().int().positive(),
         note: z.string().max(2000).optional(),
+        autoCreateJob: z.boolean().default(true),
       })
     )
     .mutation(async ({ input }) => {
@@ -168,7 +170,44 @@ export const portalRouter = router({
         })
         .where(eq(quotes.id, input.quoteId));
 
-      return { success: true, status: "accepted" as const };
+      let jobId: number | null = null;
+      if (input.autoCreateJob) {
+        const jobNumber = await getNextJobNumber(input.companyId);
+
+        jobId = await createJob({
+          companyId: input.companyId,
+          customerId: input.customerId,
+          propertyId: quote.propertyId ?? null,
+          quoteId: quote.id as any,
+          jobNumber,
+          title: quote.title ?? `Job for Quote #${quote.quoteNumber}`,
+          status: "draft",
+        } as any);
+
+        // If we have a preferred slot on the originating instant quote, schedule a visit
+        if (jobId) {
+          const preferred = await db
+            .select()
+            .from(instantQuotes)
+            .where(eq(instantQuotes.convertedToQuoteId, input.quoteId))
+            .limit(1)
+            .then(rows => rows[0]);
+
+          const parsed = preferred?.preferredSlot ? parsePreferredSlot(preferred.preferredSlot) : null;
+          if (parsed) {
+            await createVisit({
+              jobId,
+              companyId: input.companyId,
+              status: "scheduled",
+              scheduledAt: parsed.start,
+              scheduledEndAt: parsed.end,
+            } as any);
+            await updateJob(jobId, input.companyId, { status: "scheduled" });
+          }
+        }
+      }
+
+      return { success: true, status: "accepted" as const, jobId };
     }),
 
   /**
@@ -206,9 +245,38 @@ export const portalRouter = router({
       }
 
       const balance = parseFloat(String(invoice.balance ?? invoice.total ?? "0")) || 0;
-      const amount = input.amount ?? balance;
+      const depositField = (invoice as any).depositAmount
+        ? parseFloat(String((invoice as any).depositAmount))
+        : null;
+      const defaultDepositDue =
+        depositField && parseFloat(String(invoice.amountPaid ?? "0")) <= 0 ? depositField : null;
+      const amount = input.amount ?? defaultDepositDue ?? balance;
       if (amount <= 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Nothing to pay" });
+      }
+
+      // Try external payment intent first for card/ach
+      if (["card", "ach"].includes(input.method)) {
+        try {
+          const intent = await createPaymentIntent({
+            amountCents: Math.round(amount * 100),
+            currency: "usd",
+            customerEmail: invoice.customerId ? invoice.customerId.toString() : null,
+            memo: `Invoice #${invoice.invoiceNumber ?? invoice.id}`,
+          });
+
+          if (intent.provider === "external" && (intent.clientSecret || intent.paymentUrl)) {
+            return {
+              success: true,
+              requiresAction: true,
+              provider: "external" as const,
+              clientSecret: intent.clientSecret ?? null,
+              paymentUrl: intent.paymentUrl ?? null,
+            };
+          }
+        } catch (err) {
+          // fall back to direct capture
+        }
       }
 
       await createPayment({
@@ -221,7 +289,7 @@ export const portalRouter = router({
       });
 
       const updatedBalance = Math.max(0, balance - amount);
-      return { success: true, remainingBalance: updatedBalance };
+      return { success: true, remainingBalance: updatedBalance, provider: "stub" as const };
     }),
 
   /**
@@ -236,6 +304,7 @@ export const portalRouter = router({
         services: z.array(z.string()).max(20).optional(),
         preferredDate: z.string().optional(),
         address: z.string().optional(),
+        autoCreateJob: z.boolean().default(true),
       })
     )
     .mutation(async ({ input }) => {
@@ -271,6 +340,46 @@ export const portalRouter = router({
       });
 
       const leadId = (leadResult as any).insertId as number;
-      return { success: true, leadId };
+
+      let jobId: number | null = null;
+      if (input.autoCreateJob) {
+        const jobNumber = await getNextJobNumber(input.companyId);
+        jobId = await createJob({
+          companyId: input.companyId,
+          customerId: input.customerId,
+          jobNumber,
+          title: input.services?.join(", ") || "Requested work",
+          status: "draft",
+        } as any);
+
+        if (jobId && input.preferredDate) {
+          const start = new Date(`${input.preferredDate}T09:00:00Z`);
+          const end = new Date(`${input.preferredDate}T11:00:00Z`);
+          if (!isNaN(start.getTime())) {
+            await createVisit({
+              jobId,
+              companyId: input.companyId,
+              status: "scheduled",
+              scheduledAt: start,
+              scheduledEndAt: end,
+            } as any);
+            await updateJob(jobId, input.companyId, { status: "scheduled" });
+          }
+        }
+      }
+
+      return { success: true, leadId, jobId };
     }),
 });
+
+function parsePreferredSlot(slot: string | null | undefined) {
+  if (!slot) return null;
+  // expected format: YYYY-MM-DD_HH:MM-HH:MM
+  const [dateStr, window] = slot.split("_");
+  if (!dateStr || !window || !window.includes("-")) return null;
+  const [startStr, endStr] = window.split("-");
+  const start = new Date(`${dateStr}T${startStr}:00Z`);
+  const end = new Date(`${dateStr}T${endStr}:00Z`);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  return { start, end };
+}
