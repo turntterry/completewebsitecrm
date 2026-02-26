@@ -4,7 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, CheckCircle2, XCircle, Send, CreditCard, Home, AlertCircle, ExternalLink, Copy } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Send,
+  CreditCard,
+  Home,
+  AlertCircle,
+  ExternalLink,
+  Copy,
+  Clock3,
+  CalendarDays,
+  Sparkles,
+} from "lucide-react";
 
 // ─── Session helpers (share key with ClientHub magic link) ───────────────────
 
@@ -50,6 +63,31 @@ function parseIds() {
     customerId: Number.isFinite(customerId) ? customerId : null,
     companyId: Number.isFinite(companyId) ? companyId : null,
   };
+}
+
+function StatusPill({ tone, label }: { tone: "success" | "info" | "warn" | "muted"; label: string }) {
+  const palette =
+    tone === "success"
+      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+      : tone === "warn"
+        ? "bg-amber-100 text-amber-700 border-amber-200"
+        : tone === "info"
+          ? "bg-blue-100 text-blue-700 border-blue-200"
+          : "bg-slate-100 text-slate-600 border-slate-200";
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${palette}`}>
+      {label.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  );
 }
 
 export default function Portal() {
@@ -130,6 +168,29 @@ export default function Portal() {
   const resolvedCustomerId = session?.customerId ?? debugCustomerId ?? 0;
   const resolvedCompanyId = session?.companyId ?? debugCompanyId ?? 0;
 
+  const sortedQuotes = [...(snapshot.data?.quotes ?? [])].sort(
+    (a, b) => new Date(b.createdAt ?? "").getTime() - new Date(a.createdAt ?? "").getTime()
+  );
+  const sortedInvoices = [...(snapshot.data?.invoices ?? [])].sort(
+    (a, b) => new Date(b.createdAt ?? "").getTime() - new Date(a.createdAt ?? "").getTime()
+  );
+  const openInvoices = sortedInvoices.filter(inv => parseFloat(String(inv.balance ?? inv.total ?? 0)) > 0);
+  const upcomingVisits = (snapshot.data?.visits ?? []).filter(v => v.status !== "completed");
+
+  const quoteStatusTone = (status: string) => {
+    if (status === "accepted") return "success";
+    if (status === "sent" || status === "draft") return "info";
+    if (status === "changes_requested" || status === "expired") return "warn";
+    return "muted";
+  };
+
+  const invoiceStatusTone = (status: string) => {
+    if (status === "paid") return "success";
+    if (status === "past_due") return "warn";
+    if (status === "sent" || status === "upcoming") return "info";
+    return "muted";
+  };
+
   // Magic-link validation in progress
   if (validateToken.isPending) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
@@ -184,20 +245,22 @@ export default function Portal() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
-            <p className="text-xs uppercase text-slate-500">Client portal preview</p>
-            <h1 className="text-2xl font-semibold text-slate-900">
+            <p className="text-xs uppercase text-slate-500 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              Client Portal
+            </p>
+            <h1 className="text-2xl font-semibold text-slate-900 leading-tight">
               {customer.firstName} {customer.lastName}
             </h1>
-            {propertyIntel ? (
-              <p className="text-sm text-slate-500">
-                Property intel: {JSON.stringify(propertyIntel)}
-              </p>
-            ) : null}
-            {preferredSlotLabel ? (
-              <p className="text-sm text-slate-500">Preferred slot: {preferredSlotLabel}</p>
-            ) : null}
+            <p className="text-sm text-slate-500">
+              {preferredSlotLabel
+                ? `Preferred slot: ${preferredSlotLabel}`
+                : propertyIntel
+                  ? "We saved your property details for faster scheduling."
+                  : "View quotes, pay invoices, and request work anytime."}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline">Company #{session?.companyId ?? resolvedCompanyId}</Badge>
@@ -209,14 +272,47 @@ export default function Portal() {
           </div>
         </div>
 
+        {/* Quick stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card className="shadow-sm">
+            <CardContent className="py-4">
+              <p className="text-xs text-slate-500 uppercase">Open invoices</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-semibold text-slate-900">{openInvoices.length}</span>
+                <span className="text-xs text-slate-500">awaiting payment</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardContent className="py-4">
+              <p className="text-xs text-slate-500 uppercase">Quotes</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-semibold text-slate-900">{quotes.length}</span>
+                <span className="text-xs text-slate-500">on file</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardContent className="py-4">
+              <p className="text-xs text-slate-500 uppercase">Upcoming visits</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-semibold text-slate-900">{upcomingVisits.length}</span>
+                <span className="text-xs text-slate-500">scheduled</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
-              <CardTitle>Quotes</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <FileIcon /> Quotes
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {quotes.length === 0 && <p className="text-sm text-slate-500">No quotes yet.</p>}
-              {quotes.map(q => (
+              {sortedQuotes.map(q => (
                 <div
                   key={q.id}
                   className="rounded-lg border border-slate-200 px-3 py-3 flex items-start justify-between gap-3"
@@ -224,8 +320,9 @@ export default function Portal() {
                   <div>
                     <p className="font-medium text-slate-900">Quote #{q.quoteNumber}</p>
                     <p className="text-sm text-slate-500">${q.total}</p>
-                    <p className="text-xs text-slate-400">
-                      Status: {q.status} {q.acceptedAt ? `(accepted ${new Date(q.acceptedAt).toLocaleDateString()})` : ""}
+                    <p className="text-xs text-slate-400 flex items-center gap-1">
+                      <StatusPill tone={quoteStatusTone(q.status)} label={q.status} />
+                      {q.acceptedAt ? `Accepted ${new Date(q.acceptedAt).toLocaleDateString()}` : ""}
                     </p>
                   </div>
                   {q.status !== "accepted" && (
@@ -256,11 +353,13 @@ export default function Portal() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Invoices</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4" /> Invoices
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {invoices.length === 0 && <p className="text-sm text-slate-500">No invoices yet.</p>}
-              {invoices.map(inv => (
+              {sortedInvoices.map(inv => (
                 <div key={inv.id} className="rounded-lg border border-slate-200 px-3 py-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -269,7 +368,7 @@ export default function Portal() {
                         Total ${inv.total} · Balance ${inv.balance}
                       </p>
                     </div>
-                    <Badge variant="outline">{inv.status}</Badge>
+                    <StatusPill tone={invoiceStatusTone(inv.status)} label={inv.status} />
                   </div>
                   <Separator className="my-2" />
                   <p className="text-xs text-slate-500">
@@ -327,7 +426,9 @@ export default function Portal() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Jobs & visits</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="w-4 h-4" /> Jobs & visits
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {jobs.length === 0 && (
@@ -372,9 +473,10 @@ export default function Portal() {
             <CardTitle>Request work / rebook</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-slate-500">
-              Tell us what you need next. This creates a lead for the team to confirm.
-            </p>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Send className="w-4 h-4" />
+              <p>Tell us what you need next. This creates a lead for the team to confirm.</p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="text-sm text-slate-600">
                 Services (comma separated)
