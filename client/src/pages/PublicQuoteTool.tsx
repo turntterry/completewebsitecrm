@@ -276,6 +276,15 @@ export default function QuoteTool() {
       },
     [experienceConfig?.settings?.customerTierLabels]
   );
+  const manualReviewServiceKeys = useMemo(
+    () =>
+      new Set(
+        (experienceConfig?.services ?? [])
+          .filter(s => s.manualReviewRequired)
+          .map(s => s.serviceKey ?? s.name)
+      ),
+    [experienceConfig?.services]
+  );
 
   const upsellCatalog = useMemo(() => {
     const configured = experienceConfig?.settings?.upsellCatalog;
@@ -869,6 +878,7 @@ export default function QuoteTool() {
                   tierLabels={tierLabels}
                   acceptedUpsellItems={acceptedUpsellItems}
                   upsellTotal={upsellTotal}
+                  manualReviewServiceKeys={manualReviewServiceKeys}
                 />
               )}
               {step === 6 && (
@@ -1829,6 +1839,7 @@ function StepReview({
   tierLabels,
   acceptedUpsellItems,
   upsellTotal,
+  manualReviewServiceKeys,
 }: any) {
   return (
     <div>
@@ -1863,6 +1874,11 @@ function StepReview({
                       Both Sides
                     </Badge>
                   )}
+                {manualReviewServiceKeys?.has(r.serviceType) && (
+                  <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-[11px] mt-1">
+                    Requires manual review
+                  </Badge>
+                )}
               </div>
               <span className="font-heading font-bold">
                 ${r.finalPrice.toFixed(2)}
