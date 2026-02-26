@@ -31,6 +31,10 @@ export default function BookingControls() {
   const [advanceDays, setAdvanceDays] = useState(1);
   const [commercialRouting, setCommercialRouting] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const maxServicesForInstantBooking = settings?.maxServicesForInstantBooking ?? 2;
+  const blockedInstantServices = Array.isArray((settings as any)?.instantBookingBlockedServices)
+    ? ((settings as any).instantBookingBlockedServices as string[])
+    : [];
 
   if (settings && !synced) {
     setOnlineBooking(settings.onlineBookingEnabled ?? true);
@@ -59,12 +63,18 @@ export default function BookingControls() {
     requireAdvanceBooking: boolean;
     advanceBookingDays: number;
     commercialRoutingEnabled: boolean;
+    maxServicesForInstantBooking: number;
+    instantBookingBlockedServices: string[];
   }>) {
     updateDeploy.mutate({
       onlineBookingEnabled: overrides?.onlineBookingEnabled ?? onlineBooking,
       requireAdvanceBooking: overrides?.requireAdvanceBooking ?? requireAdvance,
       advanceBookingDays: overrides?.advanceBookingDays ?? advanceDays,
       commercialRoutingEnabled: overrides?.commercialRoutingEnabled ?? commercialRouting,
+      maxServicesForInstantBooking:
+        overrides?.maxServicesForInstantBooking ?? maxServicesForInstantBooking,
+      instantBookingBlockedServices:
+        overrides?.instantBookingBlockedServices ?? blockedInstantServices,
     });
   }
 

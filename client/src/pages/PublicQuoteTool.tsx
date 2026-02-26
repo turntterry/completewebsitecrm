@@ -256,6 +256,7 @@ export default function QuoteTool() {
     schedulingEligible: boolean;
     manualReviewLeadId?: number | null;
     lowConfidenceReasons?: string[];
+    schedulingBlockedReasons?: string[];
   } | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [acceptedUpsells, setAcceptedUpsells] = useState<
