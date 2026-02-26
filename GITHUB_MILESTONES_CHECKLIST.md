@@ -6,6 +6,9 @@
 
 - **Progress:** `6 / 7 milestones complete` (86%)
 - **Current phase:** `Phase 6 — Hardening + launch`
+- **Environment:** Running on `http://localhost:3001` (port 3000 occupied by older build)
+- **DB migrations applied:** 0000–0016 (includes Phase 1–5 schema: quote_sessions, quote_session_events, quote_config_versions, upsellCatalog, customerTierLabels, premiumTheme)
+- **Last updated by:** Claude Code (Sonnet 4.6) — merged Phase 1–5 Codex branch into fresh main-branch baseline; all migrations applied; app running
 
 ---
 
