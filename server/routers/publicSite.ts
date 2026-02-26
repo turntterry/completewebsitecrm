@@ -362,8 +362,59 @@ const quoteRouter = router({
             ? "range"
             : "exact";
 
+      let sessionCompanyId = 1;
+      let sessionRow:
+        | (typeof quoteSessions.$inferSelect)
+        | undefined;
+      if (input.sessionToken) {
+        const [session] = await db
+          .select()
+          .from(quoteSessions)
+          .where(eq(quoteSessions.sessionToken, input.sessionToken))
+          .limit(1);
+        if (session) {
+          sessionRow = session;
+          sessionCompanyId = Number(session.companyId ?? 1);
+        }
+      }
+
+      const [settings] = await db
+        .select()
+        .from(quoteToolSettings)
+        .where(eq(quoteToolSettings.companyId, sessionCompanyId))
+        .limit(1);
+
+      const schedulingBlockedReasons: string[] = [];
+      const maxServicesForInstantBooking =
+        settings?.maxServicesForInstantBooking ?? 2;
+      const blockedServices =
+        (settings?.instantBookingBlockedServices as string[]) ?? [];
+
+      const nonUpsellServiceTypes = input.items
+        .map(item => item.serviceType)
+        .filter(type => !type.startsWith("upsell_"));
+
+      if (
+        maxServicesForInstantBooking > 0 &&
+        nonUpsellServiceTypes.length > maxServicesForInstantBooking
+      ) {
+        schedulingBlockedReasons.push("too_many_services");
+      }
+
+      if (
+        blockedServices.length > 0 &&
+        nonUpsellServiceTypes.some(type => blockedServices.includes(type))
+      ) {
+        schedulingBlockedReasons.push("blocked_service_type");
+      }
+
+      if (!input.schedulingEligible) {
+        schedulingBlockedReasons.push("client_marked_ineligible");
+      }
+
       const finalSchedulingEligible =
-        input.schedulingEligible && finalConfidenceMode !== "manual_review";
+        schedulingBlockedReasons.length === 0 &&
+        finalConfidenceMode !== "manual_review";
 
       const [result] = await db.insert(instantQuotes).values([
         {
@@ -394,35 +445,26 @@ const quoteRouter = router({
 
       const quoteId = (result as any).insertId as number;
 
-      let sessionCompanyId = 1;
-      if (input.sessionToken) {
-        const [session] = await db
-          .select()
-          .from(quoteSessions)
-          .where(eq(quoteSessions.sessionToken, input.sessionToken))
-          .limit(1);
+      if (sessionRow) {
+        await db
+          .update(quoteSessions)
+          .set({ submittedAt: new Date() })
+          .where(eq(quoteSessions.id, sessionRow.id));
 
-        if (session) {
-          sessionCompanyId = Number(session.companyId ?? 1);
-          await db
-            .update(quoteSessions)
-            .set({ submittedAt: new Date() })
-            .where(eq(quoteSessions.id, session.id));
-
-          await db.insert(quoteSessionEvents).values({
-            sessionId: session.id,
-            eventName: "quote_submitted",
-            payload: {
-              quoteId,
-              totalPrice: input.totalPrice,
-              services: input.items.length,
-              upsells: input.acceptedUpsells.length,
-              confidenceMode: finalConfidenceMode,
-              schedulingEligible: finalSchedulingEligible,
-              lowConfidenceReasons,
-            },
-          });
-        }
+        await db.insert(quoteSessionEvents).values({
+          sessionId: sessionRow.id,
+          eventName: "quote_submitted",
+          payload: {
+            quoteId,
+            totalPrice: input.totalPrice,
+            services: input.items.length,
+            upsells: input.acceptedUpsells.length,
+            confidenceMode: finalConfidenceMode,
+            schedulingEligible: finalSchedulingEligible,
+            lowConfidenceReasons,
+            schedulingBlockedReasons,
+          },
+        });
       }
 
       let manualReviewLeadId: number | null = null;
@@ -457,6 +499,8 @@ const quoteRouter = router({
         services: input.items.length,
         upsells: input.acceptedUpsells.length,
         manualReview: finalConfidenceMode === "manual_review",
+        schedulingEligible: finalSchedulingEligible,
+        schedulingBlockedReasons,
       });
 
       return {
@@ -466,6 +510,7 @@ const quoteRouter = router({
         schedulingEligible: finalSchedulingEligible,
         manualReviewLeadId,
         lowConfidenceReasons,
+        schedulingBlockedReasons,
       };
     }),
 

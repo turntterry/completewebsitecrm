@@ -701,11 +701,21 @@ export default function QuoteTool() {
                   </p>
                 ) : null}
               </>
-            ) : (
+            ) : quoteResult.schedulingEligible ? (
               <p className="text-muted-foreground mb-8">
                 You're eligible for fast scheduling handoff right now. Use the
                 buttons below to start and complete scheduling.
               </p>
+            ) : (
+              <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 text-sm">
+                Instant booking is disabled for this quote. We'll confirm the
+                best time with you directly.
+                {quoteResult.schedulingBlockedReasons?.length ? (
+                  <div className="text-xs mt-2">
+                    Reasons: {quoteResult.schedulingBlockedReasons.join(", ")}
+                  </div>
+                ) : null}
+              </div>
             )}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a

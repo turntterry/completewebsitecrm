@@ -82,6 +82,8 @@ export const quoteToolSettingsRouter = router({
         requireAdvanceBooking: z.boolean(),
         advanceBookingDays: z.number().int().min(1).max(30),
         commercialRoutingEnabled: z.boolean(),
+        maxServicesForInstantBooking: z.number().int().min(1).max(20),
+        instantBookingBlockedServices: z.array(z.string()).max(100),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -92,7 +94,10 @@ export const quoteToolSettingsRouter = router({
 
       await db
         .update(quoteToolSettings)
-        .set(input)
+        .set({
+          ...input,
+          instantBookingBlockedServices: input.instantBookingBlockedServices,
+        })
         .where(eq(quoteToolSettings.companyId, companyId));
       return { success: true };
     }),

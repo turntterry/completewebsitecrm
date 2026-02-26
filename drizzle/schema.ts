@@ -664,6 +664,13 @@ export const quoteToolSettings = mysqlTable("quote_tool_settings", {
   requireAdvanceBooking: boolean("requireAdvanceBooking").default(false),
   advanceBookingDays: int("advanceBookingDays").default(1),
   commercialRoutingEnabled: boolean("commercialRoutingEnabled").default(false),
+  maxServicesForInstantBooking: int("maxServicesForInstantBooking")
+    .notNull()
+    .default(2),
+  instantBookingBlockedServices: json("instantBookingBlockedServices")
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   customerTierLabels: json("customerTierLabels").$type<{
     good: string;
     better: string;

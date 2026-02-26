@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Home,
@@ -131,6 +132,11 @@ export default function QuoteTool() {
   const [advanceDays, setAdvanceDays] = useState(1);
   const [commercialRouting, setCommercialRouting] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [maxServicesForInstantBooking, setMaxServicesForInstantBooking] =
+    useState(2);
+  const [blockedInstantServices, setBlockedInstantServices] = useState<
+    string[]
+  >([]);
 
   // ── Add service dialog state ──────────────────────────────────────────────
   const [newServiceName, setNewServiceName] = useState("");
@@ -189,6 +195,14 @@ export default function QuoteTool() {
     setRequireAdvance(settings.requireAdvanceBooking ?? false);
     setAdvanceDays(settings.advanceBookingDays ?? 1);
     setCommercialRouting(settings.commercialRoutingEnabled ?? false);
+    setMaxServicesForInstantBooking(
+      settings.maxServicesForInstantBooking ?? 2
+    );
+    setBlockedInstantServices(
+      Array.isArray((settings as any).instantBookingBlockedServices)
+        ? ((settings as any).instantBookingBlockedServices as string[])
+        : []
+    );
     if (Array.isArray(upsells) && upsells.length > 0) {
       setUpsellCatalog(
         upsells.map((upsell, idx) => ({
@@ -245,6 +259,31 @@ export default function QuoteTool() {
     },
     onError: e => toast.error(e.message),
   });
+  const pushDeployUpdate = (partial: {
+    onlineBookingEnabled?: boolean;
+    requireAdvanceBooking?: boolean;
+    advanceBookingDays?: number;
+    commercialRoutingEnabled?: boolean;
+    maxServicesForInstantBooking?: number;
+    instantBookingBlockedServices?: string[];
+  }) => {
+    updateDeploy.mutate({
+      onlineBookingEnabled:
+        partial.onlineBookingEnabled ?? onlineBooking,
+      requireAdvanceBooking:
+        partial.requireAdvanceBooking ?? requireAdvance,
+      advanceBookingDays:
+        partial.advanceBookingDays ?? advanceDays,
+      commercialRoutingEnabled:
+        partial.commercialRoutingEnabled ?? commercialRouting,
+      maxServicesForInstantBooking:
+        partial.maxServicesForInstantBooking ??
+        maxServicesForInstantBooking,
+      instantBookingBlockedServices:
+        partial.instantBookingBlockedServices ??
+        blockedInstantServices,
+    });
+  };
   const updateService = trpc.quoteToolSettings.updateService.useMutation({
     onSuccess: () => refetchServices(),
     onError: e => toast.error(e.message),
@@ -1584,11 +1623,8 @@ export default function QuoteTool() {
                   checked={onlineBooking}
                   onCheckedChange={v => {
                     setOnlineBooking(v);
-                    updateDeploy.mutate({
+                    pushDeployUpdate({
                       onlineBookingEnabled: v,
-                      requireAdvanceBooking: requireAdvance,
-                      advanceBookingDays: advanceDays,
-                      commercialRoutingEnabled: commercialRouting,
                     });
                   }}
                 />
@@ -1607,11 +1643,8 @@ export default function QuoteTool() {
                   disabled={!onlineBooking}
                   onCheckedChange={v => {
                     setRequireAdvance(v);
-                    updateDeploy.mutate({
-                      onlineBookingEnabled: onlineBooking,
+                    pushDeployUpdate({
                       requireAdvanceBooking: v,
-                      advanceBookingDays: advanceDays,
-                      commercialRoutingEnabled: commercialRouting,
                     });
                   }}
                 />
@@ -1633,11 +1666,8 @@ export default function QuoteTool() {
                         Math.min(30, parseInt(e.target.value) || 1)
                       );
                       setAdvanceDays(v);
-                      updateDeploy.mutate({
-                        onlineBookingEnabled: onlineBooking,
-                        requireAdvanceBooking: requireAdvance,
+                      pushDeployUpdate({
                         advanceBookingDays: v,
-                        commercialRoutingEnabled: commercialRouting,
                       });
                     }}
                   />
@@ -1674,14 +1704,90 @@ export default function QuoteTool() {
                   checked={commercialRouting}
                   onCheckedChange={v => {
                     setCommercialRouting(v);
-                    updateDeploy.mutate({
-                      onlineBookingEnabled: onlineBooking,
-                      requireAdvanceBooking: requireAdvance,
-                      advanceBookingDays: advanceDays,
+                    pushDeployUpdate({
                       commercialRoutingEnabled: v,
                     });
                   }}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Instant Booking Guardrails */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                Instant Booking Guardrails
+              </CardTitle>
+              <CardDescription>
+                Control when self-scheduling is available to customers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">
+                    Max services allowed for instant booking
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    If a quote has more than this number of services, scheduling
+                    is disabled and the team will follow up manually.
+                  </p>
+                </div>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  className="w-24 h-9 text-sm"
+                  value={maxServicesForInstantBooking}
+                  onChange={e => {
+                    const v = Math.max(
+                      1,
+                      Math.min(20, parseInt(e.target.value) || 1)
+                    );
+                    setMaxServicesForInstantBooking(v);
+                    pushDeployUpdate({
+                      maxServicesForInstantBooking: v,
+                    });
+                  }}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  Services that can never be instant-booked
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Selected services will always route to manual scheduling, even
+                  if they are the only service in the quote.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2">
+                  {services?.map(service => (
+                    <label
+                      key={service.id}
+                      className="flex items-center gap-2 text-sm border rounded-lg px-3 py-2 hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        checked={blockedInstantServices.includes(
+                          service.serviceKey ?? service.name
+                        )}
+                        onCheckedChange={checked => {
+                          const key = service.serviceKey ?? service.name;
+                          const next = checked
+                            ? [...blockedInstantServices, key]
+                            : blockedInstantServices.filter(s => s !== key);
+                          setBlockedInstantServices(next);
+                          pushDeployUpdate({
+                            instantBookingBlockedServices: next,
+                          });
+                        }}
+                      />
+                      <span>{service.name}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
