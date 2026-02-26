@@ -45,7 +45,7 @@
   - [x] Low-confidence routing workflow implemented
 
 - [ ] **Phase 6 — Hardening + launch**
-  - [ ] E2E smoke suite for quote funnel and upsells
+  - [x] E2E smoke suite for quote funnel and upsells
   - [ ] Error handling + observability pass
   - [ ] Launch checklist + rollback plan complete
 
