@@ -65,6 +65,10 @@ export default function BookingControls() {
     commercialRoutingEnabled: boolean;
     maxServicesForInstantBooking: number;
     instantBookingBlockedServices: string[];
+    maxSqftAuto: number;
+    maxLinearFtAuto: number;
+    maxStoriesAuto: number;
+    maxWindowsAuto: number;
   }>) {
     updateDeploy.mutate({
       onlineBookingEnabled: overrides?.onlineBookingEnabled ?? onlineBooking,
@@ -75,6 +79,10 @@ export default function BookingControls() {
         overrides?.maxServicesForInstantBooking ?? maxServicesForInstantBooking,
       instantBookingBlockedServices:
         overrides?.instantBookingBlockedServices ?? blockedInstantServices,
+      maxSqftAuto: overrides?.maxSqftAuto ?? 5000,
+      maxLinearFtAuto: overrides?.maxLinearFtAuto ?? 800,
+      maxStoriesAuto: overrides?.maxStoriesAuto ?? 3,
+      maxWindowsAuto: overrides?.maxWindowsAuto ?? 120,
     });
   }
 

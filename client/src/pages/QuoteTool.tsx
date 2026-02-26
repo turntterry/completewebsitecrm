@@ -138,6 +138,10 @@ export default function QuoteTool() {
   const [blockedInstantServices, setBlockedInstantServices] = useState<
     string[]
   >([]);
+  const [maxSqftAuto, setMaxSqftAuto] = useState(5000);
+  const [maxLinearFtAuto, setMaxLinearFtAuto] = useState(800);
+  const [maxStoriesAuto, setMaxStoriesAuto] = useState(3);
+  const [maxWindowsAuto, setMaxWindowsAuto] = useState(120);
 
   // ── Add service dialog state ──────────────────────────────────────────────
   const [newServiceName, setNewServiceName] = useState("");
@@ -204,6 +208,10 @@ export default function QuoteTool() {
         ? ((settings as any).instantBookingBlockedServices as string[])
         : []
     );
+    setMaxSqftAuto(Number(settings.maxSqftAuto ?? 5000));
+    setMaxLinearFtAuto(Number(settings.maxLinearFtAuto ?? 800));
+    setMaxStoriesAuto(Number(settings.maxStoriesAuto ?? 3));
+    setMaxWindowsAuto(Number(settings.maxWindowsAuto ?? 120));
     if (Array.isArray(upsells) && upsells.length > 0) {
       setUpsellCatalog(
         upsells.map((upsell, idx) => ({
@@ -267,6 +275,10 @@ export default function QuoteTool() {
     commercialRoutingEnabled?: boolean;
     maxServicesForInstantBooking?: number;
     instantBookingBlockedServices?: string[];
+    maxSqftAuto?: number;
+    maxLinearFtAuto?: number;
+    maxStoriesAuto?: number;
+    maxWindowsAuto?: number;
   }) => {
     updateDeploy.mutate({
       onlineBookingEnabled:
@@ -283,6 +295,10 @@ export default function QuoteTool() {
       instantBookingBlockedServices:
         partial.instantBookingBlockedServices ??
         blockedInstantServices,
+      maxSqftAuto: partial.maxSqftAuto ?? maxSqftAuto,
+      maxLinearFtAuto: partial.maxLinearFtAuto ?? maxLinearFtAuto,
+      maxStoriesAuto: partial.maxStoriesAuto ?? maxStoriesAuto,
+      maxWindowsAuto: partial.maxWindowsAuto ?? maxWindowsAuto,
     });
   };
   const updateService = trpc.quoteToolSettings.updateService.useMutation({
@@ -1806,6 +1822,98 @@ export default function QuoteTool() {
               </div>
 
               <Separator />
+
+              <div className="space-y-3">
+                <p className="text-sm font-medium">
+                  Complexity thresholds (auto range/manual review)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Quotes exceeding these values will skip instant booking and
+                  route to manual review.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-3">
+                    <Label className="text-xs text-muted-foreground w-32">
+                      Max sqft
+                    </Label>
+                    <Input
+                      type="number"
+                      min={500}
+                      max={20000}
+                      className="w-28 h-8 text-sm"
+                      value={maxSqftAuto}
+                      onChange={e => {
+                        const v = Math.max(
+                          500,
+                          Math.min(20000, parseInt(e.target.value) || 500)
+                        );
+                        setMaxSqftAuto(v);
+                        pushDeployUpdate({ maxSqftAuto: v });
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Label className="text-xs text-muted-foreground w-32">
+                      Max linear ft
+                    </Label>
+                    <Input
+                      type="number"
+                      min={100}
+                      max={10000}
+                      className="w-28 h-8 text-sm"
+                      value={maxLinearFtAuto}
+                      onChange={e => {
+                        const v = Math.max(
+                          100,
+                          Math.min(10000, parseInt(e.target.value) || 100)
+                        );
+                        setMaxLinearFtAuto(v);
+                        pushDeployUpdate({ maxLinearFtAuto: v });
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Label className="text-xs text-muted-foreground w-32">
+                      Max stories
+                    </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={6}
+                      className="w-20 h-8 text-sm"
+                      value={maxStoriesAuto}
+                      onChange={e => {
+                        const v = Math.max(
+                          1,
+                          Math.min(6, parseInt(e.target.value) || 1)
+                        );
+                        setMaxStoriesAuto(v);
+                        pushDeployUpdate({ maxStoriesAuto: v });
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Label className="text-xs text-muted-foreground w-32">
+                      Max windows
+                    </Label>
+                    <Input
+                      type="number"
+                      min={10}
+                      max={500}
+                      className="w-24 h-8 text-sm"
+                      value={maxWindowsAuto}
+                      onChange={e => {
+                        const v = Math.max(
+                          10,
+                          Math.min(500, parseInt(e.target.value) || 10)
+                        );
+                        setMaxWindowsAuto(v);
+                        pushDeployUpdate({ maxWindowsAuto: v });
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <p className="text-sm font-medium">

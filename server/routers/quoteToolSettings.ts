@@ -84,6 +84,10 @@ export const quoteToolSettingsRouter = router({
         commercialRoutingEnabled: z.boolean(),
         maxServicesForInstantBooking: z.number().int().min(1).max(20),
         instantBookingBlockedServices: z.array(z.string()).max(100),
+        maxSqftAuto: z.number().min(0).max(20000),
+        maxLinearFtAuto: z.number().min(0).max(10000),
+        maxStoriesAuto: z.number().int().min(1).max(6),
+        maxWindowsAuto: z.number().int().min(1).max(500),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -95,8 +99,16 @@ export const quoteToolSettingsRouter = router({
       await db
         .update(quoteToolSettings)
         .set({
-          ...input,
+          onlineBookingEnabled: input.onlineBookingEnabled,
+          requireAdvanceBooking: input.requireAdvanceBooking,
+          advanceBookingDays: input.advanceBookingDays,
+          commercialRoutingEnabled: input.commercialRoutingEnabled,
+          maxServicesForInstantBooking: input.maxServicesForInstantBooking,
           instantBookingBlockedServices: input.instantBookingBlockedServices,
+          maxSqftAuto: input.maxSqftAuto.toFixed(2),
+          maxLinearFtAuto: input.maxLinearFtAuto.toFixed(2),
+          maxStoriesAuto: input.maxStoriesAuto,
+          maxWindowsAuto: input.maxWindowsAuto,
         })
         .where(eq(quoteToolSettings.companyId, companyId));
       return { success: true };
