@@ -6,10 +6,11 @@ import {
   invoices,
   instantQuotes,
   jobs,
+  leads,
   quotes,
   visits,
 } from "../../drizzle/schema";
-import { getDb } from "../db";
+import { createPayment, getDb } from "../db";
 import { publicProcedure, router } from "../_core/trpc";
 
 async function requireDb() {
@@ -168,5 +169,108 @@ export const portalRouter = router({
         .where(eq(quotes.id, input.quoteId));
 
       return { success: true, status: "accepted" as const };
+    }),
+
+  /**
+   * Portal-side payment capture (records a payment + updates invoice balance).
+   * This is a stub for card/ACH collection; it immediately records as paid.
+   */
+  payInvoice: publicProcedure
+    .input(
+      z.object({
+        invoiceId: z.number().int().positive(),
+        customerId: z.number().int().positive(),
+        companyId: z.number().int().positive(),
+        amount: z.number().positive().optional(), // defaults to balance
+        method: z.enum(["card", "ach", "cash", "check", "other"]).default("card"),
+        note: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await requireDb();
+
+      const [invoice] = await db
+        .select()
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.id, input.invoiceId),
+            eq(invoices.customerId, input.customerId),
+            eq(invoices.companyId, input.companyId)
+          )
+        )
+        .limit(1);
+
+      if (!invoice) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found" });
+      }
+
+      const balance = parseFloat(String(invoice.balance ?? invoice.total ?? "0")) || 0;
+      const amount = input.amount ?? balance;
+      if (amount <= 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nothing to pay" });
+      }
+
+      await createPayment({
+        invoiceId: invoice.id,
+        companyId: input.companyId,
+        amount: String(amount.toFixed(2)) as any,
+        method: input.method,
+        notes: input.note ?? "Portal payment",
+        paidAt: new Date(),
+      });
+
+      const updatedBalance = Math.max(0, balance - amount);
+      return { success: true, remainingBalance: updatedBalance };
+    }),
+
+  /**
+   * Portal-side "request work / rebook" entry. Creates a lead for ops follow-up.
+   */
+  requestWork: publicProcedure
+    .input(
+      z.object({
+        customerId: z.number().int().positive(),
+        companyId: z.number().int().positive(),
+        message: z.string().max(2000).optional(),
+        services: z.array(z.string()).max(20).optional(),
+        preferredDate: z.string().optional(),
+        address: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await requireDb();
+
+      const [customer] = await db
+        .select()
+        .from(customers)
+        .where(
+          and(
+            eq(customers.id, input.customerId),
+            eq(customers.companyId, input.companyId)
+          )
+        )
+        .limit(1);
+
+      if (!customer) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Customer not found" });
+      }
+
+      const [leadResult] = await db.insert(leads).values({
+        companyId: input.companyId,
+        customerId: input.customerId,
+        firstName: customer.firstName,
+        lastName: customer.lastName ?? "",
+        email: customer.email ?? null,
+        phone: customer.phone ?? null,
+        address: input.address ?? null,
+        services: input.services ?? [],
+        notes: input.message ?? undefined,
+        status: "new",
+        source: "portal_request",
+      });
+
+      const leadId = (leadResult as any).insertId as number;
+      return { success: true, leadId };
     }),
 });
