@@ -151,9 +151,8 @@ const quoteRouter = router({
     const rows = await db.select().from(serviceConfigs);
     const result: Record<string, Record<string, unknown>> = {};
     for (const row of rows) {
-      // serviceConfigs stores key + config JSON
-      const key = (row as any).key ?? (row as any).serviceType;
-      if (key) result[key] = (row as any).config ?? (row as any).value ?? {};
+      const key = row.serviceKey;
+      if (key) result[key] = (row.pricingConfig as Record<string, unknown>) ?? {};
     }
     return result;
   }),
