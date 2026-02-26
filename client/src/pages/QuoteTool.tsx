@@ -973,6 +973,10 @@ export default function QuoteTool() {
                     label: "Upsell Accepted",
                     value: funnelSummary?.totals?.upsellAccepted ?? 0,
                   },
+                  {
+                    label: "Schedule Blocked",
+                    value: funnelSummary?.totals?.scheduleBlocked ?? 0,
+                  },
                 ].map(metric => (
                   <div key={metric.label} className="rounded-md border p-2">
                     <p className="text-xs text-muted-foreground">
@@ -1005,6 +1009,27 @@ export default function QuoteTool() {
                   </p>
                 </div>
               </div>
+
+              {funnelSummary?.scheduleBlockedReasons?.length ? (
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Schedule Blocked Reasons
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {funnelSummary.scheduleBlockedReasons.map((row: any) => (
+                      <div
+                        key={row.reason}
+                        className="flex items-center justify-between rounded-md border p-2 text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {row.reason.replace(/_/g, " ")}
+                        </span>
+                        <span className="font-semibold">{row.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">

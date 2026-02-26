@@ -72,6 +72,7 @@ export const quoteAnalyticsRouter = router({
                   "upsell_shown",
                   "upsell_accepted",
                   "quote_submitted",
+                  "schedule_blocked",
                   "schedule_started",
                   "schedule_completed",
                 ])
@@ -88,9 +89,10 @@ export const quoteAnalyticsRouter = router({
           upsellShown: boolean;
           upsellAccepted: boolean;
           submitted: boolean;
-          scheduleStarted: boolean;
-          scheduleCompleted: boolean;
-        }
+        scheduleStarted: boolean;
+        scheduleCompleted: boolean;
+        scheduleBlocked: boolean;
+      }
       >();
 
       for (const session of sessions) {
@@ -102,8 +104,11 @@ export const quoteAnalyticsRouter = router({
           submitted: Boolean(session.submittedAt),
           scheduleStarted: false,
           scheduleCompleted: false,
+          scheduleBlocked: false,
         });
       }
+
+      const scheduleBlockedReasons = new Map<string, number>();
 
       for (const event of events) {
         const row = stageMap.get(event.sessionId);
@@ -113,6 +118,16 @@ export const quoteAnalyticsRouter = router({
         if (event.eventName === "upsell_shown") row.upsellShown = true;
         if (event.eventName === "upsell_accepted") row.upsellAccepted = true;
         if (event.eventName === "quote_submitted") row.submitted = true;
+        if (event.eventName === "schedule_blocked") {
+          row.scheduleBlocked = true;
+          const payload = parsePayload(event.payload);
+          const reasons: string[] = Array.isArray(payload.reasons)
+            ? (payload.reasons as string[])
+            : [];
+          for (const r of reasons) {
+            scheduleBlockedReasons.set(r, (scheduleBlockedReasons.get(r) ?? 0) + 1);
+          }
+        }
         if (event.eventName === "schedule_started") row.scheduleStarted = true;
         if (event.eventName === "schedule_completed")
           row.scheduleCompleted = true;
@@ -125,6 +140,7 @@ export const quoteAnalyticsRouter = router({
         upsellShown: 0,
         upsellAccepted: 0,
         quoteSubmitted: 0,
+        scheduleBlocked: 0,
         scheduleStarted: 0,
         scheduleCompleted: 0,
       };
@@ -135,6 +151,7 @@ export const quoteAnalyticsRouter = router({
         if (row.upsellShown) totals.upsellShown += 1;
         if (row.upsellAccepted) totals.upsellAccepted += 1;
         if (row.submitted) totals.quoteSubmitted += 1;
+        if (row.scheduleBlocked) totals.scheduleBlocked += 1;
         if (row.scheduleStarted) totals.scheduleStarted += 1;
         if (row.scheduleCompleted) totals.scheduleCompleted += 1;
       }
@@ -154,6 +171,9 @@ export const quoteAnalyticsRouter = router({
           submitRate: rate(totals.quoteSubmitted),
           scheduleCompletionRate: rate(totals.scheduleCompleted),
         },
+        scheduleBlockedReasons: Array.from(scheduleBlockedReasons.entries()).map(
+          ([reason, count]) => ({ reason, count })
+        ),
       };
     }),
 

@@ -434,6 +434,33 @@ const quoteRouter = router({
         schedulingBlockedReasons.push("client_marked_ineligible");
       }
 
+      // Complexity guardrail: oversize / steep / high-story / large window count
+      const complexityTriggers = input.items
+        .map(item => item.inputs ?? {})
+        .filter(Boolean)
+        .some(inputs => {
+          const sqft = Number((inputs as any).sqft ?? 0);
+          const linearFeet = Number((inputs as any).linearFeet ?? 0);
+          const stories = Number((inputs as any).stories ?? 1);
+          const windowCount = Number((inputs as any).windowCount ?? 0);
+          const roofPitch = String((inputs as any).roofPitch ?? "");
+          return (
+            sqft > 5000 ||
+            linearFeet > 800 ||
+            stories >= 3 ||
+            windowCount > 120 ||
+            roofPitch === "steep"
+          );
+        });
+
+      if (complexityTriggers) {
+        schedulingBlockedReasons.push("size_or_complexity");
+      }
+
+      if (input.confidenceMode === "range") {
+        schedulingBlockedReasons.push("range_output");
+      }
+
       const finalSchedulingEligible =
         schedulingBlockedReasons.length === 0 &&
         finalConfidenceMode !== "manual_review";
