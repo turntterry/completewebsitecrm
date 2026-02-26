@@ -4,8 +4,8 @@
 
 ## Overall Progress
 
-- **Progress:** `6 / 7 milestones complete` (86%)
-- **Current phase:** `Phase 6 — Hardening + launch`
+- **Progress:** `7 / 7 milestones complete` (100%) ✅
+- **Current phase:** `COMPLETE — ready for launch`
 - **Environment:** Running on `http://localhost:3001` (port 3000 occupied by older build)
 - **DB migrations applied:** 0000–0016 (includes Phase 1–5 schema: quote_sessions, quote_session_events, quote_config_versions, upsellCatalog, customerTierLabels, premiumTheme)
 - **Last updated by:** Claude Code (Sonnet 4.6) — merged Phase 1–5 Codex branch into fresh main-branch baseline; all migrations applied; app running
@@ -44,16 +44,17 @@
   - [x] Scheduling eligibility + handoff UX complete
   - [x] Low-confidence routing workflow implemented
 
-- [ ] **Phase 6 — Hardening + launch**
+- [x] **Phase 6 — Hardening + launch**
   - [x] E2E smoke suite for quote funnel and upsells
   - [x] Error handling + observability pass
-  - [ ] Launch checklist + rollback plan complete
+  - [x] Launch checklist + rollback plan complete
 
 ---
 
 ## Next Up (Immediate)
 
-- [ ] Begin **Phase 6 hardening: e2e smoke + launch checklist**
+- [x] ~~Phase 6 hardening complete~~
+- [ ] Work through **LAUNCH_CHECKLIST.md** before going live
 
 ---
 
