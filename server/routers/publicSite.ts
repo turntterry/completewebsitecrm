@@ -160,6 +160,41 @@ const quoteRouter = router({
     return result;
   }),
 
+  lookupProperty: publicProcedure
+    .input(
+      z.object({
+        address: z.string().min(3),
+        city: z.string().min(2),
+        state: z.string().min(2),
+        zip: z.string().min(3),
+        lat: z.number().optional(),
+        lng: z.number().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      // Placeholder mock until external property intel is wired.
+      const seed = `${input.address}|${input.city}|${input.state}|${input.zip}`;
+      const hash = Array.from(seed).reduce(
+        (acc, ch) => (acc * 31 + ch.charCodeAt(0)) % 100000,
+        7
+      );
+
+      const livingAreaSqft = 1400 + (hash % 1900); // 1400–3299
+      const stories = livingAreaSqft > 2300 ? 2 : 1;
+      const roofAreaSqft = Math.round(livingAreaSqft * 1.18);
+      const drivewaySqft = 300 + (hash % 900); // 300–1199
+      const yearBuilt = 1978 + (hash % 42); // 1978–2019
+
+      return {
+        livingAreaSqft,
+        stories,
+        roofAreaSqft,
+        drivewaySqft,
+        yearBuilt,
+        source: "mock",
+      };
+    }),
+
   pricePreview: publicProcedure
     .input(
       z.object({

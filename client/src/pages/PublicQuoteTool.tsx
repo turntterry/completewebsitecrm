@@ -219,6 +219,25 @@ export default function QuoteTool() {
     trpc.publicSite.quote.getPricing.useQuery();
   const { data: experienceConfig } =
     trpc.publicSite.quote.getExperienceConfig.useQuery();
+  const propertyLookup = trpc.publicSite.quote.lookupProperty.useQuery(
+    {
+      address,
+      city,
+      state: stateVal,
+      zip,
+      lat: lat || undefined,
+      lng: lng || undefined,
+    },
+    {
+      enabled:
+        Boolean(address && city && stateVal && zip) &&
+        !pricingLoading &&
+        !submitted,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
+    }
+  );
   const submitMutation = trpc.publicSite.quote.submitV2.useMutation();
   const startSessionMutation = trpc.publicSite.quote.startSession.useMutation();
   const trackEventMutation = trpc.publicSite.quote.trackEvent.useMutation();
@@ -245,12 +264,6 @@ export default function QuoteTool() {
     Record<string, PricingInput>
   >({});
   const [propertyIntel, setPropertyIntel] = useState<PropertyIntel | null>(
-    null
-  );
-  const [propertyLookupStatus, setPropertyLookupStatus] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
-  const [propertyLookupError, setPropertyLookupError] = useState<string | null>(
     null
   );
   const lastLookupKeyRef = useRef<string | null>(null);
@@ -290,6 +303,18 @@ export default function QuoteTool() {
       },
     [experienceConfig?.settings?.customerTierLabels]
   );
+  const propertyLookupStatus: "idle" | "loading" | "success" | "error" =
+    propertyLookup.isFetching
+      ? "loading"
+      : propertyLookup.isError
+        ? "error"
+        : propertyLookup.data
+          ? "success"
+          : "idle";
+  const propertyLookupError =
+    propertyLookup.error instanceof Error
+      ? propertyLookup.error.message
+      : undefined;
   const manualReviewServiceKeys = useMemo(
     () =>
       new Set(
@@ -667,49 +692,20 @@ export default function QuoteTool() {
   useEffect(() => {
     const key = `${address}|${city}|${stateVal}|${zip}`;
     if (!address || !city || !stateVal || !zip) return;
-    if (
-      propertyLookupStatus === "loading" ||
-      (lastLookupKeyRef.current === key && propertyLookupStatus === "success")
-    ) {
-      return;
+
+    if (propertyLookup.data && lastLookupKeyRef.current !== key) {
+      setPropertyIntel(propertyLookup.data);
+      lastLookupKeyRef.current = key;
     }
 
-    let cancelled = false;
-    setPropertyIntel(null);
-    setPropertyLookupStatus("loading");
-    setPropertyLookupError(null);
-
-    mockPropertyLookup({
-      address,
-      city,
-      state: stateVal,
-      zip,
-      lat,
-      lng,
-    })
-      .then(data => {
-        if (cancelled) return;
-        setPropertyIntel(data);
-        setPropertyLookupStatus("success");
-        lastLookupKeyRef.current = key;
-      })
-      .catch(err => {
-        if (cancelled) return;
-        setPropertyLookupStatus("error");
-        setPropertyLookupError(
-          err?.message || "We couldn't auto-pull this address."
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    if (propertyLookup.error) {
+      setPropertyIntel(null);
+    }
   }, [
     address,
     city,
-    lat,
-    lng,
-    propertyLookupStatus,
+    propertyLookup.data,
+    propertyLookup.error,
     stateVal,
     zip,
   ]);
@@ -717,7 +713,6 @@ export default function QuoteTool() {
   useEffect(() => {
     if (address || city || zip) return;
     setPropertyIntel(null);
-    setPropertyLookupStatus("idle");
     lastLookupKeyRef.current = null;
   }, [address, city, zip]);
 
@@ -1072,8 +1067,8 @@ export default function QuoteTool() {
                   lookupStatus={propertyLookupStatus}
                   lookupError={propertyLookupError}
                   onRetry={() => {
-                    setPropertyLookupStatus("idle");
                     lastLookupKeyRef.current = null;
+                    propertyLookup.refetch();
                   }}
                 />
               )}
@@ -2504,45 +2499,6 @@ type PropertyIntel = {
   roofAreaSqft?: number;
   drivewaySqft?: number;
 };
-
-function hashString(value: string) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash << 5) - hash + value.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-async function mockPropertyLookup({
-  address,
-  city,
-  state,
-  zip,
-}: {
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-}): Promise<PropertyIntel> {
-  const key = `${address}|${city}|${state}|${zip}`;
-  const hash = hashString(key);
-  const livingAreaSqft = 1400 + (hash % 1800);
-  const stories = livingAreaSqft > 2200 ? 2 : 1;
-  const roofAreaSqft = Math.round(livingAreaSqft * 1.18);
-  const drivewaySqft = 350 + (hash % 650);
-  const yearBuilt = 1980 + (hash % 35);
-
-  // Simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 450));
-  return {
-    livingAreaSqft,
-    stories,
-    roofAreaSqft,
-    drivewaySqft,
-    yearBuilt,
-  };
-}
 
 function getDefaultInputs(serviceId: string): PricingInput {
   switch (serviceId) {
