@@ -202,7 +202,7 @@ export default function Requests() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <a href="/quote" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
+            <a href="/instant-quote" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
               <ExternalLink className="h-4 w-4" /> Customer Quote Link
             </a>
           </Button>
@@ -259,7 +259,7 @@ export default function Requests() {
               <p className="font-medium">No instant quotes yet</p>
               <p className="text-sm text-muted-foreground mt-1">Share your quote link with customers to start receiving instant quote requests</p>
               <Button variant="outline" className="mt-4" asChild>
-                <a href="/quote" target="_blank" rel="noopener noreferrer">
+                <a href="/instant-quote" target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4 mr-1.5" /> Open Quote Tool
                 </a>
               </Button>
