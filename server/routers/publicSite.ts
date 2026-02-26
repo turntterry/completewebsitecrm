@@ -707,7 +707,7 @@ const quoteRouter = router({
 
       notifyOwner({
         title: `New Quote: $${input.totalPrice.toFixed(2)} from ${input.customerName}`,
-        content: `Name: ${input.customerName}\nPhone: ${input.customerPhone}\nEmail: ${input.customerEmail}\nAddress: ${input.address}\nServices: ${serviceList}\nTotal: $${input.totalPrice.toFixed(2)}${input.preferredDate ? `\nPreferred date: ${input.preferredDate}` : ""}`,
+        content: `Name: ${input.customerName}\nPhone: ${input.customerPhone}\nEmail: ${input.customerEmail}\nAddress: ${input.address}\nServices: ${serviceList}\nTotal: $${input.totalPrice.toFixed(2)}${input.preferredDate ? `\nPreferred date: ${input.preferredDate}` : ""}${(input as any).preferredSlotLabel ? `\nPreferred slot: ${(input as any).preferredSlotLabel}` : ""}`,
       }).catch(() => {});
 
       return { quoteId, totalPrice: input.totalPrice };
