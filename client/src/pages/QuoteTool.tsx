@@ -86,6 +86,12 @@ export default function QuoteTool() {
     trpc.quoteToolSettings.getUpsellAnalytics.useQuery({
       days: 30,
     });
+  const { data: funnelSummary } = trpc.quoteAnalytics.funnelSummary.useQuery({
+    days: 30,
+  });
+  const { data: attributionSummary } = trpc.quoteAnalytics.attribution.useQuery(
+    { days: 30 }
+  );
   const { data: upsells, refetch: refetchUpsells } =
     trpc.quoteToolSettings.listUpsells.useQuery();
   const { data: experienceVersions = [], refetch: refetchVersions } =
@@ -869,6 +875,99 @@ export default function QuoteTool() {
                   No upsell event data yet.
                 </p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                Funnel + Attribution (30 days)
+              </CardTitle>
+              <CardDescription>
+                Conversion performance from first view to submission with top
+                traffic sources.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {[
+                  {
+                    label: "Sessions",
+                    value: funnelSummary?.totals?.sessionsStarted ?? 0,
+                  },
+                  {
+                    label: "Viewed",
+                    value: funnelSummary?.totals?.quoteViewed ?? 0,
+                  },
+                  {
+                    label: "Submitted",
+                    value: funnelSummary?.totals?.quoteSubmitted ?? 0,
+                  },
+                  {
+                    label: "Upsell Accepted",
+                    value: funnelSummary?.totals?.upsellAccepted ?? 0,
+                  },
+                ].map(metric => (
+                  <div key={metric.label} className="rounded-md border p-2">
+                    <p className="text-xs text-muted-foreground">
+                      {metric.label}
+                    </p>
+                    <p className="text-lg font-semibold">{metric.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                <div className="rounded-md border p-2">
+                  <p className="text-xs text-muted-foreground">View Rate</p>
+                  <p className="font-semibold">
+                    {funnelSummary?.rates?.viewRate ?? 0}%
+                  </p>
+                </div>
+                <div className="rounded-md border p-2">
+                  <p className="text-xs text-muted-foreground">Submit Rate</p>
+                  <p className="font-semibold">
+                    {funnelSummary?.rates?.submitRate ?? 0}%
+                  </p>
+                </div>
+                <div className="rounded-md border p-2">
+                  <p className="text-xs text-muted-foreground">
+                    Upsell Attach Rate
+                  </p>
+                  <p className="font-semibold">
+                    {funnelSummary?.rates?.upsellAttachRate ?? 0}%
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                  Top Sources
+                </p>
+                {attributionSummary?.topSources?.length ? (
+                  <div className="space-y-1">
+                    {attributionSummary.topSources
+                      .slice(0, 5)
+                      .map((row: any) => (
+                        <div
+                          key={row.source}
+                          className="flex items-center justify-between text-sm rounded-md border p-2"
+                        >
+                          <span className="font-medium truncate pr-3">
+                            {row.source}
+                          </span>
+                          <span className="text-muted-foreground whitespace-nowrap">
+                            {row.submitted}/{row.sessions} ({row.submitRate}%)
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No attribution data yet.
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
