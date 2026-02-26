@@ -435,6 +435,12 @@ export default function QuoteTool() {
       endHour: availabilityEndHour,
       preferExternal: availabilityPreferExternal,
       slotPaddingMinutes,
+      address,
+      city,
+      state: stateVal,
+      zip,
+      lat: lat || undefined,
+      lng: lng || undefined,
     },
     { enabled: step >= 5 && !pricingLoading }
   );

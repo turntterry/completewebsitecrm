@@ -190,6 +190,12 @@ const quoteRouter = router({
         endHour: z.number().min(13).max(22).optional(),
         preferExternal: z.boolean().optional(),
         slotPaddingMinutes: z.number().int().min(0).max(240).default(0),
+        address: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        zip: z.string().optional(),
+        lat: z.number().optional(),
+        lng: z.number().optional(),
       })
     )
     .query(async ({ input }) => {
@@ -945,11 +951,23 @@ async function fetchSchedulerSlots({
   daysAhead,
   startHour,
   endHour,
+  address,
+  city,
+  state,
+  zip,
+  lat,
+  lng,
 }: {
   durationMinutes: number;
   daysAhead: number;
   startHour?: number;
   endHour?: number;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  lat?: number | null;
+  lng?: number | null;
 }) {
   const url = process.env.SCHEDULER_URL;
   const apiKey = process.env.SCHEDULER_KEY;
@@ -966,6 +984,12 @@ async function fetchSchedulerSlots({
       daysAhead,
       startHour,
       endHour,
+      address,
+      city,
+      state,
+      zip,
+      lat,
+      lng,
     }),
   });
   if (!resp.ok) throw new Error(`Scheduler provider ${resp.status}`);
