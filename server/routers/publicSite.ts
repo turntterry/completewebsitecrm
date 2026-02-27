@@ -416,24 +416,29 @@ const quoteRouter = router({
 
       const bundleDiscount = input.bundleDiscount ?? 0;
       const lowConfidenceReasons: string[] = [];
+      const manualReviewReasons: string[] = [];
       if (input.confidenceMode === "manual_review") {
         lowConfidenceReasons.push("client_requested_manual_review");
+        manualReviewReasons.push("client_requested_manual_review");
       }
       if (input.confidenceMode === "range") {
         lowConfidenceReasons.push("range_output");
       }
       if (!input.schedulingEligible) {
         lowConfidenceReasons.push("scheduling_not_eligible");
+        manualReviewReasons.push("scheduling_not_eligible");
       }
       if (input.totalPrice <= 0) {
         lowConfidenceReasons.push("non_positive_total");
+        manualReviewReasons.push("non_positive_total");
       }
       if (input.items.length === 0) {
         lowConfidenceReasons.push("no_services_selected");
+        manualReviewReasons.push("no_services_selected");
       }
 
       const finalConfidenceMode: "exact" | "range" | "manual_review" =
-        lowConfidenceReasons.length > 0
+        manualReviewReasons.length > 0
           ? "manual_review"
           : input.confidenceMode === "range"
             ? "range"
