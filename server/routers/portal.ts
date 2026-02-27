@@ -188,6 +188,8 @@ export const portalRouter = router({
     .mutation(async ({ input }) => {
       const db = await requireDb();
       const portalSettings = await getPortalSettings(input.companyId);
+      const company = await getCompany(input.companyId);
+      const webhookCfg = (company as any)?.settings?.webhooks ?? {};
 
       const [quote] = await db
         .select()
@@ -307,26 +309,32 @@ export const portalRouter = router({
               .limit(1)
               .then(rows => rows[0] ?? null)
           : null;
-      sendWebhook("quote.accepted", {
-        source: "portal",
-        customer: { id: input.customerId },
-        quote: {
-          id: quote.id,
-          quoteNumber: quote.quoteNumber,
-          total: quote.total,
-          status: "accepted",
-        },
-        property: property
-          ? {
-              id: property.id,
-              address: property.address,
-              city: property.city,
-              state: property.state,
-              zip: property.zip,
-            }
-          : null,
-        job: jobId ? { id: jobId } : null,
-      }).catch(() => {});
+      if (webhookCfg.enabled) {
+        sendWebhook(
+          "quote.accepted",
+          {
+            source: "portal",
+            customer: { id: input.customerId },
+            quote: {
+              id: quote.id,
+              quoteNumber: quote.quoteNumber,
+              total: quote.total,
+              status: "accepted",
+            },
+            property: property
+              ? {
+                  id: property.id,
+                  address: property.address,
+                  city: property.city,
+                  state: property.state,
+                  zip: property.zip,
+                }
+              : null,
+            job: jobId ? { id: jobId } : null,
+          },
+          { url: webhookCfg.url, secret: webhookCfg.secret }
+        ).catch(() => {});
+      }
 
       return { success: true, status: "accepted" as const, jobId };
     }),
@@ -371,7 +379,9 @@ export const portalRouter = router({
         ? parseFloat(String((invoice as any).depositAmount))
         : null;
       const company = await getCompany(input.companyId);
-      const payments = (company as any)?.settings?.payments ?? {};
+      const settings = (company as any)?.settings ?? {};
+      const payments = settings?.payments ?? {};
+      const webhookCfg = settings?.webhooks ?? {};
       const depositPercent =
         payments.depositPercent !== undefined ? Number(payments.depositPercent) : null;
       const percentDeposit =
@@ -430,29 +440,35 @@ export const portalRouter = router({
         .from(customers)
         .where(eq(customers.id, invoice.customerId));
 
-      sendWebhook(eventType, {
-        source: "portal",
-        customer: customer
-          ? {
-              id: customer.id,
-              name: `${customer.firstName} ${customer.lastName ?? ""}`.trim(),
-              email: customer.email,
-              phone: customer.phone,
-            }
-          : { id: invoice.customerId },
-        invoice: {
-          id: invoice.id,
-          invoiceNumber: invoice.invoiceNumber,
-          total: invoice.total,
-          balance_before: balance,
-          balance_after: updatedBalance,
-        },
-        payment: {
-          amount,
-          method: input.method,
-          note: input.note ?? null,
-        },
-      }).catch(() => {});
+      if (webhookCfg.enabled) {
+        sendWebhook(
+          eventType,
+          {
+            source: "portal",
+            customer: customer
+              ? {
+                  id: customer.id,
+                  name: `${customer.firstName} ${customer.lastName ?? ""}`.trim(),
+                  email: customer.email,
+                  phone: customer.phone,
+                }
+              : { id: invoice.customerId },
+            invoice: {
+              id: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              total: invoice.total,
+              balance_before: balance,
+              balance_after: updatedBalance,
+            },
+            payment: {
+              amount,
+              method: input.method,
+              note: input.note ?? null,
+            },
+          },
+          { url: webhookCfg.url, secret: webhookCfg.secret }
+        ).catch(() => {});
+      }
 
       return { success: true, remainingBalance: updatedBalance, provider: "stub" as const };
     }),
@@ -550,12 +566,24 @@ export const portalRouter = router({
         }
       }
 
-      sendWebhook("lead.created", {
-        source: "portal",
-        lead: { id: leadId, services: input.services ?? [], message: input.message ?? null },
-        customer: { id: input.customerId },
-        job: jobId ? { id: jobId } : null,
-      }).catch(() => {});
+      const company = await getCompany(input.companyId);
+      const webhookCfg = (company as any)?.settings?.webhooks ?? {};
+
+      if (webhookCfg.enabled) {
+        sendWebhook(
+          "lead.created",
+          {
+            source: "portal",
+            lead: { id: leadId, services: input.services ?? [], message: input.message ?? null },
+            customer: { id: input.customerId },
+            job: jobId ? { id: jobId } : null,
+          },
+          {
+            url: webhookCfg?.url,
+            secret: webhookCfg?.secret,
+          }
+        ).catch(() => {});
+      }
 
       return { success: true, leadId, jobId };
     }),

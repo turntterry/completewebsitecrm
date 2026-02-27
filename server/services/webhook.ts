@@ -3,22 +3,28 @@ import { nanoid } from "nanoid";
 
 type WebhookPayload = Record<string, unknown>;
 
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
+const ENV_WEBHOOK_URL = process.env.WEBHOOK_URL;
+const ENV_WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 
-export async function sendWebhook(eventType: string, payload: WebhookPayload) {
-  if (!WEBHOOK_URL) return false;
+export async function sendWebhook(
+  eventType: string,
+  payload: WebhookPayload,
+  opts?: { url?: string | null; secret?: string | null }
+) {
+  const targetUrl = opts?.url || ENV_WEBHOOK_URL;
+  const secret = opts?.secret ?? ENV_WEBHOOK_SECRET;
+  if (!targetUrl) return false;
 
   const timestamp = new Date().toISOString();
   const eventId = nanoid(12);
   const body = JSON.stringify({ event_type: eventType, event_id: eventId, timestamp, ...payload });
 
   const signature =
-    WEBHOOK_SECRET &&
-    crypto.createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex");
+    secret &&
+    crypto.createHmac("sha256", secret).update(body).digest("hex");
 
   try {
-    await fetch(WEBHOOK_URL, {
+    await fetch(targetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

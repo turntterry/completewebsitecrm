@@ -41,6 +41,9 @@ export default function BookingControls() {
   const [useStripe, setUseStripe] = useState(false);
   const [publishableKey, setPublishableKey] = useState("");
   const [depositPercent, setDepositPercent] = useState(0);
+  const [webhookEnabled, setWebhookEnabled] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
   const maxServicesForInstantBooking = settings?.maxServicesForInstantBooking ?? 2;
   const blockedInstantServices = Array.isArray((settings as any)?.instantBookingBlockedServices)
     ? ((settings as any).instantBookingBlockedServices as string[])
@@ -61,6 +64,10 @@ export default function BookingControls() {
     setUseStripe(payments.useStripe ?? false);
     setPublishableKey(payments.publishableKey ?? "");
     setDepositPercent(payments.depositPercent ?? 0);
+    const webhooks = (company as any)?.settings?.webhooks ?? {};
+    setWebhookEnabled(webhooks.enabled ?? false);
+    setWebhookUrl(webhooks.url ?? "");
+    setWebhookSecret(webhooks.secret ?? "");
     setSynced(true);
   }
 
@@ -425,6 +432,63 @@ export default function BookingControls() {
               }
             >
               Save payment settings
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Webhooks */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Settings className="h-4 w-4" /> Webhooks
+          </CardTitle>
+          <CardDescription>
+            Send signed event payloads (quote.accepted, payment, lead.created) to your endpoint.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Enable outbound webhooks</p>
+              <p className="text-xs text-muted-foreground">
+                Payloads are HMAC-signed when a secret is set.
+              </p>
+            </div>
+            <Switch checked={webhookEnabled} onCheckedChange={setWebhookEnabled} />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Webhook URL</Label>
+            <Input
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://hooks.zapier.com/..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Webhook secret (HMAC SHA256)</Label>
+            <Input
+              value={webhookSecret}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+              placeholder="leave blank for unsigned"
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              disabled={updateCompany.isPending}
+              onClick={() =>
+                updateCompany.mutate({
+                  settings: {
+                    webhooks: {
+                      enabled: webhookEnabled,
+                      url: webhookUrl,
+                      secret: webhookSecret || undefined,
+                    },
+                  },
+                })
+              }
+            >
+              Save webhook settings
             </Button>
           </div>
         </CardContent>
