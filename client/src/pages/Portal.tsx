@@ -116,6 +116,7 @@ export default function Portal() {
   const pay = trpc.portal.payInvoice.useMutation({
     onSuccess: () => utils.portal.getSnapshot.invalidate(),
     onError: err => {
+      setApiError(err.message || "Payment failed.");
       if (payingInvoiceId) {
         setPayNotices(n => ({
           ...n,
@@ -167,6 +168,7 @@ export default function Portal() {
   const [payNotices, setPayNotices] = useState<
     Record<number, { type: "success" | "error" | "action"; message: string; url?: string | null }>
   >({});
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     if (pay.data && payingInvoiceId) {
@@ -422,6 +424,19 @@ export default function Portal() {
                         />
                       </label>
                       <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="mt-0"
+                          onClick={() =>
+                            setPayAmounts(a => ({
+                              ...a,
+                              [inv.id]: parseFloat(String(inv.balance ?? 0)).toFixed(2),
+                            }))
+                          }
+                        >
+                          Pay full balance
+                        </Button>
                         <Button
                           size="sm"
                           className="mt-0"
