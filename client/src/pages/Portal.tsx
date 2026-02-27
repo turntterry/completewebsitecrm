@@ -17,6 +17,7 @@ import {
   Clock3,
   CalendarDays,
   Sparkles,
+  ListTree,
 } from "lucide-react";
 
 // ─── Session helpers (share key with ClientHub magic link) ───────────────────
@@ -171,6 +172,7 @@ export default function Portal() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [tips, setTips] = useState<Record<number, string>>({});
   const [actionIntent, setActionIntent] = useState<{ clientSecret: string | null; publishableKey: string | null } | null>(null);
+  const [expandedQuotes, setExpandedQuotes] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (pay.data && payingInvoiceId) {
@@ -359,13 +361,47 @@ export default function Portal() {
                   key={q.id}
                   className="rounded-lg border border-slate-200 px-3 py-3 flex items-start justify-between gap-3"
                 >
-                  <div>
-                    <p className="font-medium text-slate-900">Quote #{q.quoteNumber}</p>
-                    <p className="text-sm text-slate-500">${q.total}</p>
-                    <p className="text-xs text-slate-400 flex items-center gap-1">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-900">Quote #{q.quoteNumber}</p>
                       <StatusPill tone={quoteStatusTone(q.status)} label={q.status} />
+                    </div>
+                    <p className="text-sm text-slate-500">${q.total}</p>
+                    <p className="text-xs text-slate-400">
                       {q.acceptedAt ? `Accepted ${new Date(q.acceptedAt).toLocaleDateString()}` : ""}
                     </p>
+                    {Array.isArray((q as any).lineItems) && (q as any).lineItems.length > 0 && (
+                      <div className="mt-1">
+                        <button
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                          onClick={() =>
+                            setExpandedQuotes(prev => {
+                              const next = new Set(Array.from(prev));
+                              next.has(q.id) ? next.delete(q.id) : next.add(q.id);
+                              return next;
+                            })
+                          }
+                        >
+                          <ListTree className="w-3 h-3" />
+                          {expandedQuotes.has(q.id) ? "Hide line items" : "Show line items"}
+                        </button>
+                        {expandedQuotes.has(q.id) && (
+                          <ul className="mt-1 space-y-1 text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded p-2">
+                            {(q as any).lineItems.slice(0, 6).map((li: any) => (
+                              <li key={li.id} className="flex justify-between">
+                                <span>{li.description}</span>
+                                <span>${li.total}</span>
+                              </li>
+                            ))}
+                            {(q as any).lineItems.length > 6 && (
+                              <li className="text-amber-600">
+                                … {(q as any).lineItems.length - 6} more items
+                              </li>
+                            )}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {q.status !== "accepted" && (
                     <Button
@@ -429,6 +465,13 @@ export default function Portal() {
                   <p className="text-xs text-slate-500">
                     Balance: ${inv.balance} | Paid: ${inv.amountPaid}
                   </p>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
+                    <span>Created {inv.createdAt ? new Date(inv.createdAt as any).toLocaleDateString() : "—"}</span>
+                    <span>•</span>
+                    <span>Sent {inv.sentAt ? new Date(inv.sentAt as any).toLocaleDateString() : "—"}</span>
+                    <span>•</span>
+                    <span>Paid {inv.paidAt ? new Date(inv.paidAt as any).toLocaleDateString() : "—"}</span>
+                  </div>
                   {parseFloat(String(inv.balance ?? 0)) > 0 && (
                     <div className="mt-2 space-y-2">
                       <div className="flex items-center flex-wrap gap-2">

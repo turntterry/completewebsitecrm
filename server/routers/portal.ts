@@ -8,6 +8,7 @@ import {
   invoiceLineItems,
   jobs,
   leads,
+  quoteLineItems,
   quotes,
   visits,
 } from "../../drizzle/schema";
@@ -90,6 +91,14 @@ export const portalRouter = router({
         )
         .orderBy(desc(quotes.createdAt))
         .limit(input.limit);
+      const quoteIds = quotesRows.map(q => q.id);
+      const quoteItems =
+        quoteIds.length > 0
+          ? await db
+              .select()
+              .from(quoteLineItems)
+              .where(inArray(quoteLineItems.quoteId, quoteIds))
+          : [];
 
       const invoicesRows = await db
         .select()
@@ -146,7 +155,10 @@ export const portalRouter = router({
 
       return {
         customer,
-        quotes: quotesRows,
+        quotes: quotesRows.map(q => ({
+          ...q,
+          lineItems: quoteItems.filter(li => li.quoteId === q.id),
+        })),
         invoices: invoicesRows.map(inv => ({
           ...inv,
           lineItems: lineItems.filter(li => li.invoiceId === inv.id),
