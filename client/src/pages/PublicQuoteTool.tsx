@@ -49,6 +49,7 @@ import {
   Ruler,
   FlipHorizontal,
   Info,
+  Camera,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
@@ -445,7 +446,26 @@ export default function QuoteTool() {
     { enabled: step >= 5 && !pricingLoading }
   );
 
-  const slots: Slot[] = slotsQuery.data ?? [];
+  const fallbackSlots: Slot[] = useMemo(() => {
+    const now = new Date();
+    const label = (offsetDays: number, window: string) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() + offsetDays);
+      return {
+        id: `${d.toISOString().split("T")[0]}_${window}`,
+        date: d.toISOString().split("T")[0],
+        window,
+        display: `${d.toLocaleDateString(undefined, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        })} · ${window}`,
+      };
+    };
+    return [label(1, "Next available"), label(2, "Weekday AM"), label(3, "Weekday PM")];
+  }, []);
+
+  const slots: Slot[] = (slotsQuery.data ?? []).length > 0 ? slotsQuery.data! : fallbackSlots;
 
   const selectedSlotLabel = useMemo(() => {
     return slots.find(slot => slot.id === selectedSlotId)?.display;
@@ -459,11 +479,24 @@ export default function QuoteTool() {
     return upsellCatalog.filter(upsell =>
       upsell.appliesTo.some(service => selected.has(service))
     );
-  }, [selectedServices]);
+  }, [selectedServices, upsellCatalog]);
+
+  const displayUpsells = useMemo(() => {
+    if (eligibleUpsells.length === 0) return [];
+    const sorted = [...eligibleUpsells].sort((a, b) => {
+      if (a.badge === "Bundle" && b.badge !== "Bundle") return -1;
+      if (b.badge === "Bundle" && a.badge !== "Bundle") return 1;
+      return a.price - b.price;
+    });
+    const limited = sorted.slice(0, 3).map((item, idx) =>
+      idx === 0 && !item.badge ? { ...item, badge: "Most Popular" } : item
+    );
+    return limited;
+  }, [eligibleUpsells]);
 
   const acceptedUpsellItems = useMemo(
-    () => eligibleUpsells.filter(upsell => acceptedUpsells[upsell.id]),
-    [eligibleUpsells, acceptedUpsells]
+    () => displayUpsells.filter(upsell => acceptedUpsells[upsell.id]),
+    [displayUpsells, acceptedUpsells]
   );
 
   const upsellTotal = useMemo(
@@ -900,7 +933,22 @@ export default function QuoteTool() {
       case 5:
         return true;
       case 6:
-        return true;
+        // Review step requires contact info + at least one item
+        return (
+          name.trim().length > 0 &&
+          email.trim().length > 0 &&
+          phone.trim().length > 0 &&
+          (pricingResults.length > 0 || acceptedUpsellItems.length > 0)
+        );
+      case 7:
+        // Schedule step: allow proceed even without slot, but require contact + address captured
+        return (
+          address.trim().length > 0 &&
+          city.trim().length > 0 &&
+          name.trim().length > 0 &&
+          email.trim().length > 0 &&
+          phone.trim().length > 0
+        );
       default:
         return true;
     }
@@ -1241,10 +1289,41 @@ export default function QuoteTool() {
                     </p>
                   )}
                   <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    By submitting, you'll receive a confirmation email with your
-                    quote details. We'll reach out within 24 hours to confirm
-                    measurements and schedule your service.
+                    Book your spot or text yourself this quote. We'll confirm details in minutes.
                   </p>
+
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
+                    <Button
+                      size="lg"
+                      className="bg-primary hover:bg-navy-light text-white font-semibold"
+                      onClick={handleSubmit}
+                      disabled={submitMutation.isPending}
+                    >
+                      {submitMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <Calendar className="w-4 h-4 mr-2" />
+                      )}
+                      Book My Spot
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={() => {
+                        handleSubmit();
+                        if (sessionToken) {
+                          trackEventMutation.mutate({
+                            sessionToken,
+                            eventName: "quote_text_me",
+                            payload: { channel: "sms" },
+                          });
+                        }
+                      }}
+                      disabled={submitMutation.isPending}
+                    >
+                      <Phone className="w-4 h-4 mr-2" /> Text Me This Quote
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -1267,34 +1346,24 @@ export default function QuoteTool() {
                   >
                     Next <ArrowRight className="w-4 h-4 ml-1" />
                   </Button>
-                ) : (
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={submitMutation.isPending}
-                    className="bg-primary hover:bg-navy-light text-white font-semibold px-8"
-                  >
-                    {submitMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                    )}
-                    Submit Quote
-                  </Button>
-                )}
+                ) : null}
               </div>
             </CardContent>
           </Card>
 
           {/* Trust badges */}
-          <div className="flex items-center justify-center gap-6 mt-6 text-xs text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-3 mt-6 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Star className="w-4 h-4" /> 4.9★ rated (local)
+            </span>
             <span className="flex items-center gap-1">
               <Shield className="w-4 h-4" /> Licensed & Insured
             </span>
             <span className="flex items-center gap-1">
-              <Star className="w-4 h-4" /> 5-Star Rated
+              <CheckCircle className="w-4 h-4" /> Cookeville-owned
             </span>
             <span className="flex items-center gap-1">
-              <CheckCircle className="w-4 h-4" /> Satisfaction Guaranteed
+              <Camera className="w-4 h-4" /> Recent jobs near you
             </span>
           </div>
         </div>
