@@ -170,6 +170,7 @@ export default function Portal() {
   >({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [tips, setTips] = useState<Record<number, string>>({});
+  const [actionIntent, setActionIntent] = useState<{ clientSecret: string | null; publishableKey: string | null } | null>(null);
 
   useEffect(() => {
     if (pay.data && payingInvoiceId) {
@@ -183,6 +184,12 @@ export default function Portal() {
           },
         }));
         if (pay.data.paymentUrl) window.open(pay.data.paymentUrl, "_blank");
+        if (pay.data.clientSecret) {
+          setActionIntent({
+            clientSecret: pay.data.clientSecret ?? null,
+            publishableKey: (pay.data as any).publishableKey ?? null,
+          });
+        }
       } else if (pay.data.remainingBalance !== undefined) {
         setPayNotices(n => ({
           ...n,
@@ -402,6 +409,19 @@ export default function Portal() {
                       <p className="text-sm text-slate-500">
                         Total ${inv.total} · Balance ${inv.balance}
                       </p>
+                      {Array.isArray((inv as any).lineItems) && (inv as any).lineItems.length > 0 && (
+                        <ul className="mt-1 space-y-1 text-xs text-slate-500">
+                          {(inv as any).lineItems.slice(0, 4).map((li: any) => (
+                            <li key={li.id} className="flex justify-between">
+                              <span>{li.description}</span>
+                              <span>${li.total}</span>
+                            </li>
+                          ))}
+                          {(inv as any).lineItems.length > 4 && (
+                            <li className="text-amber-600">… { (inv as any).lineItems.length - 4 } more items</li>
+                          )}
+                        </ul>
+                      )}
                     </div>
                     <StatusPill tone={invoiceStatusTone(inv.status)} label={inv.status} />
                   </div>
@@ -606,6 +626,44 @@ export default function Portal() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Payment action modal (clientSecret) */}
+        {actionIntent?.clientSecret && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+              <h3 className="text-lg font-semibold text-slate-900">Complete Payment</h3>
+              <p className="text-sm text-slate-600">
+                Your payment requires additional steps. Open the hosted payment page or use the client secret below with your payment form.
+              </p>
+              {actionIntent.publishableKey && (
+                <p className="text-xs text-slate-500">
+                  Publishable key: <code className="font-mono">{actionIntent.publishableKey}</code>
+                </p>
+              )}
+              <label className="text-xs text-slate-500 block">
+                Client secret
+                <textarea
+                  className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+                  readOnly
+                  value={actionIntent.clientSecret ?? ""}
+                  onFocus={e => e.currentTarget.select()}
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setActionIntent(null)}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    navigator.clipboard.writeText(actionIntent.clientSecret ?? "");
+                  }}
+                >
+                  Copy secret
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Card>
           <CardHeader>

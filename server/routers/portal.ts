@@ -5,6 +5,7 @@ import {
   customers,
   invoices,
   instantQuotes,
+  invoiceLineItems,
   jobs,
   leads,
   quotes,
@@ -99,6 +100,14 @@ export const portalRouter = router({
         )
         .orderBy(desc(invoices.createdAt))
         .limit(input.limit);
+      const invoiceIds = invoicesRows.map(i => i.id);
+      const lineItems =
+        invoiceIds.length > 0
+          ? await db
+              .select()
+              .from(invoiceLineItems)
+              .where(inArray(invoiceLineItems.invoiceId, invoiceIds))
+          : [];
 
       const jobsRows = await db
         .select()
@@ -136,7 +145,10 @@ export const portalRouter = router({
       return {
         customer,
         quotes: quotesRows,
-        invoices: invoicesRows,
+        invoices: invoicesRows.map(inv => ({
+          ...inv,
+          lineItems: lineItems.filter(li => li.invoiceId === inv.id),
+        })),
         jobs: jobsRows,
         visits: visitsRows,
         propertyIntel: latestInstantQuote?.propertyIntel ?? null,
