@@ -169,6 +169,7 @@ export default function Portal() {
     Record<number, { type: "success" | "error" | "action"; message: string; url?: string | null }>
   >({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [tips, setTips] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (pay.data && payingInvoiceId) {
@@ -410,8 +411,51 @@ export default function Portal() {
                   </p>
                   {parseFloat(String(inv.balance ?? 0)) > 0 && (
                     <div className="mt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="mt-0"
+                          onClick={() =>
+                            setPayAmounts(a => ({
+                              ...a,
+                              [inv.id]: parseFloat(String(inv.balance ?? 0)).toFixed(2),
+                            }))
+                          }
+                        >
+                          Pay full balance
+                        </Button>
+                        {typeof (inv as any).depositAmount !== "undefined" ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="mt-0"
+                            onClick={() =>
+                              setPayAmounts(a => ({
+                                ...a,
+                                [inv.id]: parseFloat(String((inv as any).depositAmount ?? 0)).toFixed(2),
+                              }))
+                            }
+                          >
+                            Pay deposit (${(inv as any).depositAmount})
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="mt-0"
+                          onClick={() =>
+                            setTips(t => ({
+                              ...t,
+                              [inv.id]: (parseFloat(t[inv.id] || "0") + 5).toFixed(2),
+                            }))
+                          }
+                        >
+                          +$5 tip
+                        </Button>
+                      </div>
                       <label className="text-xs text-slate-500">
-                        Amount to pay
+                        Amount to pay (includes tip if set)
                         <input
                           className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
                           type="number"
@@ -422,6 +466,11 @@ export default function Portal() {
                             setPayAmounts(a => ({ ...a, [inv.id]: e.target.value }))
                           }
                         />
+                        {tips[inv.id] && Number(tips[inv.id]) > 0 && (
+                          <span className="text-[11px] text-slate-500">
+                            Tip: ${Number(tips[inv.id]).toFixed(2)}
+                          </span>
+                        )}
                       </label>
                       <div className="flex items-center gap-2">
                         <Button
@@ -456,11 +505,12 @@ export default function Portal() {
                               return;
                             }
                             setPayingInvoiceId(inv.id);
+                            const tip = parseFloat(tips[inv.id] ?? "0") || 0;
                             pay.mutate({
                               invoiceId: inv.id,
                               customerId: resolvedCustomerId,
                               companyId: resolvedCompanyId,
-                              amount: amt,
+                              amount: amt + tip,
                             });
                           }}
                         >
