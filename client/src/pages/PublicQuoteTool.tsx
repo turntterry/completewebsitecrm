@@ -226,6 +226,8 @@ export default function QuoteTool() {
   const uploadMutation = trpc.publicSite.quote.uploadPhoto.useMutation();
 
   const [step, setStep] = useState(0);
+  const seenStepsRef = useRef<Set<number>>(new Set());
+  const abandonTrackedRef = useRef(false);
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [stateVal, setStateVal] = useState("TN");
@@ -757,6 +759,47 @@ export default function QuoteTool() {
     startSessionMutation,
     trackEventMutation,
   ]);
+
+  // Step view analytics
+  useEffect(() => {
+    if (!sessionToken) return;
+    if (seenStepsRef.current.has(step)) return;
+    seenStepsRef.current.add(step);
+    trackEventMutation.mutate({
+      sessionToken,
+      eventName: "step_view",
+      payload: {
+        step,
+        label: STEPS[step],
+        progress: Number(((step / (STEPS.length - 1)) * 100).toFixed(1)),
+      },
+    });
+  }, [sessionToken, step, trackEventMutation]);
+
+  // Abandonment tracking (visibility)
+  useEffect(() => {
+    const handler = () => {
+      if (abandonTrackedRef.current) return;
+      if (submitted || !sessionToken) return;
+      abandonTrackedRef.current = true;
+      trackEventMutation.mutate({
+        sessionToken,
+        eventName: "quote_abandoned",
+        payload: {
+          step,
+          label: STEPS[step],
+          reason: "visibility_hidden",
+        },
+      });
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") handler();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [sessionToken, step, submitted, trackEventMutation]);
 
   // Address-first auto lookup (MapMeasure/Zillow-style)
   useEffect(() => {
