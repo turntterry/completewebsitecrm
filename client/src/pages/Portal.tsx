@@ -411,7 +411,7 @@ export default function Portal() {
                   </p>
                   {parseFloat(String(inv.balance ?? 0)) > 0 && (
                     <div className="mt-2 space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center flex-wrap gap-2">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -440,6 +440,24 @@ export default function Portal() {
                             Pay deposit (${(inv as any).depositAmount})
                           </Button>
                         ) : null}
+                        {typeof (inv as any).depositAmount !== "undefined" ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="mt-0"
+                            onClick={() => {
+                              const bal = parseFloat(String(inv.balance ?? 0)) || 0;
+                              const dep = parseFloat(String((inv as any).depositAmount ?? 0)) || 0;
+                              const remaining = Math.max(bal - dep, 0);
+                              setPayAmounts(a => ({
+                                ...a,
+                                [inv.id]: remaining.toFixed(2),
+                              }));
+                            }}
+                          >
+                            Pay remaining after deposit
+                          </Button>
+                        ) : null}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -453,6 +471,22 @@ export default function Portal() {
                         >
                           +$5 tip
                         </Button>
+                        <label className="text-xs text-slate-500 ml-2">
+                          Custom tip
+                          <input
+                            className="mt-1 w-24 rounded border border-slate-200 px-2 py-1 text-sm"
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={tips[inv.id] ?? ""}
+                            onChange={e =>
+                              setTips(t => ({
+                                ...t,
+                                [inv.id]: e.target.value,
+                              }))
+                            }
+                          />
+                        </label>
                       </div>
                       <label className="text-xs text-slate-500">
                         Amount to pay (includes tip if set)
@@ -563,6 +597,9 @@ export default function Portal() {
                         </div>
                       )}
                     </div>
+                  )}
+                  {apiError && (
+                    <p className="text-xs text-red-600 mt-1">Error: {apiError}</p>
                   )}
                 </div>
               ))}
