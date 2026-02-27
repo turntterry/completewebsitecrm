@@ -205,14 +205,12 @@ const DEFAULT_UPSELL_CATALOG: {
 ];
 
 const STEPS = [
-  "Address",
+  "Address & Contact",
   "Home Details",
-  "Contact",
   "Services",
   "Details",
   "Enhance",
-  "Review",
-  "Schedule",
+  "Review & Schedule",
   "Submit",
 ];
 
@@ -247,9 +245,7 @@ export default function QuoteTool() {
   const [email, setEmail] = useState("randall@exteriorexperts.co");
   const [phone, setPhone] = useState("");
 
-  const [selectedServices, setSelectedServices] = useState<Set<string>>(
-    new Set()
-  );
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
   const [serviceInputs, setServiceInputs] = useState<
     Record<string, PricingInput>
   >({});
@@ -962,7 +958,7 @@ export default function QuoteTool() {
   };
 
   useEffect(() => {
-    if (step !== 7 || slotsQuery.isFetching) return;
+    if (step !== 5 || slotsQuery.isFetching) return;
     if (!sessionToken || slots.length > 0) return;
     trackEventMutation.mutate({
       sessionToken,
@@ -975,38 +971,30 @@ export default function QuoteTool() {
     switch (step) {
       case 0:
         return (
-          address.trim().length > 0 && city.trim().length > 0 && !outOfRange
+          address.trim().length > 0 &&
+          city.trim().length > 0 &&
+          name.trim().length > 0 &&
+          email.trim().length > 0 &&
+          phone.trim().length > 0 &&
+          !outOfRange
         );
       case 1:
         return propertyLookupStatus !== "loading";
       case 2:
-        return (
-          name.trim().length > 0 &&
-          email.trim().length > 0 &&
-          phone.trim().length > 0
-        );
-      case 3:
         return selectedServices.size > 0;
+      case 3:
+        return true;
       case 4:
         return true;
       case 5:
-        return true;
-      case 6:
-        // Review step requires contact info + at least one item
-        return (
-          name.trim().length > 0 &&
-          email.trim().length > 0 &&
-          phone.trim().length > 0 &&
-          (pricingResults.length > 0 || acceptedUpsellItems.length > 0)
-        );
-      case 7:
-        // Schedule step: allow proceed even without slot, but require contact + address captured
+        // Review & Schedule: require contact info + at least one item, with address captured
         return (
           address.trim().length > 0 &&
           city.trim().length > 0 &&
           name.trim().length > 0 &&
           email.trim().length > 0 &&
-          phone.trim().length > 0
+          phone.trim().length > 0 &&
+          (pricingResults.length > 0 || acceptedUpsellItems.length > 0)
         );
       default:
         return true;
@@ -1219,29 +1207,35 @@ export default function QuoteTool() {
           <Card className="shadow-lg border-0">
             <CardContent className="p-6 md:p-8">
               {step === 0 && (
-                <StepAddress
-                  address={address}
-                  setAddress={setAddress}
-                  city={city}
-                  setCity={setCity}
-                  stateVal={stateVal}
-                  setStateVal={setStateVal}
-                  zip={zip}
-                  setZip={setZip}
-                  lat={lat}
-                  setLat={setLat}
-                  lng={lng}
-                  setLng={setLng}
-                  distanceMiles={distanceMiles}
-                  setDistanceMiles={setDistanceMiles}
-                  outOfRange={outOfRange}
-                  setOutOfRange={setOutOfRange}
-                  globalConfig={globalConfig}
-                />
-              )}
-              {step === 1 && (
-                <StepPropertyIntel
-                  address={`${address}, ${city}, ${stateVal} ${zip}`}
+              <StepAddress
+                address={address}
+                setAddress={setAddress}
+                city={city}
+                setCity={setCity}
+                stateVal={stateVal}
+                setStateVal={setStateVal}
+                zip={zip}
+                setZip={setZip}
+                name={name}
+                setName={setName}
+                email={email}
+                setEmail={setEmail}
+                phone={phone}
+                setPhone={setPhone}
+                lat={lat}
+                setLat={setLat}
+                lng={lng}
+                setLng={setLng}
+                distanceMiles={distanceMiles}
+                setDistanceMiles={setDistanceMiles}
+                outOfRange={outOfRange}
+                setOutOfRange={setOutOfRange}
+                globalConfig={globalConfig}
+              />
+            )}
+            {step === 1 && (
+              <StepPropertyIntel
+                address={`${address}, ${city}, ${stateVal} ${zip}`}
                   propertyIntel={propertyIntel}
                   setPropertyIntel={setPropertyIntel}
                   lookupStatus={propertyLookupStatus}
@@ -1253,22 +1247,12 @@ export default function QuoteTool() {
                 />
               )}
               {step === 2 && (
-                <StepContact
-                  name={name}
-                  setName={setName}
-                  email={email}
-                  setEmail={setEmail}
-                  phone={phone}
-                  setPhone={setPhone}
-                />
-              )}
-              {step === 3 && (
                 <StepServices
                   selectedServices={selectedServices}
                   toggleService={toggleService}
                 />
               )}
-              {step === 4 && (
+              {step === 3 && (
                 <StepDetails
                   selectedServices={selectedServices}
                   serviceInputs={serviceInputs}
@@ -1278,7 +1262,7 @@ export default function QuoteTool() {
                   tierLabels={tierLabels}
                 />
               )}
-              {step === 5 && (
+              {step === 4 && (
                 <StepUpsells
                   eligibleUpsells={eligibleUpsells}
                   acceptedUpsells={acceptedUpsells}
@@ -1287,40 +1271,40 @@ export default function QuoteTool() {
                   selectedServices={selectedServices}
                 />
               )}
+              {step === 5 && (
+                <div className="space-y-8">
+                  <StepReview
+                    pricingResults={pricingResults}
+                    quoteSummary={quotePreviewSummary}
+                    finalQuoteSummary={quotePreviewSummary}
+                    serviceInputs={serviceInputs}
+                    address={`${address}, ${city}, ${stateVal} ${zip}`}
+                    name={name}
+                    tierLabels={tierLabels}
+                    acceptedUpsellItems={acceptedUpsellItems}
+                    upsellTotal={upsellTotal}
+                    manualReviewServiceKeys={manualReviewServiceKeys}
+                    complexityFlagged={complexityFlagged}
+                  />
+                  <StepSchedule
+                    preferredDate={preferredDate}
+                    setPreferredDate={setPreferredDate}
+                    preferredTime={preferredTime}
+                    setPreferredTime={setPreferredTime}
+                    referralSource={referralSource}
+                    setReferralSource={setReferralSource}
+                    photos={photos}
+                    setPhotos={setPhotos}
+                    uploading={uploading}
+                    handlePhotoUpload={handlePhotoUpload}
+                    fileInputRef={fileInputRef}
+                    slots={slots}
+                    slotsLoading={slotsQuery.isFetching}
+                    slotsError={slotsQuery.isError}
+                  />
+                </div>
+              )}
               {step === 6 && (
-                <StepReview
-                  pricingResults={pricingResults}
-                  quoteSummary={quotePreviewSummary}
-                  finalQuoteSummary={quotePreviewSummary}
-                  serviceInputs={serviceInputs}
-                  address={`${address}, ${city}, ${stateVal} ${zip}`}
-                  name={name}
-                  tierLabels={tierLabels}
-                  acceptedUpsellItems={acceptedUpsellItems}
-                  upsellTotal={upsellTotal}
-                  manualReviewServiceKeys={manualReviewServiceKeys}
-                  complexityFlagged={complexityFlagged}
-                />
-              )}
-              {step === 7 && (
-                <StepSchedule
-                  preferredDate={preferredDate}
-                  setPreferredDate={setPreferredDate}
-                  preferredTime={preferredTime}
-                  setPreferredTime={setPreferredTime}
-                  referralSource={referralSource}
-                  setReferralSource={setReferralSource}
-                  photos={photos}
-                  setPhotos={setPhotos}
-                  uploading={uploading}
-                  handlePhotoUpload={handlePhotoUpload}
-                  fileInputRef={fileInputRef}
-                  slots={slots}
-                  slotsLoading={slotsQuery.isFetching}
-                  slotsError={slotsQuery.isError}
-                />
-              )}
-              {step === 8 && (
                 <div className="text-center py-4">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <CheckCircle className="w-8 h-8 text-primary" />
@@ -1442,6 +1426,12 @@ function StepAddress({
   setStateVal,
   zip,
   setZip,
+  name,
+  setName,
+  email,
+  setEmail,
+  phone,
+  setPhone,
   lat,
   setLat,
   lng,
@@ -1455,11 +1445,50 @@ function StepAddress({
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">
-        Where's your property?
+        Where's your property? Who do we contact?
       </h2>
       <p className="text-sm text-muted-foreground mb-6">
-        We need your address to calculate travel and provide accurate pricing.
+        We need your address to calculate travel and your contact info to send the quote.
       </p>
+      <div className="space-y-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="name">Full Name</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setName(e.target.value)
+              }
+              placeholder="John Smith"
+            />
+          </div>
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setEmail(e.target.value)
+              }
+              placeholder="john@example.com"
+            />
+          </div>
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setPhone(e.target.value)
+              }
+              placeholder="(931) 555-0123"
+            />
+          </div>
+        </div>
+      </div>
       <div className="space-y-4">
         <div>
           <Label htmlFor="address">
