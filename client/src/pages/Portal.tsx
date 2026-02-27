@@ -115,6 +115,18 @@ export default function Portal() {
   });
   const pay = trpc.portal.payInvoice.useMutation({
     onSuccess: () => utils.portal.getSnapshot.invalidate(),
+    onError: err => {
+      if (payingInvoiceId) {
+        setPayNotices(n => ({
+          ...n,
+          [payingInvoiceId]: {
+            type: "error",
+            message: err.message || "Payment failed. Please try again.",
+          },
+        }));
+        setPayingInvoiceId(null);
+      }
+    },
   });
   const requestWork = trpc.portal.requestWork.useMutation();
 
@@ -150,23 +162,40 @@ export default function Portal() {
   const [requestMessage, setRequestMessage] = useState("");
   const [requestServices, setRequestServices] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
-  const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
-  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [payingInvoiceId, setPayingInvoiceId] = useState<number | null>(null);
   const [payAmounts, setPayAmounts] = useState<Record<number, string>>({});
+  const [payNotices, setPayNotices] = useState<
+    Record<number, { type: "success" | "error" | "action"; message: string; url?: string | null }>
+  >({});
 
   useEffect(() => {
-    if (pay.data) {
+    if (pay.data && payingInvoiceId) {
       if (pay.data.requiresAction && (pay.data.paymentUrl || pay.data.clientSecret)) {
-        setPaymentNotice(pay.data.paymentUrl ? "Continue payment to complete checkout." : "Complete payment with the provided client secret.");
-        setPaymentUrl(pay.data.paymentUrl ?? null);
+        setPayNotices(n => ({
+          ...n,
+          [payingInvoiceId]: {
+            type: "action",
+            message: "Continue payment to complete checkout.",
+            url: pay.data.paymentUrl ?? null,
+          },
+        }));
         if (pay.data.paymentUrl) window.open(pay.data.paymentUrl, "_blank");
       } else if (pay.data.remainingBalance !== undefined) {
-        setPaymentNotice(`Payment recorded. Remaining balance: $${pay.data.remainingBalance?.toFixed?.(2) ?? pay.data.remainingBalance}`);
+        setPayNotices(n => ({
+          ...n,
+          [payingInvoiceId]: {
+            type: "success",
+            message: `Payment recorded. Remaining balance: $${pay.data.remainingBalance?.toFixed?.(2) ?? pay.data.remainingBalance}`,
+          },
+        }));
+        setPayAmounts(a => ({
+          ...a,
+          [payingInvoiceId]: String(pay.data.remainingBalance ?? "0.00"),
+        }));
       }
       setPayingInvoiceId(null);
     }
-  }, [pay.data]);
+  }, [pay.data, payingInvoiceId]);
 
   const resolvedCustomerId = session?.customerId ?? debugCustomerId ?? 0;
   const resolvedCompanyId = session?.companyId ?? debugCompanyId ?? 0;
@@ -402,7 +431,13 @@ export default function Portal() {
                               (payAmounts[inv.id] ?? parseFloat(String(inv.balance ?? 0)).toFixed(2)).trim()
                             );
                             if (isNaN(amt) || amt <= 0) {
-                              setPaymentNotice("Enter a valid amount greater than 0.");
+                              setPayNotices(n => ({
+                                ...n,
+                                [inv.id]: {
+                                  type: "error",
+                                  message: "Enter a valid amount greater than 0.",
+                                },
+                              }));
                               return;
                             }
                             setPayingInvoiceId(inv.id);
@@ -421,11 +456,11 @@ export default function Portal() {
                           )}
                           <span className="ml-2">Pay now</span>
                         </Button>
-                        {paymentUrl && (
+                        {payNotices[inv.id]?.url && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(paymentUrl, "_blank")}
+                            onClick={() => window.open(payNotices[inv.id]?.url ?? "", "_blank")}
                           >
                             <ExternalLink className="w-3 h-3 mr-1" /> Open payment
                           </Button>
@@ -433,22 +468,30 @@ export default function Portal() {
                       </div>
                     </div>
                   )}
-                  {paymentNotice && pay.isSuccess && (
-                    <div className="text-xs text-emerald-600 mt-2 space-y-1">
-                      <p>{paymentNotice}</p>
-                      {paymentUrl && (
+                  {payNotices[inv.id] && (
+                    <div
+                      className={`text-xs mt-2 space-y-1 ${
+                        payNotices[inv.id].type === "error"
+                          ? "text-red-600"
+                          : payNotices[inv.id].type === "action"
+                            ? "text-amber-600"
+                            : "text-emerald-600"
+                      }`}
+                    >
+                      <p>{payNotices[inv.id].message}</p>
+                      {payNotices[inv.id].url && (
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(paymentUrl, "_blank")}
+                            onClick={() => window.open(payNotices[inv.id].url || "", "_blank")}
                           >
                             <ExternalLink className="w-3 h-3 mr-1" /> Open payment
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => navigator.clipboard.writeText(paymentUrl)}
+                            onClick={() => navigator.clipboard.writeText(payNotices[inv.id].url || "")}
                           >
                             <Copy className="w-3 h-3 mr-1" /> Copy link
                           </Button>
