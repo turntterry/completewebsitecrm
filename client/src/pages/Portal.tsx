@@ -18,6 +18,8 @@ import {
   CalendarDays,
   Sparkles,
   ListTree,
+  Pencil,
+  MinusCircle,
 } from "lucide-react";
 
 // ─── Session helpers (share key with ClientHub magic link) ───────────────────
@@ -173,6 +175,8 @@ export default function Portal() {
   const [tips, setTips] = useState<Record<number, string>>({});
   const [actionIntent, setActionIntent] = useState<{ clientSecret: string | null; publishableKey: string | null } | null>(null);
   const [expandedQuotes, setExpandedQuotes] = useState<Set<number>>(new Set());
+  const [approveNotes, setApproveNotes] = useState<Record<number, string>>({});
+  const [declineReasons, setDeclineReasons] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (pay.data && payingInvoiceId) {
@@ -404,25 +408,71 @@ export default function Portal() {
                     )}
                   </div>
                   {q.status !== "accepted" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={approve.isPending}
-                      onClick={() =>
-                        approve.mutate({
-                          quoteId: q.id,
-                          customerId: resolvedCustomerId,
-                          companyId: resolvedCompanyId,
-                        })
-                      }
-                    >
-                      {approve.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="w-4 h-4" />
-                      )}
-                      <span className="ml-1">Approve</span>
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs text-slate-500">
+                        Optional note
+                        <textarea
+                          className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+                          rows={2}
+                          placeholder="Add a note for the team"
+                          value={approveNotes[q.id] ?? ""}
+                          onChange={e =>
+                            setApproveNotes(n => ({ ...n, [q.id]: e.target.value }))
+                          }
+                        />
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={approve.isPending}
+                          onClick={() =>
+                            approve.mutate({
+                              quoteId: q.id,
+                              customerId: resolvedCustomerId,
+                              companyId: resolvedCompanyId,
+                              note: approveNotes[q.id] ?? undefined,
+                            })
+                          }
+                        >
+                          {approve.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4" />
+                          )}
+                          <span className="ml-1">Approve</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600"
+                          disabled={approve.isPending}
+                          onClick={() =>
+                            approve.mutate({
+                              quoteId: q.id,
+                              customerId: resolvedCustomerId,
+                              companyId: resolvedCompanyId,
+                              action: "decline",
+                              note: declineReasons[q.id] ?? undefined,
+                            } as any)
+                          }
+                        >
+                          <MinusCircle className="w-4 h-4" />
+                          <span className="ml-1">Decline</span>
+                        </Button>
+                      </div>
+                      <label className="text-xs text-slate-500">
+                        Decline reason (optional)
+                        <input
+                          className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="Too expensive, timing, etc."
+                          value={declineReasons[q.id] ?? ""}
+                          onChange={e =>
+                            setDeclineReasons(n => ({ ...n, [q.id]: e.target.value }))
+                          }
+                        />
+                      </label>
+                    </div>
                   )}
                 </div>
               ))}
