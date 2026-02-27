@@ -5,8 +5,9 @@ import { Link } from "wouter";
 import { BUSINESS, SERVICES, LOCATIONS } from "@shared/data";
 import { LocationSchema } from "@/components/SchemaMarkup";
 import { Phone, ArrowRight, MapPin, CheckCircle } from "lucide-react";
-import { useEffect } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { trackEvent } from "@/lib/analytics";
 
 interface LocationPageProps {
   locationId: string;
@@ -41,18 +42,10 @@ export default function LocationPage({ locationId }: LocationPageProps) {
 
   const locationName = `${location.name}, ${location.state}`;
   useCanonical(`/locations/${location.slug}`);
-
-  useEffect(() => {
-    document.title = `Exterior Cleaning ${location.name}, TN | Exterior Experts`;
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) {
-      metaDesc.setAttribute("content", `Professional pressure washing & exterior cleaning in ${locationName}. Licensed, insured, satisfaction guaranteed. Free quotes.`);
-    }
-    const metaKeywords = document.querySelector('meta[name="keywords"]');
-    if (metaKeywords) {
-      metaKeywords.setAttribute("content", `pressure washing ${location.name} TN, exterior cleaning ${location.name}, house washing ${location.name} TN`);
-    }
-  }, [location]);
+  usePageMeta({
+    title: `Exterior Cleaning in ${location.name}, TN | Exterior Experts`,
+    description: `Pressure washing, house washing, window and roof cleaning in ${locationName}. Licensed, insured, satisfaction guaranteed.`,
+  });
   const content = LOCATION_CONTENT[locationId] || {
     intro: `We proudly serve homeowners in ${location.name} and the surrounding area with professional exterior cleaning services.`,
     localNote: `${location.name} is within our service area. Use our instant quote tool to check pricing for your address.`,
@@ -76,12 +69,21 @@ export default function LocationPage({ locationId }: LocationPageProps) {
             <p className="text-lg text-white/80 mb-6 leading-relaxed">{location.description}</p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Link href="/instant-quote">
-                <Button size="lg" className="bg-sky hover:bg-sky-light text-white font-bold">
+                <Button
+                  size="lg"
+                  className="bg-sky hover:bg-sky-light text-white font-bold"
+                  onClick={() => trackEvent("cta_click", { location: "location_hero", city: location.id, action: "instant_quote" })}
+                >
                   Get Instant Quote <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
               <a href={`tel:${BUSINESS.phoneRaw}`}>
-                <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 font-bold">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-white/30 text-white hover:bg-white/10 font-bold"
+                  onClick={() => trackEvent("cta_click", { location: "location_hero", city: location.id, action: "call" })}
+                >
                   <Phone className="w-4 h-4 mr-2" /> {BUSINESS.phone}
                 </Button>
               </a>
@@ -115,7 +117,10 @@ export default function LocationPage({ locationId }: LocationPageProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {SERVICES.map(service => (
               <Link key={service.id} href={`/services/${service.slug}`}>
-                <Card className="group h-full hover:shadow-lg transition-all cursor-pointer hover:border-primary/30">
+                <Card
+                  className="group h-full hover:shadow-lg transition-all cursor-pointer hover:border-primary/30"
+                  onClick={() => trackEvent("service_click", { location: "location_services", city: location.id, service: service.id })}
+                >
                   <CardContent className="p-6">
                     <h3 className="font-heading font-bold text-lg mb-2 group-hover:text-primary transition-colors">
                       {service.name}
@@ -185,7 +190,12 @@ export default function LocationPage({ locationId }: LocationPageProps) {
           <div className="flex flex-wrap justify-center gap-3">
             {LOCATIONS.filter(l => l.id !== locationId).map(l => (
               <Link key={l.id} href={`/locations/${l.slug}`}>
-                <Button variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary hover:text-white">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-primary/30 text-primary hover:bg-primary hover:text-white"
+                  onClick={() => trackEvent("city_click", { location: "other_areas", city: l.id })}
+                >
                   {l.name}, {l.state}
                 </Button>
               </Link>

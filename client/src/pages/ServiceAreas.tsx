@@ -8,9 +8,15 @@ import { MapPin, ArrowRight, Phone } from "lucide-react";
 import { MapView } from "@/components/Map";
 import { useRef } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { trackEvent } from "@/lib/analytics";
 
 export default function ServiceAreas() {
   useCanonical("/service-areas");
+  usePageMeta({
+    title: "Service Areas | Exterior Experts | Cookeville & Upper Cumberland",
+    description: "We serve Cookeville, Baxter, Algood, Sparta, Livingston and the broader Upper Cumberland with pressure washing, house washing, windows, gutters, and roof cleaning.",
+  });
   const mapRef = useRef<google.maps.Map | null>(null);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -46,7 +52,10 @@ export default function ServiceAreas() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {LOCATIONS.map(loc => (
                   <Link key={loc.id} href={`/locations/${loc.slug}`}>
-                    <Card className="group hover:shadow-md transition-all cursor-pointer hover:border-primary/30 h-full">
+                    <Card
+                      className="group hover:shadow-md transition-all cursor-pointer hover:border-primary/30 h-full"
+                      onClick={() => trackEvent("city_click", { location: "service_areas_grid", city: loc.id })}
+                    >
                       <CardContent className="p-4 flex items-center gap-3">
                         <MapPin className="w-5 h-5 text-primary shrink-0" />
                         <div>
@@ -102,12 +111,21 @@ export default function ServiceAreas() {
           <p className="text-white/80 mb-8">Enter your address in our instant quote tool and we'll let you know!</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/instant-quote">
-              <Button size="lg" className="bg-sky hover:bg-sky-light text-white font-bold">
+              <Button
+                size="lg"
+                className="bg-sky hover:bg-sky-light text-white font-bold"
+                onClick={() => trackEvent("cta_click", { location: "service_areas_bottom", action: "instant_quote" })}
+              >
                 Check Your Address <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
             <a href={`tel:${BUSINESS.phoneRaw}`}>
-              <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 font-bold">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10 font-bold"
+                onClick={() => trackEvent("cta_click", { location: "service_areas_bottom", action: "call" })}
+              >
                 <Phone className="w-4 h-4 mr-2" /> {BUSINESS.phone}
               </Button>
             </a>

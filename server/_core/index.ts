@@ -11,6 +11,7 @@ import { registerSmsWebhook } from "../webhooks/twilioWebhook";
 import { registerPaymentWebhook } from "../webhooks/paymentWebhook";
 import { mockAvailabilityProvider } from "@shared/availability";
 import { trpcOnError } from "./observability";
+import { registerSeoRoutes } from "./seoRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -43,6 +44,8 @@ async function startServer() {
   registerSmsWebhook(app);
   // Payment provider webhook
   registerPaymentWebhook(app);
+  // robots.txt + sitemap.xml for marketing pages
+  registerSeoRoutes(app);
   // Local-only mock scheduler endpoint for development
   app.post("/api/mock/scheduler", (req, res) => {
     try {

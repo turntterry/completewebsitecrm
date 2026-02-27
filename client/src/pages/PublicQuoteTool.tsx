@@ -53,8 +53,10 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { toast } from "sonner";
 import { Slot } from "@shared/availability";
+import { trackEvent } from "@/lib/analytics";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Home: HomeIcon,
@@ -216,6 +218,10 @@ const STEPS = [
 
 export default function QuoteTool() {
   useCanonical("/instant-quote");
+  usePageMeta({
+    title: "Instant Quote | Exterior Experts",
+    description: "Get a price in under 2 minutes for pressure washing, house washing, windows, gutters, and more in Cookeville & Upper Cumberland.",
+  });
   const { data: pricingData, isLoading: pricingLoading } =
     trpc.publicSite.quote.getPricing.useQuery();
   const { data: experienceConfig } =
@@ -275,6 +281,10 @@ export default function QuoteTool() {
   const shownUpsellsRef = useRef<Set<string>>(new Set());
   const [scheduleHandoffStarted, setScheduleHandoffStarted] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+
+  useEffect(() => {
+    trackEvent("quote_step", { step: STEPS[step] ?? step });
+  }, [step]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const propertyLookup = trpc.publicSite.quote.lookupProperty.useQuery(
@@ -656,6 +666,12 @@ export default function QuoteTool() {
 
   const handleSubmit = async () => {
     try {
+      trackEvent("quote_submit", {
+        services: selectedServices.map(s => s.id),
+        city,
+        zip,
+        step: STEPS[step] ?? "submit",
+      });
       const result = await submitMutation.mutateAsync({
         customerName: name,
         customerEmail: email,

@@ -14,6 +14,7 @@ import ServiceAreas from "./pages/ServiceAreas";
 import LocationPage from "./pages/LocationPage";
 import CookevillePage from "./pages/CookevillePage";
 import PublicQuoteTool from "./pages/PublicQuoteTool";
+import { StickyCta } from "./components/StickyCta";
 
 // CRM pages
 import Dashboard from "./pages/Dashboard";
@@ -116,6 +117,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <StickyCta />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

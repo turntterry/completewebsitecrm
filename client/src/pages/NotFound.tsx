@@ -2,11 +2,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Home } from "lucide-react";
 import { useLocation } from "wouter";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { useCanonical } from "@/hooks/useCanonical";
+import { trackEvent } from "@/lib/analytics";
 
 export default function NotFound() {
+  useCanonical("/404");
+  usePageMeta({
+    title: "Page Not Found | Exterior Experts",
+    description: "The page you were looking for isn't here. Head back to the Exterior Experts home page.",
+  });
   const [, setLocation] = useLocation();
 
   const handleGoHome = () => {
+    trackEvent("cta_click", { location: "404", action: "go_home" });
     setLocation("/");
   };
 
