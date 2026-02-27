@@ -767,7 +767,7 @@ export default function QuoteTool() {
     seenStepsRef.current.add(step);
     trackEventMutation.mutate({
       sessionToken,
-      eventName: "step_view",
+      eventName: "step_view" as any,
       payload: {
         step,
         label: STEPS[step],
@@ -784,7 +784,7 @@ export default function QuoteTool() {
       abandonTrackedRef.current = true;
       trackEventMutation.mutate({
         sessionToken,
-        eventName: "quote_abandoned",
+        eventName: "quote_abandoned" as any,
         payload: {
           step,
           label: STEPS[step],
@@ -1357,7 +1357,7 @@ export default function QuoteTool() {
                         if (sessionToken) {
                           trackEventMutation.mutate({
                             sessionToken,
-                            eventName: "quote_text_me",
+                            eventName: "quote_text_me" as any,
                             payload: { channel: "sms" },
                           });
                         }

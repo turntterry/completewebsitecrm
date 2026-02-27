@@ -478,13 +478,14 @@ export default function BookingControls() {
               disabled={updateCompany.isPending}
               onClick={() =>
                 updateCompany.mutate({
+                  // casting to allow webhooks blob until settings type is extended
                   settings: {
                     webhooks: {
                       enabled: webhookEnabled,
                       url: webhookUrl,
                       secret: webhookSecret || undefined,
                     },
-                  },
+                  } as any,
                 })
               }
             >
