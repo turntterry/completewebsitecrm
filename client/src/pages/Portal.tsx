@@ -152,6 +152,8 @@ export default function Portal() {
   const [preferredDate, setPreferredDate] = useState("");
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [payingInvoiceId, setPayingInvoiceId] = useState<number | null>(null);
+  const [payAmounts, setPayAmounts] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (pay.data) {
@@ -162,6 +164,7 @@ export default function Portal() {
       } else if (pay.data.remainingBalance !== undefined) {
         setPaymentNotice(`Payment recorded. Remaining balance: $${pay.data.remainingBalance?.toFixed?.(2) ?? pay.data.remainingBalance}`);
       }
+      setPayingInvoiceId(null);
     }
   }, [pay.data]);
 
@@ -375,25 +378,60 @@ export default function Portal() {
                     Balance: ${inv.balance} | Paid: ${inv.amountPaid}
                   </p>
                   {parseFloat(String(inv.balance ?? 0)) > 0 && (
-                    <Button
-                      size="sm"
-                      className="mt-2"
-                      disabled={pay.isPending}
-                      onClick={() =>
-                        pay.mutate({
-                          invoiceId: inv.id,
-                          customerId: resolvedCustomerId,
-                          companyId: resolvedCompanyId,
-                        })
-                      }
-                    >
-                      {pay.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <CreditCard className="w-4 h-4" />
-                      )}
-                      <span className="ml-2">Pay now</span>
-                    </Button>
+                    <div className="mt-2 space-y-2">
+                      <label className="text-xs text-slate-500">
+                        Amount to pay
+                        <input
+                          className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={payAmounts[inv.id] ?? parseFloat(String(inv.balance ?? 0)).toFixed(2)}
+                          onChange={e =>
+                            setPayAmounts(a => ({ ...a, [inv.id]: e.target.value }))
+                          }
+                        />
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="mt-0"
+                          disabled={pay.isPending || payingInvoiceId === inv.id && pay.isPending}
+                          onClick={() => {
+                            const amt = parseFloat(
+                              (payAmounts[inv.id] ?? parseFloat(String(inv.balance ?? 0)).toFixed(2)).trim()
+                            );
+                            if (isNaN(amt) || amt <= 0) {
+                              setPaymentNotice("Enter a valid amount greater than 0.");
+                              return;
+                            }
+                            setPayingInvoiceId(inv.id);
+                            pay.mutate({
+                              invoiceId: inv.id,
+                              customerId: resolvedCustomerId,
+                              companyId: resolvedCompanyId,
+                              amount: amt,
+                            });
+                          }}
+                        >
+                          {pay.isPending && payingInvoiceId === inv.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <CreditCard className="w-4 h-4" />
+                          )}
+                          <span className="ml-2">Pay now</span>
+                        </Button>
+                        {paymentUrl && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(paymentUrl, "_blank")}
+                          >
+                            <ExternalLink className="w-3 h-3 mr-1" /> Open payment
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   )}
                   {paymentNotice && pay.isSuccess && (
                     <div className="text-xs text-emerald-600 mt-2 space-y-1">
