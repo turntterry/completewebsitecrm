@@ -22,6 +22,8 @@ import {
 } from "../db";
 import { createPaymentIntent } from "../services/payments";
 import { pushExternalSchedule } from "../services/scheduler";
+import { sendWebhook } from "../services/webhook";
+import { properties } from "../../drizzle/schema";
 import { publicProcedure, router } from "../_core/trpc";
 
 async function requireDb() {
@@ -283,6 +285,37 @@ export const portalRouter = router({
         }
       }
 
+      // Webhook: quote.accepted
+      const property =
+        quote.propertyId
+          ? await db
+              .select()
+              .from(properties)
+              .where(eq(properties.id, quote.propertyId))
+              .limit(1)
+              .then(rows => rows[0] ?? null)
+          : null;
+      sendWebhook("quote.accepted", {
+        source: "portal",
+        customer: { id: input.customerId },
+        quote: {
+          id: quote.id,
+          quoteNumber: quote.quoteNumber,
+          total: quote.total,
+          status: "accepted",
+        },
+        property: property
+          ? {
+              id: property.id,
+              address: property.address,
+              city: property.city,
+              state: property.state,
+              zip: property.zip,
+            }
+          : null,
+        job: jobId ? { id: jobId } : null,
+      }).catch(() => {});
+
       return { success: true, status: "accepted" as const, jobId };
     }),
 
@@ -376,6 +409,39 @@ export const portalRouter = router({
       });
 
       const updatedBalance = Math.max(0, balance - amount);
+      const eventType =
+        updatedBalance <= 0 ? "payment.paid_in_full" : "payment.deposit_paid";
+
+      // Fetch customer for webhook
+      const [customer] = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.id, invoice.customerId));
+
+      sendWebhook(eventType, {
+        source: "portal",
+        customer: customer
+          ? {
+              id: customer.id,
+              name: `${customer.firstName} ${customer.lastName ?? ""}`.trim(),
+              email: customer.email,
+              phone: customer.phone,
+            }
+          : { id: invoice.customerId },
+        invoice: {
+          id: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          total: invoice.total,
+          balance_before: balance,
+          balance_after: updatedBalance,
+        },
+        payment: {
+          amount,
+          method: input.method,
+          note: input.note ?? null,
+        },
+      }).catch(() => {});
+
       return { success: true, remainingBalance: updatedBalance, provider: "stub" as const };
     }),
 
@@ -471,6 +537,13 @@ export const portalRouter = router({
           }
         }
       }
+
+      sendWebhook("lead.created", {
+        source: "portal",
+        lead: { id: leadId, services: input.services ?? [], message: input.message ?? null },
+        customer: { id: input.customerId },
+        job: jobId ? { id: jobId } : null,
+      }).catch(() => {});
 
       return { success: true, leadId, jobId };
     }),
