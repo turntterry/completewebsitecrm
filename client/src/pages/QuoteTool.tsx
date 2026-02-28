@@ -39,6 +39,15 @@ import {
   ArrowDown,
 } from "lucide-react";
 import { Link } from "wouter";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const SERVICE_ICONS: Record<string, React.ReactNode> = {
   Home: <Home className="w-5 h-5" />,
@@ -153,6 +162,16 @@ export default function QuoteTool() {
   const [newServiceName, setNewServiceName] = useState("");
   const [showAddService, setShowAddService] = useState(false);
   const [draftVersionLabel, setDraftVersionLabel] = useState("Config Snapshot");
+  // ── Edit service dialog state ────────────────────────────────────────────
+  const [editingService, setEditingService] = useState<any | null>(null);
+  const [svcName, setSvcName] = useState("");
+  const [svcKey, setSvcKey] = useState("");
+  const [svcDescription, setSvcDescription] = useState("");
+  const [svcPricingType, setSvcPricingType] = useState<"fixed" | "per_sqft" | "per_linear_ft" | "per_unit" | "tiered">("per_sqft");
+  const [svcBasePrice, setSvcBasePrice] = useState<string>("0");
+  const [svcPricePerUnit, setSvcPricePerUnit] = useState<string>("0");
+  const [svcMinCharge, setSvcMinCharge] = useState<string>("0");
+  const [svcManualReview, setSvcManualReview] = useState(false);
   // ── Upsell state ─────────────────────────────────────────────────────────
   const [upsellCatalog, setUpsellCatalog] = useState<
     {
@@ -332,7 +351,11 @@ export default function QuoteTool() {
     });
   };
   const updateService = trpc.quoteToolSettings.updateService.useMutation({
-    onSuccess: () => refetchServices(),
+    onSuccess: () => {
+      refetchServices();
+      toast.success("Service updated");
+      setEditingService(null);
+    },
     onError: e => toast.error(e.message),
   });
   const createService = trpc.quoteToolSettings.createService.useMutation({
@@ -443,6 +466,12 @@ export default function QuoteTool() {
   const handleCopyLink = () => {
     navigator.clipboard.writeText(standaloneUrl);
     toast.success("Link copied to clipboard");
+  };
+
+  const formatMoney = (val: string | number) => {
+    const num = typeof val === "string" ? parseFloat(val) : val;
+    if (isNaN(num)) return "0.00";
+    return num.toFixed(2);
   };
 
   if (settingsLoading || servicesLoading) {
@@ -599,11 +628,19 @@ export default function QuoteTool() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                    onClick={() =>
-                      toast.info(
-                        `Configure pricing for ${svc.name} — coming soon`
-                      )
-                    }
+                    onClick={() => {
+                      setEditingService(svc);
+                      setSvcName(svc.name ?? "");
+                      setSvcKey(svc.serviceKey ?? "");
+                      setSvcDescription(svc.description ?? "");
+                      setSvcPricingType(
+                        (svc.pricingType as any) ?? "per_sqft"
+                      );
+                      setSvcBasePrice(String(svc.basePrice ?? "0"));
+                      setSvcPricePerUnit(String(svc.pricePerUnit ?? "0"));
+                      setSvcMinCharge(String(svc.minimumCharge ?? "0"));
+                      setSvcManualReview(!!svc.manualReviewRequired);
+                    }}
                   >
                     <Settings className="w-4 h-4" />
                   </Button>
@@ -2164,5 +2201,112 @@ export default function QuoteTool() {
         </div>
       )}
     </div>
+
+    <Dialog open={!!editingService} onOpenChange={v => !v && setEditingService(null)}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit Service</DialogTitle>
+          <DialogDescription>Update pricing basics for this service.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Name</Label>
+              <Input value={svcName} onChange={e => setSvcName(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Service Key</Label>
+              <Input
+                value={svcKey}
+                onChange={e => setSvcKey(e.target.value)}
+                placeholder="house_washing"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Description</Label>
+            <Textarea
+              rows={2}
+              value={svcDescription}
+              onChange={e => setSvcDescription(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Pricing Type</Label>
+              <Select value={svcPricingType} onValueChange={v => setSvcPricingType(v as any)}>
+                <SelectTrigger><SelectValue placeholder="per_sqft" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixed</SelectItem>
+                  <SelectItem value="per_sqft">Per Sq Ft</SelectItem>
+                  <SelectItem value="per_linear_ft">Per Linear Ft</SelectItem>
+                  <SelectItem value="per_unit">Per Unit</SelectItem>
+                  <SelectItem value="tiered">Tiered</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Base Price ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={svcBasePrice}
+                onChange={e => setSvcBasePrice(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Price / Unit</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={svcPricePerUnit}
+                onChange={e => setSvcPricePerUnit(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Minimum Charge ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={svcMinCharge}
+                onChange={e => setSvcMinCharge(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 mt-6">
+              <Switch checked={svcManualReview} onCheckedChange={setSvcManualReview} />
+              <Label className="text-xs text-muted-foreground">Manual review</Label>
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={() => setEditingService(null)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              if (!editingService) return;
+              updateService.mutate({
+                id: editingService.id,
+                name: svcName || editingService.name,
+                serviceKey: svcKey || null,
+                description: svcDescription || null,
+                pricingType: svcPricingType,
+                basePrice: parseFloat(formatMoney(svcBasePrice)) as any,
+                pricePerUnit: parseFloat(formatMoney(svcPricePerUnit)) as any,
+                minimumCharge: parseFloat(formatMoney(svcMinCharge)) as any,
+                manualReviewRequired: svcManualReview,
+              } as any);
+            }}
+            disabled={updateService.isPending}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
