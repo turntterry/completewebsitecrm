@@ -126,6 +126,32 @@ const QUOTABLE_SERVICES = [
   },
 ];
 
+type BundleCard = { id: string; title: string; price: number; desc: string; badge?: string };
+
+// Easy-to-edit bundle cards (shared defaults)
+const DEFAULT_BUNDLES: BundleCard[] = [
+  {
+    id: "combo",
+    title: "House Wash Combo",
+    price: 505,
+    desc: "Pair this service with a full exterior house wash in one visit.",
+    badge: "Bundle",
+  },
+  {
+    id: "curb_appeal",
+    title: "Curb Appeal Upgrade",
+    price: 695,
+    desc: "House wash + exterior windows + this service for a total refresh.",
+  },
+];
+
+// Per-service bundle overrides (edit here to customize)
+const SERVICE_BUNDLE_MAP: Record<string, BundleCard[] | undefined> = {
+  // driveway_cleaning: [
+  //   { id: "wash_seal", title: "Wash + Seal", price: 825, desc: "Clean and seal your driveway in one visit.", badge: "Most Popular" },
+  // ],
+};
+
 // Slider configs per service (defaults, overridden by DB config)
 const SLIDER_DEFAULTS: Record<
   string,
@@ -1955,20 +1981,7 @@ function ServiceDetailForm({
 
   const showBundleCards =
     serviceId !== "window_cleaning" && serviceId !== "house_washing";
-  const bundles = [
-    {
-      id: "combo",
-      title: "House Wash Combo",
-      price: 505,
-      desc: "Pair this service with a full exterior house wash for a bundled visit.",
-    },
-    {
-      id: "curb_appeal",
-      title: "Curb Appeal Upgrade",
-      price: 695,
-      desc: "House wash + exterior windows + this service in one trip.",
-    },
-  ];
+  const bundles = SERVICE_BUNDLE_MAP[serviceId] ?? DEFAULT_BUNDLES;
 
   return (
     <Card className="border-2 overflow-hidden">
