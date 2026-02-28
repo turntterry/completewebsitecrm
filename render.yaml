@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: exterior-experts-crm
+    env: node
+    plan: standard
+    buildCommand: npm install --force && npm run render:build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: COMPANY_LOGO_URL
+        sync: false
+      - key: COMPANY_NAME
+        sync: false
+      - key: COMPANY_PHONE
+        sync: false
+      - key: COMPANY_ADDRESS
+        sync: false
