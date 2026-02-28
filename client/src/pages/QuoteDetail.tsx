@@ -514,9 +514,22 @@ export default function QuoteDetail() {
         <Card className="shadow-sm print:border print:shadow-none">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Client Preview</p>
-                <h2 className="text-lg font-semibold">Exterior Experts Estimate</h2>
+              <div className="flex items-center gap-3">
+                {((q as any).logoUrl || (q as any).branding?.logoUrl) ? (
+                  <img
+                    src={(q as any).logoUrl ?? (q as any).branding?.logoUrl}
+                    alt="Company logo"
+                    className="h-10 w-auto rounded"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                    EX
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Client Preview</p>
+                  <h2 className="text-lg font-semibold">Exterior Experts Estimate</h2>
+                </div>
               </div>
               <div className="text-right text-sm text-muted-foreground">
                 <div className="font-medium text-foreground">Quote #{q.quoteNumber}</div>
@@ -587,6 +600,7 @@ export default function QuoteDetail() {
                 <p className="font-semibold text-foreground">Exterior Experts</p>
                 <p>177 Webb Ave, Cookeville, TN</p>
                 <p>(931) 284-2291</p>
+                <p>Payment due upon completion unless otherwise noted.</p>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}>
