@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Send, CheckCircle, XCircle, Briefcase, Plus, Trash2, ChevronDown, ChevronUp, Check, Pencil, ExternalLink, Percent, DollarSign, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle, XCircle, Briefcase, Plus, Trash2, ChevronDown, ChevronUp, Check, Pencil, ExternalLink, Percent, DollarSign, Eye, EyeOff, Copy, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -313,6 +313,10 @@ export default function QuoteDetail() {
     });
   };
 
+  const shareLink = `${window.location.origin}/quote/${(quote as any).publicToken}`;
+
+
+
   useEffect(() => {
     if (quote) {
       setDepositValue(String((quote as any).depositAmount ?? "0"));
@@ -351,46 +355,140 @@ export default function QuoteDetail() {
         <Link href="/admin/quotes"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1.5" />Quotes</Button></Link>
       </div>
 
-      {/* Summary / balances */}
+      {/* Top bar actions & summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Quote #{q.quoteNumber}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge className={`${STATUS_COLORS[q.status] ?? ""}`}>{q.status?.replace(/_/g, " ")}</Badge>
+                <span className="text-sm text-muted-foreground">
+                  {q.customer?.firstName} {q.customer?.lastName}
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap items-center">
+              {q.preferredSlotLabel && (
+                <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
+                  Preferred Slot: {q.preferredSlotLabel}
+                </Badge>
+              )}
+              <div className="flex rounded-full border bg-muted/50 p-1">
+                <Button size="sm" variant={mode === "preview" ? "default" : "ghost"} className="gap-1" onClick={() => setMode("preview")}>
+                  <Eye className="h-4 w-4" /> Preview
+                </Button>
+                <Button size="sm" variant={mode === "view" ? "default" : "ghost"} className="gap-1" onClick={() => setMode("view")}>
+                  <EyeOff className="h-4 w-4" /> Details
+                </Button>
+              </div>
+              {q.status === "draft" && (
+                <Button size="sm" onClick={() => updateMutation.mutate({ id, status: "sent" })} disabled={updateMutation.isPending}>
+                  <Send className="h-4 w-4 mr-1.5" /> Send Quote
+                </Button>
+              )}
+              {q.status === "sent" && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => updateMutation.mutate({ id, status: "changes_requested" })} disabled={updateMutation.isPending}>
+                    <XCircle className="h-4 w-4 mr-1.5" /> Changes Requested
+                  </Button>
+                  <Button size="sm" onClick={() => acceptMutation.mutate({ id })} disabled={acceptMutation.isPending}>
+                    <CheckCircle className="h-4 w-4 mr-1.5" /> Mark Accepted
+                  </Button>
+                </>
+              )}
+              {q.status === "changes_requested" && (
+                <Button size="sm" variant="outline" onClick={() => updateMutation.mutate({ id, status: "sent" })} disabled={updateMutation.isPending}>
+                  <Send className="h-4 w-4 mr-1.5" /> Resend
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => navigate(`/quote/${q.publicToken}`)}>
+                <ExternalLink className="h-4 w-4 mr-1.5" /> Client View
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  sendPortalLink.mutate({
+                    quoteId: id,
+                    customerId: q.customerId,
+                    origin: "quote_detail",
+                  })
+                }
+                disabled={sendPortalLink.isPending}
+              >
+                {sendPortalLink.isPending ? "Sending..." : "Send Portal Link"}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary / balances */}
       <Card className="border-primary/20 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold">Totals</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span className="font-medium">${totals.subtotal.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tax ({q.taxRate ?? 0}%)</span>
-            <span className="font-medium">${totals.taxAmount.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between pt-1 border-t border-dashed">
-            <span className="text-muted-foreground">Deposit</span>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">$</span>
-              <Input
-                className="h-8 w-28 text-sm"
-                value={depositValue}
-                onChange={(e) => setDepositValue(e.target.value)}
-              />
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="font-medium">${totals.subtotal.toFixed(2)}</span>
             </div>
-          </div>
-          <div className="flex justify-between text-base font-bold border-t pt-2">
-            <span>Total</span>
-            <span>${totals.total.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Balance after deposit</span>
-            <span className="font-semibold text-foreground">${totals.balance.toFixed(2)}</span>
-          </div>
-          <div className="pt-2 flex justify-end">
-            <Button size="sm" onClick={saveTotals} disabled={updateMutation.isPending}>
-              Save totals
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tax ({q.taxRate ?? 0}%)</span>
+              <span className="font-medium">${totals.taxAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between pt-1 border-t border-dashed">
+              <span className="text-muted-foreground">Deposit</span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">$</span>
+                <Input
+                  className="h-8 w-28 text-sm"
+                  value={depositValue}
+                  onChange={(e) => setDepositValue(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-between text-base font-bold border-t pt-2">
+              <span>Total</span>
+              <span>${totals.total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Balance after deposit</span>
+              <span className="font-semibold text-foreground">${totals.balance.toFixed(2)}</span>
+            </div>
+            <div className="pt-2 flex justify-end">
+              <Button size="sm" onClick={saveTotals} disabled={updateMutation.isPending}>
+                Save totals
+              </Button>
+            </div>
+            <div className="pt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => {
+                  navigator.clipboard.writeText(shareLink);
+                  toast.success("Client link copied");
+                }}
+              >
+                <Copy className="h-3.5 w-3.5" /> Copy Link
+              </Button>
+              {q.customer?.email && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1"
+                  asChild
+                >
+                  <a href={`mailto:${q.customer.email}?subject=Your Quote ${q.quoteNumber}&body=${encodeURIComponent(`Hi ${q.customer.firstName ?? ""},\\n\\nYou can view your quote here: ${shareLink}\\n\\nThanks!`)}`}>
+                    <Mail className="h-3.5 w-3.5" /> Email Link
+                  </a>
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
