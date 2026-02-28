@@ -1953,6 +1953,23 @@ function ServiceDetailForm({
 
   const sliderDef = SLIDER_DEFAULTS[serviceId];
 
+  const showBundleCards =
+    serviceId !== "window_cleaning" && serviceId !== "house_washing";
+  const bundles = [
+    {
+      id: "combo",
+      title: "House Wash Combo",
+      price: 505,
+      desc: "Pair this service with a full exterior house wash for a bundled visit.",
+    },
+    {
+      id: "curb_appeal",
+      title: "Curb Appeal Upgrade",
+      price: 695,
+      desc: "House wash + exterior windows + this service in one trip.",
+    },
+  ];
+
   return (
     <Card className="border-2 overflow-hidden">
       <CardContent className="p-0">
@@ -2190,6 +2207,55 @@ function ServiceDetailForm({
               onChange={v => updateInput("sqft", v)}
               icon={<Ruler className="w-4 h-4" />}
             />
+          )}
+
+          {/* Bundled upsell cards (for non-window/house wash services) */}
+          {showBundleCards && (
+            <div className="space-y-3">
+              <Label className="block">Popular Bundles</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {bundles.map(bundle => {
+                  const selected = inputs.bundleChoice === bundle.id;
+                  return (
+                    <button
+                      key={bundle.id}
+                      type="button"
+                      onClick={() => updateInput("bundleChoice", bundle.id)}
+                      className={`text-left rounded-xl border-2 p-4 transition-all ${
+                        selected
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-border hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-heading font-bold text-sm mb-1">
+                            {bundle.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {bundle.desc}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-heading font-bold text-primary text-lg">
+                            ${bundle.price.toFixed(0)}
+                          </p>
+                          {selected && (
+                            <span className="text-[10px] text-primary font-semibold">
+                              Added
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Bundle pricing is quoted on-site. Selecting a bundle flags our team to apply
+                the combo rate (no separate visit needed).
+              </p>
+            </div>
           )}
         </div>
       </CardContent>
