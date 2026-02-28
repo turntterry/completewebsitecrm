@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, GripVertical, Eye, EyeOff, Percent, DollarSign } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 
@@ -34,6 +34,7 @@ function calcTotal(qty: string, price: string) {
 }
 
 export default function NewQuote() {
+  const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
@@ -46,6 +47,9 @@ export default function NewQuote() {
   const [message, setMessage] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [taxRate, setTaxRate] = useState("0");
+  const [discountValue, setDiscountValue] = useState("0");
+  const [discountType, setDiscountType] = useState<"percent" | "amount">("percent");
+  const [depositValue, setDepositValue] = useState("0");
   const [lineItems, setLineItems] = useState<LineItem[]>([newLineItem()]);
   const [optionSets, setOptionSets] = useState<OptionSet[]>([]);
   const [expandedSets, setExpandedSets] = useState<Set<number>>(new Set([0]));
@@ -170,14 +174,39 @@ export default function NewQuote() {
   };
 
   const subtotal = lineItems.reduce((s, li) => s + parseFloat(li.total || "0"), 0);
-  const tax = subtotal * (parseFloat(taxRate) / 100);
-  const total = subtotal + tax;
+  const discount =
+    discountType === "percent"
+      ? subtotal * (parseFloat(discountValue) / 100 || 0)
+      : parseFloat(discountValue) || 0;
+  const taxableBase = Math.max(0, subtotal - discount);
+  const tax = taxableBase * (parseFloat(taxRate) / 100);
+  const total = Math.max(0, taxableBase + tax);
+  const deposit = parseFloat(depositValue) || 0;
+  const balanceDue = Math.max(0, total - deposit);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerId) { toast.error("Please select a client"); return; }
     if (lineItems.every((li) => !li.description.trim())) {
       toast.error("Add at least one line item"); return;
+    }
+    const preparedLineItems = lineItems
+      .filter((li) => li.description.trim())
+      .map((li) => ({
+        description: li.description,
+        details: li.details || undefined,
+        quantity: li.quantity || "1",
+        unitPrice: li.unitPrice || "0",
+        total: li.total || "0",
+      }));
+    if (discount > 0) {
+      preparedLineItems.push({
+        description: "Discount",
+        details: discountType === "percent" ? `${discountValue}% off` : undefined,
+        quantity: "1",
+        unitPrice: (-discount).toFixed(2),
+        total: (-discount).toFixed(2),
+      });
     }
     createMutation.mutate({
       customerId,
@@ -186,15 +215,8 @@ export default function NewQuote() {
       message: message || undefined,
       internalNotes: internalNotes || undefined,
       taxRate: taxRate || "0",
-      lineItems: lineItems
-        .filter((li) => li.description.trim())
-        .map((li) => ({
-          description: li.description,
-          details: li.details || undefined,
-          quantity: li.quantity || "1",
-          unitPrice: li.unitPrice || "0",
-          total: li.total || "0",
-        })),
+      depositAmount: depositValue || undefined,
+      lineItems: preparedLineItems,
     });
   };
 
@@ -207,19 +229,58 @@ export default function NewQuote() {
     });
   };
 
+  const clientName = customers.find((c: any) => c.id === customerId);
+  const propertyDisplay =
+    properties.find((p: any) => p.id === propertyId)?.address ??
+    properties[0]?.address;
+
+  const previewLines = lineItems.filter(li => li.description.trim());
+  if (discount > 0) {
+    previewLines.push({
+      description: "Discount",
+      details: discountType === "percent" ? `${discountValue}%` : "",
+      quantity: "1",
+      unitPrice: (-discount).toFixed(2),
+      total: (-discount).toFixed(2),
+    });
+  }
+
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/admin/quotes">
-          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1.5" />Quotes</Button>
-        </Link>
-      </div>
-      <div>
-        <h1 className="text-2xl font-bold">New Quote</h1>
-        <p className="text-sm text-muted-foreground mt-1">Build a quote for a client</p>
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/admin/quotes">
+            <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1.5" />Quotes</Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">New Quote</h1>
+            <p className="text-sm text-muted-foreground">Build and preview before sending</p>
+          </div>
+        </div>
+        <div className="flex rounded-full border bg-muted/50 p-1 gap-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={mode === "edit" ? "default" : "ghost"}
+            onClick={() => setMode("edit")}
+            className="gap-1"
+          >
+            <EyeOff className="h-4 w-4" /> Edit
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={mode === "preview" ? "default" : "ghost"}
+            onClick={() => setMode("preview")}
+            className="gap-1"
+          >
+            <Eye className="h-4 w-4" /> Preview
+          </Button>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
         {/* Client & Property */}
         <Card>
           <CardHeader><CardTitle className="text-base">Client & Property</CardTitle></CardHeader>
@@ -271,10 +332,12 @@ export default function NewQuote() {
         {/* Line Items */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Product / Service</CardTitle>
-            <Button type="button" size="sm" variant="outline" onClick={() => setLineItems((p) => [...p, newLineItem()])}>
-              <Plus className="h-4 w-4 mr-1.5" />Add Line Item
-            </Button>
+            <CardTitle className="text-base">Products & Services</CardTitle>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => setLineItems((p) => [...p, newLineItem()])}>
+                <Plus className="h-4 w-4 mr-1.5" />Quick add
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {lineItems.map((li, idx) => (
@@ -359,10 +422,35 @@ export default function NewQuote() {
             ))}
 
             {/* Totals */}
-            <div className="border-t pt-4 space-y-2">
+            <div className="border-t pt-4 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-medium">${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Discount</span>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      className="h-7 text-xs w-20"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setDiscountType(discountType === "percent" ? "amount" : "percent")}
+                    >
+                      {discountType === "percent" ? <Percent className="h-3.5 w-3.5" /> : <DollarSign className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+                <span className="font-medium">-${discount.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
@@ -382,9 +470,30 @@ export default function NewQuote() {
                 </div>
                 <span className="font-medium">${tax.toFixed(2)}</span>
               </div>
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Deposit</span>
+                  <div className="relative w-24">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+                    <Input
+                      className="h-7 text-xs pl-5"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={depositValue}
+                      onChange={(e) => setDepositValue(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <span className="font-medium">-${deposit.toFixed(2)}</span>
+              </div>
               <div className="flex justify-between text-base font-bold border-t pt-2">
                 <span>Total</span>
                 <span>${total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Balance due after deposit</span>
+                <span className="font-semibold text-foreground">${balanceDue.toFixed(2)}</span>
               </div>
             </div>
           </CardContent>
@@ -611,6 +720,104 @@ export default function NewQuote() {
           <Button type="submit" disabled={createMutation.isPending || saveOptionSetMutation.isPending}>
             {createMutation.isPending ? "Creating..." : "Create Quote"}
           </Button>
+        </div>
+        </div>
+
+        {/* Summary / Preview column */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card className="border-primary/20 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="font-medium text-foreground">${subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Discount</span>
+                  <span className="font-medium text-destructive">-${discount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Tax</span>
+                  <span className="font-medium">${tax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Deposit</span>
+                  <span className="font-medium">-${deposit.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold border-t pt-2">
+                  <span>Total</span>
+                  <span>${total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Balance due</span>
+                  <span className="font-semibold text-primary">${balanceDue.toFixed(2)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                {mode === "preview" ? "Preview" : "Next Steps"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {mode === "preview" ? (
+                <div className="space-y-3 text-sm">
+                  <div className="border rounded-lg p-3 bg-white shadow-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs uppercase tracking-wide text-muted-foreground">Estimate</span>
+                      <span className="text-xs text-muted-foreground">{new Date().toLocaleDateString()}</span>
+                    </div>
+                    <div className="text-base font-semibold">
+                      {clientName ? `${clientName.firstName} ${clientName.lastName}` : "Client"} {propertyDisplay ? `· ${propertyDisplay}` : ""}
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-3 bg-white shadow-sm divide-y">
+                    {previewLines.map((li, idx) => (
+                      <div key={idx} className="flex justify-between py-2 first:pt-0 last:pb-0">
+                        <div>
+                          <div className="font-medium">{li.description}</div>
+                          {li.details && <div className="text-xs text-muted-foreground">{li.details}</div>}
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold">${li.total}</div>
+                          <div className="text-[11px] text-muted-foreground">{li.quantity} × ${li.unitPrice}</div>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between pt-2 text-sm font-semibold">
+                      <span>Total</span>
+                      <span>${total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Balance due after deposit</span>
+                      <span className="font-semibold text-foreground">${balanceDue.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Switch to Preview to see the client-facing layout.</p>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
+                >
+                  {mode === "edit" ? "Preview" : "Back to Edit"}
+                </Button>
+                <Button type="submit" className="w-full" disabled={createMutation.isPending || saveOptionSetMutation.isPending}>
+                  {createMutation.isPending ? "Creating..." : "Create Quote"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </form>
     </div>
