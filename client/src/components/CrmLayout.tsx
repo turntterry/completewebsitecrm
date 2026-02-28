@@ -3,6 +3,7 @@ import { getLoginUrl } from "@/const";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
+  Bell,
   Bot,
   Building2,
   Calendar,
@@ -16,6 +17,8 @@ import {
   Menu,
   MessageSquare,
   Package,
+  Plus,
+  Search,
   Settings,
   Share2,
   Users,
@@ -28,6 +31,8 @@ import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -225,7 +230,7 @@ export default function CrmLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-[#f7f9fc] via-[#eef2f8] to-[#e6ecf5] dark:from-background dark:via-background dark:to-background overflow-hidden">
       {/* Desktop Sidebar */}
       <aside
         className={cn(
@@ -275,9 +280,79 @@ export default function CrmLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
+        {/* Desktop top bar */}
+        <div className="hidden lg:flex items-center gap-3 px-6 py-4 border-b bg-white/90 backdrop-blur-md border-muted">
+          <div className="flex items-center gap-2 min-w-[220px]">
+            <span className="text-sm font-semibold text-muted-foreground">Workspace</span>
+            <Badge variant="outline" className="text-xs">Live</Badge>
+          </div>
+          <div className="flex-1 flex items-center gap-3">
+            <div className="relative w-full max-w-xl">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-10 pr-3 h-10 bg-muted/60 border-border focus-visible:ring-1 focus-visible:ring-primary"
+                placeholder="Search leads, clients, quotes… (Ctrl/Cmd + K)"
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Quick Create
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => (window.location.href = "/admin/leads")}>
+                  New Lead
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => (window.location.href = "/admin/quotes/new")}>
+                  New Quote
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => (window.location.href = "/admin/jobs/new")}>
+                  New Job
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => (window.location.href = "/admin/invoices/new")}>
+                  New Invoice
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="ghost" size="icon" className="relative">
+              <Bell className="h-5 w-5 text-muted-foreground" />
+              {smsUnread > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-white text-[10px] flex items-center justify-center">
+                  {smsUnread > 9 ? "9+" : smsUnread}
+                </span>
+              )}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 px-2 py-1 rounded-lg border bg-white shadow-sm">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {user?.name?.charAt(0) ?? "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-left leading-tight">
+                    <p className="text-sm font-semibold text-foreground">{user?.name ?? "You"}</p>
+                    <p className="text-[11px] text-muted-foreground">{user?.email}</p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={logout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
-          {children}
+        <main className="flex-1 overflow-y-auto px-4 py-4 lg:px-8 lg:py-8">
+          <div className="mx-auto w-full max-w-6xl space-y-6">
+            {children}
+          </div>
         </main>
       </div>
     </div>
