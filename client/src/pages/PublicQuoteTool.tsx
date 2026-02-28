@@ -152,6 +152,15 @@ const SERVICE_BUNDLE_MAP: Record<string, BundleCard[] | undefined> = {
   // ],
 };
 
+function getBundleChoiceSavings(serviceInputs: Record<string, PricingInput>) {
+  const selections = Object.values(serviceInputs).filter(
+    (v: any) => v?.bundleChoice
+  );
+  // Flat, easy-to-understand savings per bundle selection.
+  const savingsPerBundle = 75;
+  return selections.length * savingsPerBundle;
+}
+
 // Slider configs per service (defaults, overridden by DB config)
 const SLIDER_DEFAULTS: Record<
   string,
@@ -505,9 +514,20 @@ export default function QuoteTool() {
     return slots.find(slot => slot.id === selectedSlotId)?.display;
   }, [selectedSlotId, slots]);
 
-  const quoteSummary = useMemo(() => {
+  const rawQuoteSummary = useMemo(() => {
     return calculateQuoteTotal(pricingResults, distanceMiles, globalConfig);
   }, [pricingResults, distanceMiles, globalConfig]);
+
+  const bundleChoiceSavings = useMemo(
+    () => getBundleChoiceSavings(serviceInputs),
+    [serviceInputs]
+  );
+
+  const quoteSummary = useMemo(() => {
+    const subtotal = Math.max(0, rawQuoteSummary.subtotal - bundleChoiceSavings);
+    const totalPrice = Math.max(0, rawQuoteSummary.totalPrice - bundleChoiceSavings);
+    return { ...rawQuoteSummary, subtotal, totalPrice, bundleChoiceSavings };
+  }, [bundleChoiceSavings, rawQuoteSummary]);
   const eligibleUpsells = useMemo(() => {
     const selected = new Set(Array.from(selectedServices));
     return upsellCatalog.filter(upsell =>
@@ -585,16 +605,26 @@ export default function QuoteTool() {
   const quotePreviewSummary = useMemo(() => {
     if (!previewData?.breakdown) return finalQuoteSummary;
 
+    const previewSubtotal = Math.max(
+      0,
+      previewData.breakdown.servicesSubtotal - bundleChoiceSavings
+    );
+    const previewTotal = Math.max(
+      0,
+      previewData.breakdown.total - bundleChoiceSavings + upsellTotal
+    );
+
     return {
       ...finalQuoteSummary,
-      subtotal: previewData.breakdown.servicesSubtotal,
+      subtotal: previewSubtotal,
       bundleDiscountPercent: previewData.breakdown.bundleDiscountPercent,
       bundleDiscount: previewData.breakdown.bundleDiscountAmount,
+      bundleChoiceSavings,
       travelFee: previewData.breakdown.travelFee,
       jobMinimumApplied: previewData.breakdown.jobMinimumApplied,
-      totalPrice: previewData.breakdown.total,
+      totalPrice: previewTotal,
     };
-  }, [previewData?.breakdown, finalQuoteSummary]);
+  }, [previewData?.breakdown, finalQuoteSummary, bundleChoiceSavings, upsellTotal]);
 
   const toggleService = (id: string) => {
     setSelectedServices(prev => {
@@ -2637,6 +2667,12 @@ function StepReview({
           <div className="flex justify-between text-sm text-green-600">
             <span>Bundle Discount ({quoteSummary.bundleDiscountPercent}%)</span>
             <span>-${quoteSummary.bundleDiscount.toFixed(2)}</span>
+          </div>
+        )}
+        {quoteSummary.bundleChoiceSavings > 0 && (
+          <div className="flex justify-between text-sm text-green-600">
+            <span>Bundle Choice Savings</span>
+            <span>-${quoteSummary.bundleChoiceSavings.toFixed(2)}</span>
           </div>
         )}
 
