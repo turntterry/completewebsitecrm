@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { addDays, startOfWeek, format, isSameDay } from "date-fns";
 
@@ -23,6 +23,10 @@ export default function Schedule() {
     to: weekEnd.toISOString(),
   });
 
+  const totalVisits = (visits as any[]).length;
+  const scheduledVisits = (visits as any[]).filter((v) => v.status !== "needs_scheduling").length;
+  const needsScheduling = totalVisits - scheduledVisits;
+
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const visitsOnDay = (day: Date) =>
@@ -32,6 +36,7 @@ export default function Schedule() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Operations</p>
           <h1 className="text-2xl font-bold text-foreground">Schedule</h1>
           <p className="text-sm text-muted-foreground">
             {format(weekStart, "MMM d")} – {format(weekEnd, "MMM d, yyyy")}
@@ -47,7 +52,34 @@ export default function Schedule() {
           <Button variant="outline" size="sm" onClick={() => setWeekStart(addDays(weekStart, 7))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
+          <Button size="sm" asChild>
+            <a href="/admin/jobs/new" className="flex items-center gap-1">
+              <Plus className="h-4 w-4" /> New Job
+            </a>
+          </Button>
         </div>
+      </div>
+
+      {/* Stats strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Card className="bg-gradient-to-br from-blue-50 via-white to-white border-blue-100">
+          <CardContent className="py-4">
+            <p className="text-xs text-muted-foreground">Scheduled visits</p>
+            <p className="text-2xl font-bold">{scheduledVisits}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-amber-50 via-white to-white border-amber-100">
+          <CardContent className="py-4">
+            <p className="text-xs text-muted-foreground">Needs scheduling</p>
+            <p className="text-2xl font-bold">{needsScheduling}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-slate-50 via-white to-white border-slate-100">
+          <CardContent className="py-4">
+            <p className="text-xs text-muted-foreground">Total this week</p>
+            <p className="text-2xl font-bold">{totalVisits}</p>
+          </CardContent>
+        </Card>
       </div>
 
       {isLoading ? (
@@ -60,14 +92,17 @@ export default function Schedule() {
             const dayVisits = visitsOnDay(day);
             const isToday = isSameDay(day, new Date());
             return (
-              <div key={day.toISOString()} className={`rounded-xl border ${isToday ? "border-primary bg-primary/5" : "border-border bg-card"} p-3 min-h-32`}>
-                <div className="mb-2">
-                  <p className={`text-xs font-medium uppercase tracking-wide ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+              <div key={day.toISOString()} className={`rounded-xl border shadow-sm ${isToday ? "border-primary bg-primary/5" : "border-border bg-card"} p-3 min-h-32`}>
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <p className={`text-xs font-medium uppercase tracking-wide ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                     {format(day, "EEE")}
-                  </p>
-                  <p className={`text-lg font-bold ${isToday ? "text-primary" : "text-foreground"}`}>
-                    {format(day, "d")}
-                  </p>
+                    </p>
+                    <p className={`text-lg font-bold ${isToday ? "text-primary" : "text-foreground"}`}>
+                      {format(day, "d")}
+                    </p>
+                  </div>
+                  {isToday && <Badge variant="outline" className="text-[11px]">Today</Badge>}
                 </div>
                 <div className="space-y-1.5">
                   {dayVisits.map((v: any) => (

@@ -152,7 +152,9 @@ const SERVICE_BUNDLE_MAP: Record<string, BundleCard[] | undefined> = {
   // ],
 };
 
-function getBundleChoiceSavings(serviceInputs: Record<string, PricingInput>) {
+type BundleAwarePricingInput = PricingInput & { bundleChoice?: string };
+
+function getBundleChoiceSavings(serviceInputs: Record<string, BundleAwarePricingInput>) {
   const selections = Object.values(serviceInputs).filter(
     (v: any) => v?.bundleChoice
   );
@@ -282,7 +284,7 @@ export default function QuoteTool() {
 
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
   const [serviceInputs, setServiceInputs] = useState<
-    Record<string, PricingInput>
+    Record<string, BundleAwarePricingInput>
   >({});
   const [propertyIntel, setPropertyIntel] = useState<PropertyIntel | null>(
     null
@@ -719,7 +721,7 @@ export default function QuoteTool() {
   const handleSubmit = async () => {
     try {
       trackEvent("quote_submit", {
-        services: selectedServices.map(s => s.id),
+        services: Array.from(selectedServices),
         city,
         zip,
         step: STEPS[step] ?? "submit",
@@ -1998,7 +2000,7 @@ function ServiceDetailForm({
   price,
 }: {
   serviceId: string;
-  inputs: PricingInput;
+  inputs: BundleAwarePricingInput;
   updateInput: (key: string, val: unknown) => void;
   config: ServiceConfig;
   tierLabels: { good: string; better: string; best: string };

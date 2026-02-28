@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, ClipboardList, Phone, Mail, Zap, MapPin, DollarSign, ChevronDown, ChevronUp, ExternalLink, Calendar } from "lucide-react";
+import { Plus, ClipboardList, Phone, Mail, Zap, MapPin, DollarSign, ChevronDown, ChevronUp, ExternalLink, Calendar, Search, MessageSquare, FilePlus2 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
@@ -57,7 +57,7 @@ function InstantQuoteCard({ quote }: { quote: any }) {
     : [];
 
   return (
-    <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
+    <Card className="hover:shadow-xl transition-all border border-border/70 bg-gradient-to-r from-white via-white to-slate-50">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
@@ -160,6 +160,27 @@ function InstantQuoteCard({ quote }: { quote: any }) {
                 </button>
               ))}
             </div>
+            <div className="flex flex-wrap gap-2">
+              {quote.phone && (
+                <Button size="sm" variant="secondary" asChild>
+                  <a href={`tel:${quote.phone}`} className="flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5" /> Call
+                  </a>
+                </Button>
+              )}
+              {quote.phone && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={`sms:${quote.phone}`} className="flex items-center gap-1">
+                    <MessageSquare className="h-3.5 w-3.5" /> Text
+                  </a>
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" asChild>
+                <a href="/admin/quotes/new" className="flex items-center gap-1">
+                  <FilePlus2 className="h-3.5 w-3.5" /> Create Quote
+                </a>
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
@@ -170,6 +191,9 @@ function InstantQuoteCard({ quote }: { quote: any }) {
 export default function Requests() {
   const [tab, setTab] = useState<"instant" | "manual">("instant");
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [iqFilter, setIqFilter] = useState<string>("all");
   const utils = trpc.useUtils();
 
   const { data: leads = [], isLoading: leadsLoading } = trpc.leads.list.useQuery({});
@@ -185,6 +209,33 @@ export default function Requests() {
     onError: (e) => toast.error(e.message),
   });
   const { register, handleSubmit, reset, setValue } = useForm<RequestForm>();
+
+  const filteredLeads = useMemo(() => {
+    const q = search.toLowerCase();
+    return (leads as any[])
+      .filter((l) => statusFilter === "all" || l.status === statusFilter)
+      .filter((l) =>
+        !q ||
+        l.firstName?.toLowerCase().includes(q) ||
+        l.lastName?.toLowerCase().includes(q) ||
+        l.email?.toLowerCase().includes(q) ||
+        l.phone?.toLowerCase().includes(q)
+      );
+  }, [leads, search, statusFilter]);
+
+  const filteredIQ = useMemo(() => {
+    const q = search.toLowerCase();
+    return (instantQuotesList as any[])
+      .filter((l) => iqFilter === "all" || l.status === iqFilter)
+      .filter((l) =>
+        !q ||
+        l.firstName?.toLowerCase().includes(q) ||
+        l.lastName?.toLowerCase().includes(q) ||
+        l.email?.toLowerCase().includes(q) ||
+        l.phone?.toLowerCase().includes(q) ||
+        l.address?.toLowerCase().includes(q)
+      );
+  }, [instantQuotesList, search, iqFilter]);
 
   const onSubmit = (data: RequestForm) => {
     if (!data.firstName.trim()) { toast.error("First name is required"); return; }
@@ -253,6 +304,48 @@ export default function Requests() {
         </button>
       </div>
 
+      {/* Filters / search */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, email, phone, address"
+            className="pl-9 w-72"
+          />
+        </div>
+        {tab === "manual" ? (
+          <div className="flex gap-2 flex-wrap">
+            {["all", "new", "contacted", "follow_up", "quoted", "won", "lost"].map((s) => (
+              <Button
+                key={s}
+                size="sm"
+                variant={statusFilter === s ? "default" : "outline"}
+                className="capitalize"
+                onClick={() => setStatusFilter(s)}
+              >
+                {s.replace(/_/g, " ")}
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-2 flex-wrap">
+            {["all", "pending", "booked", "declined", "converted"].map((s) => (
+              <Button
+                key={s}
+                size="sm"
+                variant={iqFilter === s ? "default" : "outline"}
+                className="capitalize"
+                onClick={() => setIqFilter(s)}
+              >
+                {s.replace(/_/g, " ")}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Instant Quotes Tab */}
       {tab === "instant" && (
         <div className="space-y-2">
@@ -270,7 +363,7 @@ export default function Requests() {
               </Button>
             </CardContent></Card>
           ) : (
-            (instantQuotesList as any[]).map((q) => <InstantQuoteCard key={q.id} quote={q} />)
+            (filteredIQ as any[]).map((q) => <InstantQuoteCard key={q.id} quote={q} />)
           )}
         </div>
       )}
@@ -289,25 +382,48 @@ export default function Requests() {
             </CardContent></Card>
           ) : (
             <div className="space-y-2">
-              {(leads as any[]).map((r) => (
-                <Card key={r.id} className="hover:shadow-md transition-shadow">
+              {(filteredLeads as any[]).map((r) => (
+                <Card key={r.id} className="hover:shadow-xl transition-all border border-border/70 bg-white">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <div className="flex items-start gap-4">
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center shrink-0">
                         <ClipboardList className="h-5 w-5 text-blue-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold">{r.firstName} {r.lastName}</p>
                           <Badge className={`text-xs ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-700"}`}>{r.status?.replace(/_/g, " ")}</Badge>
                         </div>
-                        <div className="flex items-center gap-4 mt-1 flex-wrap">
-                          {r.email && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3 w-3" />{r.email}</span>}
-                          {r.phone && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="h-3 w-3" />{r.phone}</span>}
+                        <div className="flex items-center gap-4 mt-1 flex-wrap text-xs text-muted-foreground">
+                          {r.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{r.email}</span>}
+                          {r.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{r.phone}</span>}
                         </div>
-                        {r.notes && <p className="text-xs text-muted-foreground mt-1 truncate">{r.notes}</p>}
+                        {r.notes && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{r.notes}</p>}
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {r.phone && (
+                            <Button size="sm" variant="secondary" asChild>
+                              <a href={`tel:${r.phone}`} className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Call</a>
+                            </Button>
+                          )}
+                          {r.phone && (
+                            <Button size="sm" variant="outline" asChild>
+                              <a href={`sms:${r.phone}`} className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> Text</a>
+                            </Button>
+                          )}
+                          {r.email && (
+                            <Button size="sm" variant="ghost" asChild>
+                              <a href={`mailto:${r.email}`} className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Email</a>
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost" asChild>
+                            <a href="/admin/quotes/new" className="flex items-center gap-1"><FilePlus2 className="h-3.5 w-3.5" /> Create Quote</a>
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground shrink-0">{new Date(r.createdAt).toLocaleDateString()}</p>
+                      <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground shrink-0">
+                        <span>{new Date(r.createdAt).toLocaleDateString()}</span>
+                        <span className="text-[11px] bg-muted px-2 py-0.5 rounded-full">Website request</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

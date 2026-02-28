@@ -3,7 +3,6 @@
  * All email sending for the app goes through this module.
  */
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Using Resend's built-in verified domain. To send from exteriorexperts.co,
 // verify that domain in the Resend dashboard and update this line.
 const FROM_EMAIL = "Exterior Experts <onboarding@resend.dev>";
@@ -16,7 +15,9 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
-  if (!RESEND_API_KEY) {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
     console.error("[email] RESEND_API_KEY is not set");
     return false;
   }
@@ -25,7 +26,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
