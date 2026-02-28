@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Send, CheckCircle, XCircle, Briefcase, Plus, Trash2, ChevronDown, ChevronUp, Check, Pencil, ExternalLink, Percent, DollarSign, Eye, EyeOff, Copy, Mail } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle, XCircle, Briefcase, Plus, Trash2, ChevronDown, ChevronUp, Check, Pencil, ExternalLink, Percent, DollarSign, Eye, EyeOff, Copy, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -305,6 +305,10 @@ export default function QuoteDetail() {
     onSuccess: (data) => toast.success(`Portal link sent to ${data.email}`),
     onError: (e) => toast.error(e.message),
   });
+  const smsSend = trpc.sms.send.useMutation({
+    onSuccess: () => toast.success("Text sent"),
+    onError: (e) => toast.error(e.message),
+  });
   const saveTotals = () => {
     updateMutation.mutate({
       id,
@@ -483,6 +487,22 @@ export default function QuoteDetail() {
                   <a href={`mailto:${q.customer.email}?subject=Your Quote ${q.quoteNumber}&body=${encodeURIComponent(`Hi ${q.customer.firstName ?? ""},\\n\\nYou can view your quote here: ${shareLink}\\n\\nThanks!`)}`}>
                     <Mail className="h-3.5 w-3.5" /> Email Link
                   </a>
+                </Button>
+              )}
+              {q.customer?.phone && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1"
+                  onClick={() =>
+                    smsSend.mutate({
+                      toPhone: q.customer.phone,
+                      body: `Hi ${q.customer.firstName ?? ""}, view your quote here: ${shareLink}`,
+                    })
+                  }
+                  disabled={smsSend.isPending}
+                >
+                  <Phone className="h-3.5 w-3.5" /> Text Link
                 </Button>
               )}
             </div>
