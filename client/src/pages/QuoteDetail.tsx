@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Send, CheckCircle, XCircle, Briefcase, Plus, Trash2, ChevronDown, ChevronUp, Check, Pencil, ExternalLink, Percent, DollarSign, Eye, EyeOff, Copy, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle, XCircle, Briefcase, Plus, Trash2, ChevronDown, ChevronUp, Check, Pencil, ExternalLink, Percent, DollarSign, Eye, EyeOff, Copy, Mail, Phone, Printer } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -509,6 +509,94 @@ export default function QuoteDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {mode === "preview" && (
+        <Card className="shadow-sm print:border print:shadow-none">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Client Preview</p>
+                <h2 className="text-lg font-semibold">Exterior Experts Estimate</h2>
+              </div>
+              <div className="text-right text-sm text-muted-foreground">
+                <div className="font-medium text-foreground">Quote #{q.quoteNumber}</div>
+                <div>{new Date(q.createdAt).toLocaleDateString()}</div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">To</p>
+                <p className="font-semibold text-foreground">
+                  {q.customer?.firstName} {q.customer?.lastName}
+                </p>
+                {q.customer?.email && <p className="text-muted-foreground">{q.customer.email}</p>}
+                {q.customer?.phone && <p className="text-muted-foreground">{q.customer.phone}</p>}
+              </div>
+              <div className="md:text-right">
+                <p className="text-xs text-muted-foreground uppercase">Project</p>
+                <p className="font-semibold text-foreground">
+                  {q.property?.address ?? "Property"}{q.property?.city ? `, ${q.property.city}` : ""}
+                </p>
+                {q.preferredSlotLabel && (
+                  <p className="text-xs text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded-full mt-1">
+                    {q.preferredSlotLabel}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="border rounded-lg divide-y">
+              {lineItems.map((li: any) => (
+                <div key={li.id} className="flex justify-between p-3">
+                  <div>
+                    <p className="font-medium">{li.description}</p>
+                    {li.details && <p className="text-xs text-muted-foreground">{li.details}</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">${parseFloat(String(li.total)).toFixed(2)}</p>
+                    <p className="text-[11px] text-muted-foreground">{li.quantity} × ${parseFloat(String(li.unitPrice)).toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="p-3 flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">${totals.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="p-3 flex justify-between text-sm">
+                <span className="text-muted-foreground">Tax ({q.taxRate ?? 0}%)</span>
+                <span className="font-medium">${totals.taxAmount.toFixed(2)}</span>
+              </div>
+              <div className="p-3 flex justify-between text-sm">
+                <span className="text-muted-foreground">Deposit</span>
+                <span className="font-medium">-${totals.deposit.toFixed(2)}</span>
+              </div>
+              <div className="p-3 flex justify-between text-base font-bold">
+                <span>Total</span>
+                <span>${totals.total.toFixed(2)}</span>
+              </div>
+              <div className="p-3 flex justify-between text-sm text-muted-foreground">
+                <span>Balance after deposit</span>
+                <span className="font-semibold text-foreground">${totals.balance.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+              <div className="text-xs text-muted-foreground">
+                <p className="font-semibold text-foreground">Exterior Experts</p>
+                <p>177 Webb Ave, Cookeville, TN</p>
+                <p>(931) 284-2291</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}>
+                  <Printer className="h-4 w-4" /> Print / PDF
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
