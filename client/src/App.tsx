@@ -14,6 +14,7 @@ import ServiceAreas from "./pages/ServiceAreas";
 import LocationPage from "./pages/LocationPage";
 import CookevillePage from "./pages/CookevillePage";
 import PublicQuoteTool from "./pages/PublicQuoteTool";
+import { StickyCta } from "./components/StickyCta";
 
 // CRM pages
 import Dashboard from "./pages/Dashboard";
@@ -48,6 +49,7 @@ import StandaloneQuoteLink from "./pages/StandaloneQuoteLink";
 import FieldTimer from "./pages/FieldTimer";
 import AiReceptionist from "./pages/AiReceptionist";
 import Messages from "./pages/Messages";
+import Portal from "./pages/Portal";
 
 function Router() {
   return (
@@ -70,6 +72,7 @@ function Router() {
       <Route path="/field" component={FieldTimer} />
       <Route path="/field/:visitId" component={FieldTimer} />
       <Route path="/client" component={ClientHub} />
+      <Route path="/portal" component={Portal} />
       <Route path="/login" component={LoginPage} />
 
       {/* ── CRM admin routes (all under /admin) ── */}
@@ -114,6 +117,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <StickyCta />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

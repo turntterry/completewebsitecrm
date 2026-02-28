@@ -5,11 +5,13 @@ import { Link } from "wouter";
 import { BUSINESS, SERVICES, LOCATIONS, SEED_GALLERY } from "@shared/data";
 import { LocalBusinessSchema, WebSiteSchema } from "@/components/SchemaMarkup";
 import { useCanonical } from "@/hooks/useCanonical";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import {
   Phone, Star, Shield, Award, Clock, CheckCircle, ArrowRight,
   Home as HomeIcon, Droplets, SquareStack, Filter, LayoutGrid, Triangle, Fence, MapPin,
   Users, ThumbsUp, Sparkles,
 } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Home: HomeIcon, Droplets, SquareStack, Filter, LayoutGrid, Triangle, Fence,
@@ -17,6 +19,12 @@ const ICON_MAP: Record<string, React.ElementType> = {
 
 export default function Home() {
   useCanonical("/");
+  usePageMeta({
+    title: "Exterior Experts | Power Washing & Window Cleaning in Cookeville, TN",
+    description:
+      "Premium pressure washing, house washing, window cleaning, roof and gutter cleaning across Cookeville & Upper Cumberland. Licensed, insured, satisfaction guaranteed.",
+    image: HERO_BG,
+  });
   return (
     <SiteLayout>
       <LocalBusinessSchema />
@@ -37,13 +45,33 @@ export default function Home() {
 
 const HERO_BG = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663366996886/QPbkPWKJvkoDTGcA.jpg";
 
+function HeroImage() {
+  return (
+    <picture>
+      <source
+        srcSet="https://files.manuscdn.com/user_upload_by_module/session_file/310519663366996886/QPbkPWKJvkoDTGcA.avif"
+        type="image/avif"
+      />
+      <source
+        srcSet="https://files.manuscdn.com/user_upload_by_module/session_file/310519663366996886/QPbkPWKJvkoDTGcA.webp"
+        type="image/webp"
+      />
+      <img
+        src={HERO_BG}
+        alt="Exterior Experts crew washing a home"
+        className="absolute inset-0 w-full h-full object-cover"
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
+      />
+    </picture>
+  );
+}
+
 function HeroSection() {
   return (
     <section className="relative bg-navy overflow-hidden min-h-[600px] md:min-h-[700px] flex items-center">
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url("${HERO_BG}")` }}
-      />
+      <HeroImage />
       <div className="absolute inset-0 bg-gradient-to-r from-navy-dark/90 via-navy/75 to-navy/40" />
       <div className="absolute inset-0 bg-gradient-to-t from-navy-dark/40 via-transparent to-transparent" />
       <div className="container relative py-20 md:py-28 lg:py-36">
@@ -57,13 +85,22 @@ function HeroSection() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <Link href="/instant-quote">
-              <Button size="lg" className="bg-sky hover:bg-sky-light text-white font-bold text-lg px-8 py-6 shadow-lg">
+              <Button
+                size="lg"
+                className="bg-sky hover:bg-sky-light text-white font-bold text-lg px-8 py-6 shadow-lg"
+                onClick={() => trackEvent("cta_click", { location: "home_hero", action: "instant_quote" })}
+              >
                 Get My Free Quote
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
             <a href={`tel:${BUSINESS.phoneRaw}`}>
-              <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 font-bold text-lg px-8 py-6">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10 font-bold text-lg px-8 py-6"
+                onClick={() => trackEvent("cta_click", { location: "home_hero", action: "call" })}
+              >
                 <Phone className="w-5 h-5 mr-2" />
                 Call Now
               </Button>
@@ -206,7 +243,11 @@ function GalleryPreview() {
         </div>
         <div className="text-center mt-8">
           <Link href="/gallery">
-            <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white font-semibold">
+            <Button
+              variant="outline"
+              className="border-primary text-primary hover:bg-primary hover:text-white font-semibold"
+              onClick={() => trackEvent("cta_click", { location: "gallery_preview", action: "view_gallery" })}
+            >
               View Full Gallery
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
@@ -326,7 +367,11 @@ function ReviewsSection() {
         </div>
         <div className="text-center mt-8">
           <a href={BUSINESS.googleMapsUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white font-semibold">
+            <Button
+              variant="outline"
+              className="border-primary text-primary hover:bg-primary hover:text-white font-semibold"
+              onClick={() => trackEvent("cta_click", { location: "reviews_section", action: "view_google_reviews" })}
+            >
               See All Reviews on Google
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
@@ -389,13 +434,22 @@ function CTASection() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/instant-quote">
-            <Button size="lg" className="bg-sky hover:bg-sky-light text-white font-bold text-lg px-8 py-6">
+            <Button
+              size="lg"
+              className="bg-sky hover:bg-sky-light text-white font-bold text-lg px-8 py-6"
+              onClick={() => trackEvent("cta_click", { location: "bottom_cta", action: "instant_quote" })}
+            >
               Get My Free Quote
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </Link>
           <a href={`tel:${BUSINESS.phoneRaw}`}>
-            <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 font-bold text-lg px-8 py-6">
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-white/30 text-white hover:bg-white/10 font-bold text-lg px-8 py-6"
+              onClick={() => trackEvent("cta_click", { location: "bottom_cta", action: "call" })}
+            >
               <Phone className="w-5 h-5 mr-2" />
               Call {BUSINESS.phone}
             </Button>

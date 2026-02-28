@@ -5,6 +5,7 @@ import { getDb, getOrCreateCompany } from "../db";
 import {
   clientHubTokens,
   customers,
+  instantQuotes,
   properties,
   quotes,
   invoices,
@@ -296,7 +297,27 @@ export const clientHubRouter = router({
         ? (await db.select().from(properties).where(eq(properties.id, quote.propertyId)))[0] ?? null
         : null;
 
-      return { quote, lineItems, optionSets, optionItems, customer: customer ?? null, property };
+      const iqRow = await db
+        .select()
+        .from(instantQuotes)
+        .where(eq(instantQuotes.convertedToQuoteId, input.quoteId))
+        .limit(1)
+        .then(rows => rows[0]);
+
+      return {
+        quote,
+        lineItems,
+        optionSets,
+        optionItems,
+        customer: customer ?? null,
+        property,
+        preferredSlot: iqRow?.preferredSlot ?? null,
+        preferredSlotLabel: iqRow?.preferredSlotLabel ?? null,
+        propertyIntel: iqRow?.propertyIntel ?? {
+          squareFootage: iqRow?.squareFootage,
+          stories: iqRow?.stories,
+        },
+      };
     }),
 
   /**

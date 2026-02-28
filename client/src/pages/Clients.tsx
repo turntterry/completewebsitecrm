@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Phone, Mail, MapPin, ChevronRight } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, ChevronRight, Filter } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -37,19 +37,26 @@ export default function Clients() {
   });
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
+    <div className="space-y-5">
+      <div className="bg-white/90 backdrop-blur border rounded-2xl p-4 lg:p-6 shadow-sm flex flex-wrap items-center gap-4 justify-between">
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Customers</p>
           <h1 className="text-2xl font-bold text-foreground">Clients</h1>
-          <p className="text-sm text-muted-foreground">{(clients as any[]).length} total clients</p>
+          <p className="text-sm text-muted-foreground">{(clients as any[]).length} total</p>
         </div>
-        <Button onClick={() => { reset(); setShowCreate(true); }}>
-          <Plus className="h-4 w-4 mr-1.5" /> New Client
-        </Button>
-      </div>
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search clients..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search clients..." className="pl-9 w-64" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <Button variant="outline" className="gap-2">
+            <Filter className="h-4 w-4" />
+            Filters
+          </Button>
+          <Button onClick={() => { reset(); setShowCreate(true); }}>
+            <Plus className="h-4 w-4 mr-1.5" /> New Client
+          </Button>
+        </div>
       </div>
       {isLoading ? (
         <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}</div>
@@ -59,27 +66,29 @@ export default function Clients() {
           {!search && <Button className="mt-4" onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1.5" /> Add Client</Button>}
         </CardContent></Card>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {(clients as any[]).map((c) => (
             <Link key={c.id} href={`/admin/clients/${c.id}`}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card className="hover:shadow-lg transition-all cursor-pointer border-border/70 group">
                 <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-start gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <span className="text-sm font-semibold text-primary">{c.firstName?.[0]}{c.lastName?.[0]}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold">{c.firstName} {c.lastName}</p>
+                        <p className="font-semibold leading-tight truncate">{c.firstName} {c.lastName}</p>
                         {c.leadSource && <Badge variant="secondary" className="text-xs">{c.leadSource}</Badge>}
                       </div>
-                      <div className="flex items-center gap-4 mt-1 flex-wrap">
-                        {c.email && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3 w-3" />{c.email}</span>}
-                        {c.phone && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="h-3 w-3" />{c.phone}</span>}
-                        {c.billingCity && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{c.billingCity}, {c.billingState}</span>}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                        {c.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{c.email}</span>}
+                        {c.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{c.phone}</span>}
+                        {c.billingCity && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{c.billingCity}, {c.billingState}</span>}
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex flex-col items-end gap-2">
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-primary" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

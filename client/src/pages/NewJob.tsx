@@ -23,6 +23,7 @@ export default function NewJob() {
 
   const params = new URLSearchParams(window.location.search);
   const prefilledCustomerId = params.get("customerId") ? parseInt(params.get("customerId")!) : undefined;
+  const preferredSlotLabel = params.get("preferredSlotLabel") || "";
 
   const [customerId, setCustomerId] = useState<number | undefined>(prefilledCustomerId);
   const [propertyId, setPropertyId] = useState<number | undefined>();
@@ -49,6 +50,26 @@ export default function NewJob() {
       setPropertyId(undefined);
     }
   }, [customerId, properties.length]);
+
+  // Prefill from preferred slot if provided
+  useEffect(() => {
+    if (preferredSlotLabel && !instructions) {
+      setInstructions(`Customer preferred slot: ${preferredSlotLabel}`);
+    }
+    if (preferredSlotLabel && !scheduledAt) {
+      const [datePart, windowPart] = preferredSlotLabel.split(" · ");
+      if (datePart && windowPart && windowPart.includes("-")) {
+        const [start, end] = windowPart.split("-");
+        const parsedDate = new Date(datePart);
+        if (!isNaN(parsedDate.getTime())) {
+          const isoDate = parsedDate.toISOString().split("T")[0];
+          setScheduledAt(`${isoDate}T${start}`);
+          setScheduledEndAt(`${isoDate}T${end}`);
+          setScheduleNow(true);
+        }
+      }
+    }
+  }, [preferredSlotLabel, instructions, scheduledAt]);
 
   const createMutation = trpc.jobs.create.useMutation({
     onSuccess: (id) => {

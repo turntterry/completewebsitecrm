@@ -21,12 +21,15 @@ import { marketingRouter } from "./routers/marketing";
 import { smsRouter } from "./routers/sms";
 import { aiReceptionistRouter } from "./routers/aiReceptionist";
 import { publicSiteRouter } from "./routers/publicSite";
+import { quoteAnalyticsRouter } from "./routers/quoteAnalytics";
+import { portalRouter } from "./routers/portal";
 
 export const appRouter = router({
   publicSite: publicSiteRouter,
+  quoteAnalytics: quoteAnalyticsRouter,
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -51,6 +54,7 @@ export const appRouter = router({
   marketing: marketingRouter,
   sms: smsRouter,
   aiReceptionist: aiReceptionistRouter,
+  portal: portalRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -7,9 +7,15 @@ import { trpc } from "@/lib/trpc";
 import { ArrowRight, X } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { trackEvent } from "@/lib/analytics";
 
 export default function Gallery() {
   useCanonical("/gallery");
+  usePageMeta({
+    title: "Exterior Cleaning Gallery | Before & After | Exterior Experts",
+    description: "Browse real pressure washing, house washing, roof, gutter, and window cleaning projects across Cookeville & Upper Cumberland.",
+  });
   const { data: dbImages } = trpc.publicSite.gallery.list.useQuery();
   const [filter, setFilter] = useState("all");
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -55,7 +61,10 @@ export default function Gallery() {
             <Button
               variant={filter === "all" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFilter("all")}
+              onClick={() => {
+                setFilter("all");
+                trackEvent("gallery_filter", { filter: "all" });
+              }}
               className={filter === "all" ? "bg-primary text-white" : ""}
             >
               All
@@ -65,7 +74,10 @@ export default function Gallery() {
                 key={s.id}
                 variant={filter === s.id ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter(s.id)}
+                onClick={() => {
+                  setFilter(s.id);
+                  trackEvent("gallery_filter", { filter: s.id });
+                }}
                 className={filter === s.id ? "bg-primary text-white" : ""}
               >
                 {s.shortName}
@@ -79,7 +91,10 @@ export default function Gallery() {
               <div
                 key={i}
                 className="relative group overflow-hidden rounded-xl aspect-square cursor-pointer"
-                onClick={() => setLightbox(img.url)}
+                onClick={() => {
+                  setLightbox(img.url);
+                  trackEvent("gallery_open", { service: img.service || "general" });
+                }}
               >
                 <img
                   src={img.url}
@@ -121,7 +136,11 @@ export default function Gallery() {
           </h2>
           <p className="text-white/80 mb-8">Get an instant quote and see how affordable professional cleaning can be.</p>
           <Link href="/instant-quote">
-            <Button size="lg" className="bg-sky hover:bg-sky-light text-white font-bold">
+            <Button
+              size="lg"
+              className="bg-sky hover:bg-sky-light text-white font-bold"
+              onClick={() => trackEvent("cta_click", { location: "gallery_bottom", action: "instant_quote" })}
+            >
               Get Instant Quote <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </Link>

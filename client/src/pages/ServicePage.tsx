@@ -5,8 +5,9 @@ import { Link } from "wouter";
 import { BUSINESS, SERVICES, LOCATIONS, SEED_GALLERY } from "@shared/data";
 import { ServiceSchema } from "@/components/SchemaMarkup";
 import { Phone, ArrowRight, CheckCircle, Star, Shield, Clock } from "lucide-react";
-import { useEffect } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { trackEvent } from "@/lib/analytics";
 
 interface ServicePageProps {
   serviceId: string;
@@ -176,17 +177,11 @@ export default function ServicePage({ serviceId, locationId }: ServicePageProps)
   const locationName = `${location.name}, ${location.state}`;
   const pageTitle = `${service.name} in ${locationName}`;
 
-  useEffect(() => {
-    document.title = `${service.name} ${location.name}, TN | Exterior Experts`;
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) {
-      metaDesc.setAttribute("content", `Professional ${service.name.toLowerCase()} in ${locationName}. Licensed, insured, satisfaction guaranteed. Free quotes.`);
-    }
-    const metaKeywords = document.querySelector('meta[name="keywords"]');
-    if (metaKeywords) {
-      metaKeywords.setAttribute("content", `${service.name.toLowerCase()} ${location.name} TN, ${service.shortName.toLowerCase()} ${location.name}, exterior cleaning ${location.name} TN`);
-    }
-  }, [service, location, locationName]);
+  usePageMeta({
+    title: `${service.name} in ${locationName} | Exterior Experts`,
+    description: service.metaDescription,
+    image: relatedImages[0]?.url,
+  });
 
   return (
     <SiteLayout>
@@ -202,13 +197,22 @@ export default function ServicePage({ serviceId, locationId }: ServicePageProps)
             </h1>
             <p className="text-lg text-white/80 mb-6 leading-relaxed">{service.description}</p>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Link href="/instant-quote">
-                <Button size="lg" className="bg-sky hover:bg-sky-light text-white font-bold">
+            <Link href="/instant-quote">
+                <Button
+                  size="lg"
+                  className="bg-sky hover:bg-sky-light text-white font-bold"
+                  onClick={() => trackEvent("cta_click", { location: "service_hero", service: service.id, action: "instant_quote" })}
+                >
                   Get Instant Quote <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
               <a href={`tel:${BUSINESS.phoneRaw}`}>
-                <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 font-bold">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-white/30 text-white hover:bg-white/10 font-bold"
+                  onClick={() => trackEvent("cta_click", { location: "service_hero", service: service.id, action: "call" })}
+                >
                   <Phone className="w-4 h-4 mr-2" /> {BUSINESS.phone}
                 </Button>
               </a>

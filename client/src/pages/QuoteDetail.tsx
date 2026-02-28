@@ -1,13 +1,13 @@
 import { trpc } from "@/lib/trpc";
 import { useParams, Link, useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Send, CheckCircle, XCircle, Briefcase, Plus, Trash2, ChevronDown, ChevronUp, Check, Pencil, ExternalLink } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle, XCircle, Briefcase, Plus, Trash2, ChevronDown, ChevronUp, Check, Pencil, ExternalLink, Percent, DollarSign, Eye, EyeOff, Copy, Mail, Phone, Printer } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -288,6 +288,8 @@ export default function QuoteDetail() {
   const id = parseInt(params.id ?? "0");
   const [, navigate] = useLocation();
   const [showOptionSetEditor, setShowOptionSetEditor] = useState(false);
+  const [mode, setMode] = useState<"preview" | "view">("preview");
+  const [depositValue, setDepositValue] = useState<string>("0");
   const utils = trpc.useUtils();
   const { data: quote, isLoading } = trpc.quotes.get.useQuery({ id }, { enabled: !!id && id > 0 });
   const { data: optionSets = [] } = trpc.quotes.listOptionSets.useQuery({ quoteId: id }, { enabled: !!id && id > 0 });
@@ -303,12 +305,43 @@ export default function QuoteDetail() {
     onSuccess: (data) => toast.success(`Portal link sent to ${data.email}`),
     onError: (e) => toast.error(e.message),
   });
+  const smsSend = trpc.sms.send.useMutation({
+    onSuccess: () => toast.success("Text sent"),
+    onError: (e) => toast.error(e.message),
+  });
+  const saveTotals = () => {
+    updateMutation.mutate({
+      id,
+      depositAmount: depositValue || "0",
+      taxRate: q.taxRate ?? "0",
+    });
+  };
+
+  const shareLink = `${window.location.origin}/quote/${(quote as any).publicToken}`;
+
+
+
+  useEffect(() => {
+    if (quote) {
+      setDepositValue(String((quote as any).depositAmount ?? "0"));
+    }
+  }, [quote]);
 
   if (isLoading) return <div className="p-6"><div className="h-8 w-48 bg-muted animate-pulse rounded" /></div>;
   if (!quote) return <div className="p-6"><p className="text-muted-foreground">Quote not found.</p></div>;
 
   const q = quote as any;
   const lineItems = q.lineItems as any[] ?? [];
+  const propertyIntel = (q as any).propertyIntel ?? {};
+
+  const totals = useMemo(() => {
+    const subtotal = parseFloat(String(q.subtotal ?? 0)) || 0;
+    const taxAmount = parseFloat(String(q.taxAmount ?? 0)) || 0;
+    const total = parseFloat(String(q.total ?? subtotal + taxAmount)) || 0;
+    const deposit = parseFloat(depositValue) || 0;
+    const balance = Math.max(0, total - deposit);
+    return { subtotal, taxAmount, total, deposit, balance };
+  }, [q.subtotal, q.taxAmount, q.total, depositValue]);
 
   return (
     <div className="p-6 space-y-6">
@@ -326,6 +359,259 @@ export default function QuoteDetail() {
         <Link href="/admin/quotes"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1.5" />Quotes</Button></Link>
       </div>
 
+      {/* Top bar actions & summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Quote #{q.quoteNumber}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge className={`${STATUS_COLORS[q.status] ?? ""}`}>{q.status?.replace(/_/g, " ")}</Badge>
+                <span className="text-sm text-muted-foreground">
+                  {q.customer?.firstName} {q.customer?.lastName}
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap items-center">
+              {q.preferredSlotLabel && (
+                <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
+                  Preferred Slot: {q.preferredSlotLabel}
+                </Badge>
+              )}
+              <div className="flex rounded-full border bg-muted/50 p-1">
+                <Button size="sm" variant={mode === "preview" ? "default" : "ghost"} className="gap-1" onClick={() => setMode("preview")}>
+                  <Eye className="h-4 w-4" /> Preview
+                </Button>
+                <Button size="sm" variant={mode === "view" ? "default" : "ghost"} className="gap-1" onClick={() => setMode("view")}>
+                  <EyeOff className="h-4 w-4" /> Details
+                </Button>
+              </div>
+              {q.status === "draft" && (
+                <Button size="sm" onClick={() => updateMutation.mutate({ id, status: "sent" })} disabled={updateMutation.isPending}>
+                  <Send className="h-4 w-4 mr-1.5" /> Send Quote
+                </Button>
+              )}
+              {q.status === "sent" && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => updateMutation.mutate({ id, status: "changes_requested" })} disabled={updateMutation.isPending}>
+                    <XCircle className="h-4 w-4 mr-1.5" /> Changes Requested
+                  </Button>
+                  <Button size="sm" onClick={() => acceptMutation.mutate({ id })} disabled={acceptMutation.isPending}>
+                    <CheckCircle className="h-4 w-4 mr-1.5" /> Mark Accepted
+                  </Button>
+                </>
+              )}
+              {q.status === "changes_requested" && (
+                <Button size="sm" variant="outline" onClick={() => updateMutation.mutate({ id, status: "sent" })} disabled={updateMutation.isPending}>
+                  <Send className="h-4 w-4 mr-1.5" /> Resend
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => navigate(`/quote/${q.publicToken}`)}>
+                <ExternalLink className="h-4 w-4 mr-1.5" /> Client View
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  sendPortalLink.mutate({
+                    quoteId: id,
+                    customerId: q.customerId,
+                    origin: "quote_detail",
+                  })
+                }
+                disabled={sendPortalLink.isPending}
+              >
+                {sendPortalLink.isPending ? "Sending..." : "Send Portal Link"}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary / balances */}
+      <Card className="border-primary/20 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Totals</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="font-medium">${totals.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tax ({q.taxRate ?? 0}%)</span>
+              <span className="font-medium">${totals.taxAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between pt-1 border-t border-dashed">
+              <span className="text-muted-foreground">Deposit</span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">$</span>
+                <Input
+                  className="h-8 w-28 text-sm"
+                  value={depositValue}
+                  onChange={(e) => setDepositValue(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-between text-base font-bold border-t pt-2">
+              <span>Total</span>
+              <span>${totals.total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Balance after deposit</span>
+              <span className="font-semibold text-foreground">${totals.balance.toFixed(2)}</span>
+            </div>
+            <div className="pt-2 flex justify-end">
+              <Button size="sm" onClick={saveTotals} disabled={updateMutation.isPending}>
+                Save totals
+              </Button>
+            </div>
+            <div className="pt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => {
+                  navigator.clipboard.writeText(shareLink);
+                  toast.success("Client link copied");
+                }}
+              >
+                <Copy className="h-3.5 w-3.5" /> Copy Link
+              </Button>
+              {q.customer?.email && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1"
+                  asChild
+                >
+                  <a href={`mailto:${q.customer.email}?subject=Your Quote ${q.quoteNumber}&body=${encodeURIComponent(`Hi ${q.customer.firstName ?? ""},\\n\\nYou can view your quote here: ${shareLink}\\n\\nThanks!`)}`}>
+                    <Mail className="h-3.5 w-3.5" /> Email Link
+                  </a>
+                </Button>
+              )}
+              {q.customer?.phone && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1"
+                  onClick={() =>
+                    smsSend.mutate({
+                      toPhone: q.customer.phone,
+                      body: `Hi ${q.customer.firstName ?? ""}, view your quote here: ${shareLink}`,
+                    })
+                  }
+                  disabled={smsSend.isPending}
+                >
+                  <Phone className="h-3.5 w-3.5" /> Text Link
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {mode === "preview" && (
+        <Card className="shadow-sm print:border print:shadow-none">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {((q as any).logoUrl || (q as any).branding?.logoUrl) ? (
+                  <img
+                    src={(q as any).logoUrl ?? (q as any).branding?.logoUrl}
+                    alt="Company logo"
+                    className="h-10 w-auto rounded"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                    EX
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Client Preview</p>
+                  <h2 className="text-lg font-semibold">Exterior Experts Estimate</h2>
+                </div>
+              </div>
+              <div className="text-right text-sm text-muted-foreground">
+                <div className="font-medium text-foreground">Quote #{q.quoteNumber}</div>
+                <div>{new Date(q.createdAt).toLocaleDateString()}</div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">To</p>
+                <p className="font-semibold text-foreground">
+                  {q.customer?.firstName} {q.customer?.lastName}
+                </p>
+                {q.customer?.email && <p className="text-muted-foreground">{q.customer.email}</p>}
+                {q.customer?.phone && <p className="text-muted-foreground">{q.customer.phone}</p>}
+              </div>
+              <div className="md:text-right">
+                <p className="text-xs text-muted-foreground uppercase">Project</p>
+                <p className="font-semibold text-foreground">
+                  {q.property?.address ?? "Property"}{q.property?.city ? `, ${q.property.city}` : ""}
+                </p>
+                {q.preferredSlotLabel && (
+                  <p className="text-xs text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded-full mt-1">
+                    {q.preferredSlotLabel}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="border rounded-lg divide-y">
+              {lineItems.map((li: any) => (
+                <div key={li.id} className="flex justify-between p-3">
+                  <div>
+                    <p className="font-medium">{li.description}</p>
+                    {li.details && <p className="text-xs text-muted-foreground">{li.details}</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">${parseFloat(String(li.total)).toFixed(2)}</p>
+                    <p className="text-[11px] text-muted-foreground">{li.quantity} × ${parseFloat(String(li.unitPrice)).toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="p-3 flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">${totals.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="p-3 flex justify-between text-sm">
+                <span className="text-muted-foreground">Tax ({q.taxRate ?? 0}%)</span>
+                <span className="font-medium">${totals.taxAmount.toFixed(2)}</span>
+              </div>
+              <div className="p-3 flex justify-between text-sm">
+                <span className="text-muted-foreground">Deposit</span>
+                <span className="font-medium">-${totals.deposit.toFixed(2)}</span>
+              </div>
+              <div className="p-3 flex justify-between text-base font-bold">
+                <span>Total</span>
+                <span>${totals.total.toFixed(2)}</span>
+              </div>
+              <div className="p-3 flex justify-between text-sm text-muted-foreground">
+                <span>Balance after deposit</span>
+                <span className="font-semibold text-foreground">${totals.balance.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+              <div className="text-xs text-muted-foreground">
+                <p className="font-semibold text-foreground">Exterior Experts</p>
+                <p>177 Webb Ave, Cookeville, TN</p>
+                <p>(931) 284-2291</p>
+                <p>Payment due upon completion unless otherwise noted.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}>
+                  <Printer className="h-4 w-4" /> Print / PDF
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Quote #{q.quoteNumber}</h1>
@@ -336,7 +622,20 @@ export default function QuoteDetail() {
             </span>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {q.preferredSlotLabel && (
+            <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
+              Preferred Slot: {q.preferredSlotLabel}
+            </Badge>
+          )}
+          <div className="flex rounded-full border bg-muted/50 p-1">
+            <Button size="sm" variant={mode === "preview" ? "default" : "ghost"} className="gap-1" onClick={() => setMode("preview")}>
+              <Eye className="h-4 w-4" /> Preview
+            </Button>
+            <Button size="sm" variant={mode === "view" ? "default" : "ghost"} className="gap-1" onClick={() => setMode("view")}>
+              <EyeOff className="h-4 w-4" /> Details
+            </Button>
+          </div>
           {q.status === "draft" && (
             <Button size="sm" onClick={() => updateMutation.mutate({ id, status: "sent" })} disabled={updateMutation.isPending}>
               <Send className="h-4 w-4 mr-1.5" /> Send Quote
@@ -353,7 +652,18 @@ export default function QuoteDetail() {
             </>
           )}
           {q.status === "accepted" && (
-            <Button size="sm" onClick={() => navigate(`/admin/jobs/new?quoteId=${id}&customerId=${q.customerId}`)}>
+            <Button
+              size="sm"
+              onClick={() =>
+                navigate(
+                  `/admin/jobs/new?quoteId=${id}&customerId=${q.customerId}${
+                    q.preferredSlotLabel
+                      ? `&preferredSlotLabel=${encodeURIComponent(q.preferredSlotLabel)}`
+                      : ""
+                  }`
+                )
+              }
+            >
               <Briefcase className="h-4 w-4 mr-1.5" /> Convert to Job
             </Button>
           )}
@@ -392,6 +702,74 @@ export default function QuoteDetail() {
                 <p className="text-muted-foreground">
                   {[q.property.address, q.property.city, q.property.state, q.property.zip].filter(Boolean).join(", ")}
                 </p>
+              </div>
+            )}
+            {(propertyIntel.livingAreaSqft ||
+              propertyIntel.squareFootage ||
+              propertyIntel.stories ||
+              propertyIntel.yearBuilt) && (
+              <div className="pt-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">
+                  Property Intel
+                </p>
+                <div className="text-xs space-y-0.5 text-muted-foreground">
+                  {propertyIntel.livingAreaSqft || propertyIntel.squareFootage ? (
+                    <div className="flex justify-between">
+                      <span>Living area</span>
+                      <span className="font-medium text-foreground">
+                        {Math.round(
+                          propertyIntel.livingAreaSqft ??
+                            propertyIntel.squareFootage
+                        ).toLocaleString()}{" "}
+                        sqft
+                      </span>
+                    </div>
+                  ) : null}
+                  {propertyIntel.stories && (
+                    <div className="flex justify-between">
+                      <span>Stories</span>
+                      <span className="font-medium text-foreground">
+                        {propertyIntel.stories}
+                      </span>
+                    </div>
+                  )}
+                  {propertyIntel.yearBuilt && (
+                    <div className="flex justify-between">
+                      <span>Year built</span>
+                      <span className="font-medium text-foreground">
+                        {propertyIntel.yearBuilt}
+                      </span>
+                    </div>
+                  )}
+                  {(propertyIntel.roofAreaSqft || propertyIntel.drivewaySqft) && (
+                    <div className="flex justify-between">
+                      <span>Roof / Drive</span>
+                      <span className="font-medium text-foreground">
+                        {propertyIntel.roofAreaSqft
+                          ? `${Math.round(
+                              propertyIntel.roofAreaSqft
+                            ).toLocaleString()} roof`
+                          : ""}
+                        {propertyIntel.roofAreaSqft && propertyIntel.drivewaySqft
+                          ? " · "
+                          : ""}
+                        {propertyIntel.drivewaySqft
+                          ? `${Math.round(
+                              propertyIntel.drivewaySqft
+                            ).toLocaleString()} drive`
+                          : ""}
+                      </span>
+                    </div>
+                  )}
+                  {propertyIntel.source && (
+                    <div className="flex justify-between">
+                      <span>Source</span>
+                      <span className="text-foreground">
+                        {propertyIntel.source}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {q.customer?.phone && (

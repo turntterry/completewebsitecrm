@@ -266,7 +266,23 @@ export async function getQuoteWithLineItems(id: number, companyId: number) {
   const property = quote.propertyId
     ? (await db.select().from(properties).where(eq(properties.id, quote.propertyId)))[0] ?? null
     : null;
-  return { ...quote, lineItems, customer: customer ?? null, property };
+  const [iqRow] = await db
+    .select()
+    .from(instantQuotes)
+    .where(eq(instantQuotes.convertedToQuoteId, id));
+
+  return {
+    ...quote,
+    lineItems,
+    customer: customer ?? null,
+    property,
+    preferredSlot: iqRow?.preferredSlot ?? null,
+    preferredSlotLabel: iqRow?.preferredSlotLabel ?? null,
+    propertyIntel: iqRow?.propertyIntel ?? {
+      squareFootage: iqRow?.squareFootage,
+      stories: iqRow?.stories,
+    },
+  };
 }
 
 export async function getNextQuoteNumber(companyId: number) {
@@ -383,11 +399,12 @@ export async function listVisitsWithJob(companyId: number, from?: Date, to?: Dat
       jobTitle: jobs.title,
       customerFirstName: customers.firstName,
       customerLastName: customers.lastName,
-      propertyAddress: customers.address,
+      propertyAddress: properties.address,
     })
     .from(visits)
     .leftJoin(jobs, eq(jobs.id, visits.jobId))
     .leftJoin(customers, eq(customers.id, jobs.customerId))
+    .leftJoin(properties, eq(properties.id, jobs.propertyId))
     .where(and(...conditions))
     .orderBy(visits.scheduledAt);
   return rows.map((r) => ({

@@ -17,6 +17,8 @@ import {
   CheckCircle,
   XCircle,
   Settings,
+  Workflow,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -24,6 +26,7 @@ import { Link } from "wouter";
 export default function BookingControls() {
   const utils = trpc.useUtils();
   const { data: settings, isLoading } = trpc.quoteToolSettings.getSettings.useQuery();
+   const { data: company } = trpc.company.get.useQuery();
 
   const [synced, setSynced] = useState(false);
   const [onlineBooking, setOnlineBooking] = useState(true);
@@ -31,13 +34,40 @@ export default function BookingControls() {
   const [advanceDays, setAdvanceDays] = useState(1);
   const [commercialRouting, setCommercialRouting] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [autoJobApprove, setAutoJobApprove] = useState(true);
+  const [autoJobRequest, setAutoJobRequest] = useState(true);
+  const [visitStart, setVisitStart] = useState(9);
+  const [visitEnd, setVisitEnd] = useState(11);
+  const [useStripe, setUseStripe] = useState(false);
+  const [publishableKey, setPublishableKey] = useState("");
+  const [depositPercent, setDepositPercent] = useState(0);
+  const [webhookEnabled, setWebhookEnabled] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const maxServicesForInstantBooking = settings?.maxServicesForInstantBooking ?? 2;
+  const blockedInstantServices = Array.isArray((settings as any)?.instantBookingBlockedServices)
+    ? ((settings as any).instantBookingBlockedServices as string[])
+    : [];
 
-  if (settings && !synced) {
+  if (settings && company && !synced) {
     setOnlineBooking(settings.onlineBookingEnabled ?? true);
     setRequireAdvance(settings.requireAdvanceBooking ?? false);
     setAdvanceDays(settings.advanceBookingDays ?? 1);
     setCommercialRouting(settings.commercialRoutingEnabled ?? false);
     setIsActive(!!(settings as any).isActive);
+    const portal = (company as any)?.settings?.portal ?? {};
+    setAutoJobApprove(portal.autoCreateJobOnApprove ?? true);
+    setAutoJobRequest(portal.autoCreateJobOnRequest ?? true);
+    setVisitStart(portal.defaultVisitStartHour ?? 9);
+    setVisitEnd(portal.defaultVisitEndHour ?? 11);
+    const payments = (company as any)?.settings?.payments ?? {};
+    setUseStripe(payments.useStripe ?? false);
+    setPublishableKey(payments.publishableKey ?? "");
+    setDepositPercent(payments.depositPercent ?? 0);
+    const webhooks = (company as any)?.settings?.webhooks ?? {};
+    setWebhookEnabled(webhooks.enabled ?? false);
+    setWebhookUrl(webhooks.url ?? "");
+    setWebhookSecret(webhooks.secret ?? "");
     setSynced(true);
   }
 
@@ -54,17 +84,54 @@ export default function BookingControls() {
     onError: (e) => toast.error(e.message),
   });
 
+  const updateCompany = trpc.company.update.useMutation({
+    onSuccess: () => {
+      utils.company.get.invalidate();
+      toast.success("Portal automation settings saved");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   function saveAll(overrides?: Partial<{
     onlineBookingEnabled: boolean;
     requireAdvanceBooking: boolean;
     advanceBookingDays: number;
     commercialRoutingEnabled: boolean;
+    maxServicesForInstantBooking: number;
+    instantBookingBlockedServices: string[];
+    availabilityStartHour: number;
+    availabilityEndHour: number;
+    availabilityDaysAhead: number;
+    availabilityPreferExternal: boolean;
+    slotPaddingMinutes: number;
+    maxSqftAuto: number;
+    maxLinearFtAuto: number;
+    maxStoriesAuto: number;
+    maxWindowsAuto: number;
   }>) {
     updateDeploy.mutate({
       onlineBookingEnabled: overrides?.onlineBookingEnabled ?? onlineBooking,
       requireAdvanceBooking: overrides?.requireAdvanceBooking ?? requireAdvance,
       advanceBookingDays: overrides?.advanceBookingDays ?? advanceDays,
       commercialRoutingEnabled: overrides?.commercialRoutingEnabled ?? commercialRouting,
+      maxServicesForInstantBooking:
+        overrides?.maxServicesForInstantBooking ?? maxServicesForInstantBooking,
+      instantBookingBlockedServices:
+        overrides?.instantBookingBlockedServices ?? blockedInstantServices,
+      availabilityStartHour:
+        overrides?.availabilityStartHour ?? (settings as any)?.availabilityStartHour ?? 9,
+      availabilityEndHour:
+        overrides?.availabilityEndHour ?? (settings as any)?.availabilityEndHour ?? 17,
+      availabilityDaysAhead:
+        overrides?.availabilityDaysAhead ?? (settings as any)?.availabilityDaysAhead ?? 9,
+      availabilityPreferExternal:
+        overrides?.availabilityPreferExternal ?? (settings as any)?.availabilityPreferExternal ?? true,
+      slotPaddingMinutes:
+        overrides?.slotPaddingMinutes ?? (settings as any)?.slotPaddingMinutes ?? 0,
+      maxSqftAuto: overrides?.maxSqftAuto ?? 5000,
+      maxLinearFtAuto: overrides?.maxLinearFtAuto ?? 800,
+      maxStoriesAuto: overrides?.maxStoriesAuto ?? 3,
+      maxWindowsAuto: overrides?.maxWindowsAuto ?? 120,
     });
   }
 
@@ -234,6 +301,197 @@ export default function BookingControls() {
               <span className="text-sm text-muted-foreground">business days</span>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Portal automation */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Workflow className="h-4 w-4" /> Portal Automation
+          </CardTitle>
+          <CardDescription>
+            Control what happens when clients approve quotes or request work from the portal
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Auto-create job on approval</p>
+              <p className="text-xs text-muted-foreground">
+                When a client approves a quote, create a draft job and schedule the preferred slot if provided.
+              </p>
+            </div>
+            <Switch checked={autoJobApprove} onCheckedChange={setAutoJobApprove} />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Auto-create job on request</p>
+              <p className="text-xs text-muted-foreground">
+                When a client submits a request/rebook form, create a draft job and schedule a placeholder visit.
+              </p>
+            </div>
+            <Switch checked={autoJobRequest} onCheckedChange={setAutoJobRequest} />
+          </div>
+          <Separator />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Default visit start hour (0-23)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={23}
+                value={visitStart}
+                onChange={(e) => setVisitStart(Number(e.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Default visit end hour (0-23)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={23}
+                value={visitEnd}
+                onChange={(e) => setVisitEnd(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              disabled={updateCompany.isPending}
+              onClick={() =>
+                updateCompany.mutate({
+                  settings: {
+                    portal: {
+                      autoCreateJobOnApprove: autoJobApprove,
+                      autoCreateJobOnRequest: autoJobRequest,
+                      defaultVisitStartHour: visitStart,
+                      defaultVisitEndHour: visitEnd,
+                    },
+                  },
+                })
+              }
+            >
+              Save portal automation
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payments */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="h-4 w-4" /> Payments
+          </CardTitle>
+          <CardDescription>
+            Stripe secret key stays in env; set publishable key and defaults here.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Use Stripe for portal payments</p>
+              <p className="text-xs text-muted-foreground">
+                Requires STRIPE_SECRET_KEY on the server. Client uses the publishable key below.
+              </p>
+            </div>
+            <Switch checked={useStripe} onCheckedChange={setUseStripe} />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Stripe publishable key</Label>
+            <Input
+              value={publishableKey}
+              onChange={(e) => setPublishableKey(e.target.value)}
+              placeholder="pk_live_..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Default deposit (% of total)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              value={depositPercent}
+              onChange={(e) => setDepositPercent(Number(e.target.value))}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              disabled={updateCompany.isPending}
+              onClick={() =>
+                updateCompany.mutate({
+                  settings: {
+                    payments: {
+                      useStripe,
+                      publishableKey,
+                      depositPercent,
+                    },
+                  },
+                })
+              }
+            >
+              Save payment settings
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Webhooks */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Settings className="h-4 w-4" /> Webhooks
+          </CardTitle>
+          <CardDescription>
+            Send signed event payloads (quote.accepted, payment, lead.created) to your endpoint.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Enable outbound webhooks</p>
+              <p className="text-xs text-muted-foreground">
+                Payloads are HMAC-signed when a secret is set.
+              </p>
+            </div>
+            <Switch checked={webhookEnabled} onCheckedChange={setWebhookEnabled} />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Webhook URL</Label>
+            <Input
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://hooks.zapier.com/..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Webhook secret (HMAC SHA256)</Label>
+            <Input
+              value={webhookSecret}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+              placeholder="leave blank for unsigned"
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              disabled={updateCompany.isPending}
+              onClick={() =>
+                updateCompany.mutate({
+                  // casting to allow webhooks blob until settings type is extended
+                  settings: {
+                    webhooks: {
+                      enabled: webhookEnabled,
+                      url: webhookUrl,
+                      secret: webhookSecret || undefined,
+                    },
+                  } as any,
+                })
+              }
+            >
+              Save webhook settings
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

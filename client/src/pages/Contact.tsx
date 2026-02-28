@@ -11,10 +11,16 @@ import { trpc } from "@/lib/trpc";
 import { Phone, Mail, MapPin, Clock, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { useCanonical } from "@/hooks/useCanonical";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { trackEvent } from "@/lib/analytics";
 import { toast } from "sonner";
 
 export default function Contact() {
   useCanonical("/contact");
+  usePageMeta({
+    title: "Contact Exterior Experts | Free Pressure Washing & Window Cleaning Quote",
+    description: "Call or message Exterior Experts for pressure washing, house washing, window and roof cleaning across Cookeville & Upper Cumberland. Licensed, insured, guaranteed.",
+  });
   const [form, setForm] = useState({ name: "", email: "", phone: "", service: "", message: "", address: "" });
   const [submitted, setSubmitted] = useState(false);
   const submitMutation = trpc.publicSite.contact.submit.useMutation({
@@ -33,6 +39,7 @@ export default function Contact() {
       toast.error("Please fill in your name and email.");
       return;
     }
+    trackEvent("form_submit", { form: "contact", service: form.service || "unspecified" });
     submitMutation.mutate(form);
   };
 
@@ -67,7 +74,16 @@ export default function Contact() {
                   <CardContent className="p-8 text-center">
                     <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-4" />
                     <h3 className="font-heading font-bold text-xl mb-2">Message Sent!</h3>
-                    <p className="text-muted-foreground">We'll get back to you as soon as possible. For immediate assistance, call us at {BUSINESS.phone}.</p>
+                    <p className="text-muted-foreground">
+                      We'll get back to you as soon as possible. For immediate assistance, call us at{" "}
+                      <a
+                        href={`tel:${BUSINESS.phoneRaw}`}
+                        className="text-primary hover:underline"
+                        onClick={() => trackEvent("cta_click", { location: "contact_success", action: "call" })}
+                      >
+                        {BUSINESS.phone}
+                      </a>.
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
@@ -125,7 +141,13 @@ export default function Contact() {
                     <Phone className="w-6 h-6 text-primary shrink-0 mt-1" />
                     <div>
                       <h3 className="font-bold mb-1">Phone</h3>
-                      <a href={`tel:${BUSINESS.phoneRaw}`} className="text-primary hover:underline">{BUSINESS.phone}</a>
+                      <a
+                        href={`tel:${BUSINESS.phoneRaw}`}
+                        className="text-primary hover:underline"
+                        onClick={() => trackEvent("cta_click", { location: "contact_info", action: "call" })}
+                      >
+                        {BUSINESS.phone}
+                      </a>
                     </div>
                   </CardContent>
                 </Card>
@@ -134,7 +156,13 @@ export default function Contact() {
                     <Mail className="w-6 h-6 text-primary shrink-0 mt-1" />
                     <div>
                       <h3 className="font-bold mb-1">Email</h3>
-                      <a href={`mailto:${BUSINESS.email}`} className="text-primary hover:underline">{BUSINESS.email}</a>
+                      <a
+                        href={`mailto:${BUSINESS.email}`}
+                        className="text-primary hover:underline"
+                        onClick={() => trackEvent("cta_click", { location: "contact_info", action: "email" })}
+                      >
+                        {BUSINESS.email}
+                      </a>
                     </div>
                   </CardContent>
                 </Card>
@@ -165,7 +193,10 @@ export default function Contact() {
                   Skip the wait and get pricing instantly with our online quote tool.
                 </p>
                 <a href="/instant-quote">
-                  <Button className="bg-primary hover:bg-navy-light text-white font-semibold w-full">
+                  <Button
+                    className="bg-primary hover:bg-navy-light text-white font-semibold w-full"
+                    onClick={() => trackEvent("cta_click", { location: "contact_instant_quote", action: "instant_quote" })}
+                  >
                     Get Instant Quote
                   </Button>
                 </a>

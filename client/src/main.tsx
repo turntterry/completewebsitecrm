@@ -7,6 +7,7 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
+import { initAnalytics } from "./lib/analytics";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,9 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
+
+// Initialize Google Analytics (if VITE_GA_ID provided)
+initAnalytics();
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>

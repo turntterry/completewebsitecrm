@@ -39,14 +39,14 @@ const conditionSchema = z.object({
 const actionSchema = z.object({
   id: z.string(), // client-side uuid for keying
   type: z.enum(["send_sms", "send_email", "add_note"]),
-  config: z.record(z.any()),
+  config: z.record(z.string(), z.any()),
 });
 
 const ruleInputSchema = z.object({
   name: z.string().min(1).max(120),
   enabled: z.boolean().default(true),
   trigger: triggerEnum,
-  triggerConfig: z.record(z.any()).optional(),
+  triggerConfig: z.record(z.string(), z.any()).optional(),
   conditions: z.array(conditionSchema).default([]),
   actions: z.array(actionSchema).min(1, "At least one action required"),
 });
