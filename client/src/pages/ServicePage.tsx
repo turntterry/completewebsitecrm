@@ -163,17 +163,35 @@ const SERVICE_CONTENT: Record<string, {
 };
 
 export default function ServicePage({ serviceId, locationId }: ServicePageProps) {
-  const service = SERVICES.find(s => s.id === serviceId)!;
-  const location = (locationId ? LOCATIONS.find(l => l.id === locationId) : LOCATIONS.find(l => l.id === "cookeville"))!;
+  // Accept both slug and id in the URL and fall back safely
+  const service =
+    SERVICES.find(s => s.slug === serviceId) ??
+    SERVICES.find(s => s.id === serviceId);
+
+  // If we can't resolve the service, show a simple not-found message instead of crashing
+  if (!service) {
+    return (
+      <SiteLayout>
+        <section className="py-16 text-center">
+          <h1 className="text-3xl font-heading mb-4">Service not found</h1>
+          <p className="text-muted-foreground">
+            We couldn't find that service. Please pick a service from the menu.
+          </p>
+        </section>
+      </SiteLayout>
+    );
+  }
+
+  const location =
+    (locationId ? LOCATIONS.find(l => l.id === locationId) : LOCATIONS.find(l => l.id === "cookeville")) ??
+    LOCATIONS.find(l => l.id === "cookeville")!;
   
   // Determine the canonical path based on service and location
-  const canonicalPath = locationId && locationId !== "cookeville" && location
-    ? `/services/${service.slug}`
-    : `/services/${service.slug}`;
+  const canonicalPath = `/services/${service.slug}`;
   useCanonical(canonicalPath);
 
-  const content = SERVICE_CONTENT[serviceId] || SERVICE_CONTENT.pressure_washing;
-  const relatedImages = SEED_GALLERY.filter(g => g.service === serviceId).slice(0, 4);
+  const content = SERVICE_CONTENT[service.id] || SERVICE_CONTENT.pressure_washing;
+  const relatedImages = SEED_GALLERY.filter(g => g.service === service.id).slice(0, 4);
   const locationName = `${location.name}, ${location.state}`;
   const pageTitle = `${service.name} in ${locationName}`;
 
