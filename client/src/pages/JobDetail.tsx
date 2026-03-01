@@ -3,9 +3,11 @@ import { useParams, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Calendar, Clock, CheckCircle, PlayCircle } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, CheckCircle, PlayCircle, Camera } from "lucide-react";
 import { toast } from "sonner";
 import JobCostingPanel from "@/components/JobCostingPanel";
+import JobPhotosTab from "@/components/JobPhotosTab";
+import { useState } from "react";
 
 const STATUS_COLORS: Record<string, string> = {
   needs_scheduling: "bg-yellow-100 text-yellow-800",
@@ -19,8 +21,13 @@ const STATUS_COLORS: Record<string, string> = {
 export default function JobDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id ?? "0");
+  const [activeTab, setActiveTab] = useState<"details" | "photos">("details");
   const utils = trpc.useUtils();
   const { data: job, isLoading } = trpc.jobs.get.useQuery({ id }, { enabled: !!id && id > 0 });
+  const { data: jobPhotos = [] } = trpc.attachments.list.useQuery(
+    { attachableType: "job", attachableId: id }, { enabled: !!id && id > 0 }
+  );
+  const photoCount = (jobPhotos as any[]).filter(p => !p.mimeType || p.mimeType.startsWith("image/") || p.mimeType.startsWith("video/")).length;
   const updateMutation = trpc.jobs.update.useMutation({
     onSuccess: () => { utils.jobs.get.invalidate({ id }); toast.success("Job updated"); },
   });
@@ -73,157 +80,188 @@ export default function JobDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Client</CardTitle></CardHeader>
-          <CardContent className="text-sm space-y-1.5">
-            <p className="font-semibold text-foreground">
-              {j.customer?.firstName} {j.customer?.lastName}
-            </p>
-            {j.property && (
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-0.5">Property Address</p>
-                <p className="text-muted-foreground">
-                  {[j.property.address, j.property.city, j.property.state, j.property.zip].filter(Boolean).join(", ")}
+      {/* Tab nav */}
+      <div className="flex items-center gap-1 border-b border-border">
+        <button
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === "details" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setActiveTab("details")}
+        >
+          Details
+        </button>
+        <button
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === "photos" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setActiveTab("photos")}
+        >
+          <Camera className="h-3.5 w-3.5" />
+          Photos
+          {photoCount > 0 && (
+            <span className="ml-1 text-[10px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
+              {photoCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Photos tab */}
+      {activeTab === "photos" && (
+        <JobPhotosTab jobId={id} jobTitle={j.title ?? `Job #${j.jobNumber}`} />
+      )}
+
+      {activeTab === "details" && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Client</CardTitle></CardHeader>
+              <CardContent className="text-sm space-y-1.5">
+                <p className="font-semibold text-foreground">
+                  {j.customer?.firstName} {j.customer?.lastName}
                 </p>
-              </div>
-            )}
-            {j.customer?.phone && (
-              <p className="text-muted-foreground">{j.customer.phone}</p>
-            )}
-            {j.customer?.email && (
-              <a href={`mailto:${j.customer.email}`} className="text-blue-600 hover:underline block">
-                {j.customer.email}
-              </a>
-            )}
-            <Link href={`/admin/clients/${j.customerId}`}>
-              <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1">View Client Profile &rarr;</Button>
-            </Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Details</CardTitle></CardHeader>
-          <CardContent className="text-sm">
-            <table className="w-full">
-              <tbody className="divide-y divide-border">
-                <tr>
-                  <td className="py-1.5 text-muted-foreground">Job #</td>
-                  <td className="py-1.5 text-right font-medium">{j.jobNumber}</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 text-muted-foreground">Created</td>
-                  <td className="py-1.5 text-right">{new Date(j.createdAt).toLocaleDateString()}</td>
-                </tr>
-                {j.visits?.[0]?.scheduledAt && (
-                  <tr>
-                    <td className="py-1.5 text-muted-foreground">Scheduled</td>
-                    <td className="py-1.5 text-right">{new Date(j.visits[0].scheduledAt).toLocaleDateString()}</td>
-                  </tr>
+                {j.property && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-0.5">Property Address</p>
+                    <p className="text-muted-foreground">
+                      {[j.property.address, j.property.city, j.property.state, j.property.zip].filter(Boolean).join(", ")}
+                    </p>
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      </div>
+                {j.customer?.phone && (
+                  <p className="text-muted-foreground">{j.customer.phone}</p>
+                )}
+                {j.customer?.email && (
+                  <a href={`mailto:${j.customer.email}`} className="text-blue-600 hover:underline block">
+                    {j.customer.email}
+                  </a>
+                )}
+                <Link href={`/admin/clients/${j.customerId}`}>
+                  <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1">View Client Profile &rarr;</Button>
+                </Link>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Details</CardTitle></CardHeader>
+              <CardContent className="text-sm">
+                <table className="w-full">
+                  <tbody className="divide-y divide-border">
+                    <tr>
+                      <td className="py-1.5 text-muted-foreground">Job #</td>
+                      <td className="py-1.5 text-right font-medium">{j.jobNumber}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 text-muted-foreground">Created</td>
+                      <td className="py-1.5 text-right">{new Date(j.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                    {j.visits?.[0]?.scheduledAt && (
+                      <tr>
+                        <td className="py-1.5 text-muted-foreground">Scheduled</td>
+                        <td className="py-1.5 text-right">{new Date(j.visits[0].scheduledAt).toLocaleDateString()}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </div>
 
-      {lineItems.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Services</CardTitle></CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2 font-medium text-muted-foreground">Description</th>
-                  <th className="text-right py-2 font-medium text-muted-foreground">Qty</th>
-                  <th className="text-right py-2 font-medium text-muted-foreground">Price</th>
-                  <th className="text-right py-2 font-medium text-muted-foreground">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lineItems.map((li: any) => (
-                  <tr key={li.id} className="border-b border-border last:border-0">
-                    <td className="py-3">{li.description}</td>
-                    <td className="py-3 text-right">{li.quantity}</td>
-                    <td className="py-3 text-right">${parseFloat(String(li.unitPrice)).toFixed(2)}</td>
-                    <td className="py-3 text-right font-medium">${parseFloat(String(li.total)).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-border">
-                  <td colSpan={3} className="pt-2 text-right font-bold">Total</td>
-                  <td className="pt-2 text-right font-bold">${parseFloat(String(j.total ?? 0)).toFixed(2)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </CardContent>
-        </Card>
-      )}
+          {lineItems.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Services</CardTitle></CardHeader>
+              <CardContent>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 font-medium text-muted-foreground">Description</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Qty</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Price</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map((li: any) => (
+                      <tr key={li.id} className="border-b border-border last:border-0">
+                        <td className="py-3">{li.description}</td>
+                        <td className="py-3 text-right">{li.quantity}</td>
+                        <td className="py-3 text-right">${parseFloat(String(li.unitPrice)).toFixed(2)}</td>
+                        <td className="py-3 text-right font-medium">${parseFloat(String(li.total)).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-border">
+                      <td colSpan={3} className="pt-2 text-right font-bold">Total</td>
+                      <td className="pt-2 text-right font-bold">${parseFloat(String(j.total ?? 0)).toFixed(2)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </CardContent>
+            </Card>
+          )}
 
-      {visits.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Visit History</CardTitle>
-              {visits.some((v: any) => v.status === "scheduled" || v.status === "in_progress") && (
-                <a
-                  href={`/field/${visits.find((v: any) => v.status === "scheduled" || v.status === "in_progress")?.id}`}
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  📍 Open Field Timer
-                </a>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {visits.map((v: any) => (
-              <div key={v.id} className="flex items-start gap-3 text-sm border-b border-border last:border-0 py-2">
-                <Clock className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium">
-                    {v.scheduledAt ? new Date(v.scheduledAt).toLocaleDateString() : "Unscheduled"}
-                  </p>
-                  {v.checkInAt && (
-                    <p className="text-xs text-muted-foreground">
-                      In: {new Date(v.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      {v.checkInAddress && <span className="ml-1">· {v.checkInAddress}</span>}
-                    </p>
+          {visits.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Visit History</CardTitle>
+                  {visits.some((v: any) => v.status === "scheduled" || v.status === "in_progress") && (
+                    <a
+                      href={`/field/${visits.find((v: any) => v.status === "scheduled" || v.status === "in_progress")?.id}`}
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      📍 Open Field Timer
+                    </a>
                   )}
-                  {v.checkOutAt && (
-                    <p className="text-xs text-muted-foreground">
-                      Out: {new Date(v.checkOutAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      {v.checkOutAddress && v.checkOutAddress !== v.checkInAddress && (
-                        <span className="ml-1">· {v.checkOutAddress}</span>
-                      )}
-                    </p>
-                  )}
-                  {v.durationMinutes && (
-                    <p className="text-xs text-green-600 font-medium mt-0.5">
-                      ⏱ {Math.floor(v.durationMinutes / 60) > 0 ? `${Math.floor(v.durationMinutes / 60)}h ` : ""}
-                      {v.durationMinutes % 60}m on site
-                    </p>
-                  )}
-                  {v.notes && <p className="text-xs text-muted-foreground mt-0.5 italic">"{v.notes}"</p>}
                 </div>
-                <Badge variant="secondary" className="text-xs shrink-0">{v.status.replace("_", " ")}</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {visits.map((v: any) => (
+                  <div key={v.id} className="flex items-start gap-3 text-sm border-b border-border last:border-0 py-2">
+                    <Clock className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">
+                        {v.scheduledAt ? new Date(v.scheduledAt).toLocaleDateString() : "Unscheduled"}
+                      </p>
+                      {v.checkInAt && (
+                        <p className="text-xs text-muted-foreground">
+                          In: {new Date(v.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {v.checkInAddress && <span className="ml-1">· {v.checkInAddress}</span>}
+                        </p>
+                      )}
+                      {v.checkOutAt && (
+                        <p className="text-xs text-muted-foreground">
+                          Out: {new Date(v.checkOutAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {v.checkOutAddress && v.checkOutAddress !== v.checkInAddress && (
+                            <span className="ml-1">· {v.checkOutAddress}</span>
+                          )}
+                        </p>
+                      )}
+                      {v.durationMinutes && (
+                        <p className="text-xs text-green-600 font-medium mt-0.5">
+                          ⏱ {Math.floor(v.durationMinutes / 60) > 0 ? `${Math.floor(v.durationMinutes / 60)}h ` : ""}
+                          {v.durationMinutes % 60}m on site
+                        </p>
+                      )}
+                      {v.notes && <p className="text-xs text-muted-foreground mt-0.5 italic">"{v.notes}"</p>}
+                    </div>
+                    <Badge variant="secondary" className="text-xs shrink-0">{v.status.replace("_", " ")}</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
-      {j.notes && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Notes</CardTitle></CardHeader>
-          <CardContent><p className="text-sm whitespace-pre-wrap">{j.notes}</p></CardContent>
-        </Card>
-      )}
+          {j.notes && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Notes</CardTitle></CardHeader>
+              <CardContent><p className="text-sm whitespace-pre-wrap">{j.notes}</p></CardContent>
+            </Card>
+          )}
 
-      {/* ── Job Costing (Phase 2B) ── */}
-      <div>
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Cost Tracking & Profitability</h2>
-        <JobCostingPanel jobId={id} />
-      </div>
+          {/* ── Job Costing (Phase 2B) ── */}
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Cost Tracking & Profitability</h2>
+            <JobCostingPanel jobId={id} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -44,6 +44,9 @@ import {
   users,
   visitAssignments,
   visits,
+  mediaTags,
+  photoTagAssignments,
+  shareLinks,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1150,4 +1153,129 @@ export async function getActiveVisitsForCompany(companyId: number) {
     .from(visits)
     .where(and(eq(visits.companyId, companyId), eq(visits.status, "in_progress")))
     .orderBy(desc(visits.checkInAt));
+}
+
+// ─── Expert Cam: Attachments extensions ───────────────────────────────────────
+export async function listAllAttachments(companyId: number, filters?: { attachableType?: string; label?: string }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: ReturnType<typeof eq>[] = [eq(attachments.companyId, companyId)];
+  if (filters?.attachableType) conditions.push(eq(attachments.attachableType, filters.attachableType));
+  if (filters?.label) conditions.push(eq(attachments.label, filters.label));
+  return db.select().from(attachments).where(and(...conditions)).orderBy(desc(attachments.createdAt));
+}
+
+export async function listAllAttachmentsWithJob(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: attachments.id,
+      url: attachments.url,
+      label: attachments.label,
+      caption: attachments.caption,
+      mimeType: attachments.mimeType,
+      filename: attachments.filename,
+      attachableType: attachments.attachableType,
+      attachableId: attachments.attachableId,
+      createdAt: attachments.createdAt,
+      jobNumber: jobs.jobNumber,
+      jobTitle: jobs.title,
+      customerFirstName: customers.firstName,
+      customerLastName: customers.lastName,
+    })
+    .from(attachments)
+    .leftJoin(jobs, and(eq(attachments.attachableType, "job"), eq(attachments.attachableId, jobs.id)))
+    .leftJoin(customers, eq(jobs.customerId, customers.id))
+    .where(and(eq(attachments.companyId, companyId), eq(attachments.attachableType, "job")))
+    .orderBy(desc(attachments.createdAt));
+  return rows;
+}
+
+export async function updateAttachment(id: number, companyId: number, data: { caption?: string; label?: string }) {
+  const db = await getDb();
+  if (!db) return;
+  const updates: Record<string, unknown> = {};
+  if (data.caption !== undefined) updates.caption = data.caption;
+  if (data.label !== undefined) updates.label = data.label;
+  if (Object.keys(updates).length === 0) return;
+  await db.update(attachments).set(updates).where(and(eq(attachments.id, id), eq(attachments.companyId, companyId)));
+}
+
+// ─── Expert Cam: Media Tags ───────────────────────────────────────────────────
+export async function listMediaTags(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(mediaTags).where(eq(mediaTags.companyId, companyId)).orderBy(asc(mediaTags.name));
+}
+
+export async function createMediaTag(companyId: number, name: string, color?: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(mediaTags).values({ companyId, name, color: color ?? "blue" });
+  return (result as any).insertId as number;
+}
+
+export async function deleteMediaTag(id: number, companyId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(photoTagAssignments).where(eq(photoTagAssignments.tagId, id));
+  await db.delete(mediaTags).where(and(eq(mediaTags.id, id), eq(mediaTags.companyId, companyId)));
+}
+
+export async function assignPhotoTag(attachmentId: number, tagId: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Ignore if already assigned
+  await db.insert(photoTagAssignments).values({ attachmentId, tagId }).onDuplicateKeyUpdate({ set: { tagId } });
+}
+
+export async function removePhotoTag(attachmentId: number, tagId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(photoTagAssignments).where(and(eq(photoTagAssignments.attachmentId, attachmentId), eq(photoTagAssignments.tagId, tagId)));
+}
+
+export async function getTagsForPhoto(attachmentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ tag: mediaTags })
+    .from(photoTagAssignments)
+    .innerJoin(mediaTags, eq(photoTagAssignments.tagId, mediaTags.id))
+    .where(eq(photoTagAssignments.attachmentId, attachmentId));
+  return rows.map(r => r.tag);
+}
+
+// ─── Expert Cam: Share Links ──────────────────────────────────────────────────
+export async function createShareLink(data: typeof shareLinks.$inferInsert) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(shareLinks).values(data);
+  return (result as any).insertId as number;
+}
+
+export async function getShareLink(token: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(shareLinks).where(eq(shareLinks.token, token)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function listShareLinksForJob(jobId: number, companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(shareLinks).where(and(eq(shareLinks.jobId, jobId), eq(shareLinks.companyId, companyId))).orderBy(desc(shareLinks.createdAt));
+}
+
+export async function deleteShareLink(id: number, companyId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(shareLinks).where(and(eq(shareLinks.id, id), eq(shareLinks.companyId, companyId)));
+}
+
+export async function incrementShareLinkViews(token: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(shareLinks).set({ viewCount: sql`viewCount + 1` }).where(eq(shareLinks.token, token));
 }

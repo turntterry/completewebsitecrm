@@ -7,6 +7,7 @@ import {
   mysqlTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
 
@@ -289,16 +290,53 @@ export const attachments = mysqlTable("attachments", {
   s3Key: text("s3Key").notNull(),
   url: text("url").notNull(),
   label: varchar("label", { length: 64 }),
+  caption: text("caption"),
   mimeType: varchar("mimeType", { length: 128 }),
   filename: varchar("filename", { length: 255 }),
   fileSize: int("fileSize"),
   attachableType: varchar("attachableType", { length: 64 }).notNull(),
   attachableId: int("attachableId").notNull(),
   uploadedById: int("uploadedById"),
+  takenAt: timestamp("takenAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type Attachment = typeof attachments.$inferSelect;
+
+// ─── Expert Cam: Media Tags ───────────────────────────────────────────────────
+export const mediaTags = mysqlTable("mediaTags", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 64 }).notNull(),
+  color: varchar("color", { length: 32 }).default("blue"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MediaTag = typeof mediaTags.$inferSelect;
+
+export const photoTagAssignments = mysqlTable("photoTagAssignments", {
+  id: int("id").autoincrement().primaryKey(),
+  attachmentId: int("attachmentId").notNull(),
+  tagId: int("tagId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  uniqueAssignment: uniqueIndex("photo_tag_unique").on(t.attachmentId, t.tagId),
+}));
+
+// ─── Expert Cam: Share Links ──────────────────────────────────────────────────
+export const shareLinks = mysqlTable("shareLinks", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  jobId: int("jobId"),
+  type: mysqlEnum("shareLinkType", ["gallery", "timeline"]).default("gallery").notNull(),
+  title: varchar("title", { length: 255 }),
+  expiresAt: timestamp("expiresAt"),
+  viewCount: int("viewCount").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ShareLink = typeof shareLinks.$inferSelect;
 
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 export const invoices = mysqlTable("invoices", {

@@ -7,6 +7,7 @@ import {
   Bot,
   Building2,
   Calendar,
+  Camera,
   ChevronDown,
   ClipboardList,
   FileText,
@@ -55,6 +56,7 @@ const navItems: NavItem[] = [
   { label: "Requests", href: "/admin/requests", icon: ClipboardList },
   { label: "Quotes", href: "/admin/quotes", icon: FileText },
   { label: "Jobs", href: "/admin/jobs", icon: Building2 },
+  { label: "Expert Cam", href: "/admin/expert-cam", icon: Camera },
   { label: "Messages", href: "/admin/messages", icon: MessageSquare },
   { label: "Invoices", href: "/admin/invoices", icon: FileText },
   {
