@@ -37,8 +37,23 @@ const LOCATION_CONTENT: Record<string, { intro: string; localNote: string }> = {
 };
 
 export default function LocationPage({ locationId }: LocationPageProps) {
-  const location = LOCATIONS.find(l => l.id === locationId);
-  if (!location) return null;
+  // Accept both slug and id in the URL and fail gracefully
+  const location =
+    LOCATIONS.find(l => l.slug === locationId) ??
+    LOCATIONS.find(l => l.id === locationId);
+
+  if (!location) {
+    return (
+      <SiteLayout>
+        <section className="py-16 text-center">
+          <h1 className="text-3xl font-heading mb-4">Location not found</h1>
+          <p className="text-muted-foreground">
+            Please choose a service area from the list.
+          </p>
+        </section>
+      </SiteLayout>
+    );
+  }
 
   const locationName = `${location.name}, ${location.state}`;
   useCanonical(`/locations/${location.slug}`);
@@ -46,7 +61,7 @@ export default function LocationPage({ locationId }: LocationPageProps) {
     title: `Exterior Cleaning in ${location.name}, TN | Exterior Experts`,
     description: `Pressure washing, house washing, window and roof cleaning in ${locationName}. Licensed, insured, satisfaction guaranteed.`,
   });
-  const content = LOCATION_CONTENT[locationId] || {
+  const content = LOCATION_CONTENT[location.id] || {
     intro: `We proudly serve homeowners in ${location.name} and the surrounding area with professional exterior cleaning services.`,
     localNote: `${location.name} is within our service area. Use our instant quote tool to check pricing for your address.`,
   };
