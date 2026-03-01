@@ -309,17 +309,24 @@ export default function QuoteDetail() {
     onSuccess: () => toast.success("Text sent"),
     onError: (e) => toast.error(e.message),
   });
+
+  const totals = useMemo(() => {
+    const _q = quote as any;
+    const subtotal = parseFloat(String(_q?.subtotal ?? 0)) || 0;
+    const taxAmount = parseFloat(String(_q?.taxAmount ?? 0)) || 0;
+    const total = parseFloat(String(_q?.total ?? subtotal + taxAmount)) || 0;
+    const deposit = parseFloat(depositValue) || 0;
+    const balance = Math.max(0, total - deposit);
+    return { subtotal, taxAmount, total, deposit, balance };
+  }, [(quote as any)?.subtotal, (quote as any)?.taxAmount, (quote as any)?.total, depositValue]);
+
   const saveTotals = () => {
     updateMutation.mutate({
       id,
       depositAmount: depositValue || "0",
-      taxRate: q.taxRate ?? "0",
+      taxRate: (quote as any)?.taxRate ?? "0",
     });
   };
-
-  const shareLink = `${window.location.origin}/quote/${(quote as any).publicToken}`;
-
-
 
   useEffect(() => {
     if (quote) {
@@ -331,17 +338,9 @@ export default function QuoteDetail() {
   if (!quote) return <div className="p-6"><p className="text-muted-foreground">Quote not found.</p></div>;
 
   const q = quote as any;
+  const shareLink = `${window.location.origin}/quote/${q.publicToken}`;
   const lineItems = q.lineItems as any[] ?? [];
-  const propertyIntel = (q as any).propertyIntel ?? {};
-
-  const totals = useMemo(() => {
-    const subtotal = parseFloat(String(q.subtotal ?? 0)) || 0;
-    const taxAmount = parseFloat(String(q.taxAmount ?? 0)) || 0;
-    const total = parseFloat(String(q.total ?? subtotal + taxAmount)) || 0;
-    const deposit = parseFloat(depositValue) || 0;
-    const balance = Math.max(0, total - deposit);
-    return { subtotal, taxAmount, total, deposit, balance };
-  }, [q.subtotal, q.taxAmount, q.total, depositValue]);
+  const propertyIntel = (q as any).propertyIntel ?? [];
 
   return (
     <div className="p-6 space-y-6">

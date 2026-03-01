@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, Package, Wrench } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Package, Wrench, Download } from "lucide-react";
 
 type CatalogItem = {
   id: number;
@@ -89,6 +89,18 @@ export default function ProductCatalog() {
       utils.productCatalog.list.invalidate();
       toast.success("Product deleted");
       setDeleteConfirm(null);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const importMutation = trpc.productCatalog.importFromQuoteServices.useMutation({
+    onSuccess: (result) => {
+      utils.productCatalog.list.invalidate();
+      if (result.imported > 0) {
+        toast.success(`Imported ${result.imported} service${result.imported !== 1 ? "s" : ""}${result.skipped > 0 ? ` (${result.skipped} already existed)` : ""}`);
+      } else {
+        toast.info(result.skipped > 0 ? "All quote services already exist in your catalog." : "No enabled quote services found to import.");
+      }
     },
     onError: (e) => toast.error(e.message),
   });
@@ -162,9 +174,19 @@ export default function ProductCatalog() {
             {items.length} items in your catalog
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-1.5" /> Add Item
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => importMutation.mutate()}
+            disabled={importMutation.isPending}
+          >
+            <Download className="h-4 w-4 mr-1.5" />
+            {importMutation.isPending ? "Importing..." : "Import from Quote Tool"}
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-1.5" /> Add Item
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

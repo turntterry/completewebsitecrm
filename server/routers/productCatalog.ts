@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { productCatalog } from "../../drizzle/schema";
+import { productCatalog, quoteToolServices } from "../../drizzle/schema";
 import { eq, and, asc } from "drizzle-orm";
 
 export const productCatalogRouter = router({
@@ -157,4 +157,63 @@ export const productCatalogRouter = router({
 
       return { success: true };
     }),
+
+  /** Import enabled services from the instant quote tool into the product catalog */
+  importFromQuoteServices: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const companyId = ctx.user.companyId;
+    if (!companyId) throw new TRPCError({ code: "FORBIDDEN" });
+
+    // Fetch all enabled quote services
+    const quoteServices = await db
+      .select()
+      .from(quoteToolServices)
+      .where(and(eq(quoteToolServices.companyId, companyId), eq(quoteToolServices.enabled, true)))
+      .orderBy(asc(quoteToolServices.sortOrder));
+
+    if (quoteServices.length === 0) return { imported: 0, skipped: 0 };
+
+    // Fetch existing catalog names (lowercased) to avoid duplicates
+    const existing = await db
+      .select({ name: productCatalog.name, sortOrder: productCatalog.sortOrder })
+      .from(productCatalog)
+      .where(eq(productCatalog.companyId, companyId))
+      .orderBy(asc(productCatalog.sortOrder));
+
+    const existingNames = new Set(existing.map((e) => e.name.toLowerCase().trim()));
+    const maxSort = existing.length > 0 ? (existing[existing.length - 1].sortOrder ?? 0) + 1 : 0;
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const svc of quoteServices) {
+      const nameLower = svc.name.toLowerCase().trim();
+      if (existingNames.has(nameLower)) {
+        skipped++;
+        continue;
+      }
+
+      // Use minimumCharge if set, otherwise basePrice
+      const minCharge = parseFloat(svc.minimumCharge ?? "0");
+      const base = parseFloat(svc.basePrice ?? "0");
+      const unitPrice = minCharge > 0 ? minCharge : base > 0 ? base : 0;
+
+      await db.insert(productCatalog).values({
+        companyId,
+        name: svc.name,
+        description: svc.description ?? null,
+        category: "Service",
+        unitPrice: String(unitPrice.toFixed(2)),
+        taxable: false,
+        active: true,
+        sortOrder: maxSort + imported,
+      });
+
+      existingNames.add(nameLower);
+      imported++;
+    }
+
+    return { imported, skipped };
+  }),
 });

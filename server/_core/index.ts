@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -70,6 +71,8 @@ async function startServer() {
       res.status(400).json({ error: "Failed to generate mock slots", detail: String(err) });
     }
   });
+  // Serve locally uploaded files (fallback when Forge storage is not configured)
+  app.use("/uploads", express.static(path.resolve(process.cwd(), "public/uploads")));
   // tRPC API
   app.use(
     "/api/trpc",
