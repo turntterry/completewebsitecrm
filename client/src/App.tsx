@@ -50,6 +50,8 @@ import FieldTimer from "./pages/FieldTimer";
 import AiReceptionist from "./pages/AiReceptionist";
 import Messages from "./pages/Messages";
 import Portal from "./pages/Portal";
+import ExpertCam from "./pages/ExpertCam";
+import ShareGallery from "./pages/ShareGallery";
 
 function Router() {
   return (
@@ -67,6 +69,9 @@ function Router() {
       </Route>
       <Route path="/cookeville" component={CookevillePage} />
       <Route path="/instant-quote" component={PublicQuoteTool} />
+
+      {/* ── Expert Cam public share ── */}
+      <Route path="/share/:token" component={ShareGallery} />
 
       {/* ── Shared / no-sidebar routes ── */}
       <Route path="/field" component={FieldTimer} />
@@ -104,6 +109,7 @@ function Router() {
       <Route path="/admin/booking-controls" component={() => <CrmLayout><BookingControls /></CrmLayout>} />
       <Route path="/admin/standalone-link" component={() => <CrmLayout><StandaloneQuoteLink /></CrmLayout>} />
       <Route path="/admin/ai-receptionist" component={() => <CrmLayout><AiReceptionist /></CrmLayout>} />
+      <Route path="/admin/expert-cam" component={() => <CrmLayout><ExpertCam /></CrmLayout>} />
 
       <Route component={NotFound} />
     </Switch>

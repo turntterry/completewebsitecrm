@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createAttachment, deleteAttachment, listAttachments, getOrCreateCompany } from "../db";
+import { createAttachment, deleteAttachment, listAttachments, listAllAttachments, listAllAttachmentsWithJob, updateAttachment, getOrCreateCompany } from "../db";
 import { storagePut } from "../storage";
 import { protectedProcedure, router } from "../_core/trpc";
 import { nanoid } from "nanoid";
@@ -51,6 +51,34 @@ export const attachmentsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
       await deleteAttachment(input.id, companyId);
+      return true;
+    }),
+
+  listAll: protectedProcedure
+    .input(z.object({
+      attachableType: z.string().optional(),
+      label: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
+      return listAllAttachments(companyId, input ?? {});
+    }),
+
+  listAllWithJob: protectedProcedure
+    .query(async ({ ctx }) => {
+      const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
+      return listAllAttachmentsWithJob(companyId);
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      caption: z.string().optional(),
+      label: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
+      await updateAttachment(input.id, companyId, { caption: input.caption, label: input.label });
       return true;
     }),
 });

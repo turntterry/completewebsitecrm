@@ -50,6 +50,13 @@
       "when": 1771514520123,
       "tag": "0006_volatile_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1772381877128,
+      "tag": "0007_light_korg",
+      "breakpoints": true
     }
   ]
 }
