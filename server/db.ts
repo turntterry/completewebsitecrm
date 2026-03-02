@@ -295,10 +295,23 @@ export async function getNextQuoteNumber(companyId: number) {
   return (result[0]?.max ?? 0) + 1;
 }
 
+export async function getQuoteByToken(token: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(quotes).where(eq(quotes.publicToken, token)).limit(1);
+  const quote = result[0];
+  if (!quote) return null;
+  const lineItems = await db.select().from(quoteLineItems).where(eq(quoteLineItems.quoteId, quote.id)).orderBy(quoteLineItems.sortOrder);
+  const [customer] = await db.select().from(customers).where(eq(customers.id, quote.customerId));
+  const [company] = await db.select().from(companies).where(eq(companies.id, quote.companyId));
+  return { ...quote, lineItems, customer: customer ?? null, company: company ?? null };
+}
+
 export async function createQuote(data: InsertQuote, lineItems: InsertQuoteLineItem[]) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(quotes).values(data);
+  const token = `qt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  const [result] = await db.insert(quotes).values({ ...data, publicToken: token });
   const quoteId = (result as any).insertId as number;
   if (lineItems.length > 0) {
     await db.insert(quoteLineItems).values(lineItems.map((li, i) => ({ ...li, quoteId, sortOrder: i })));

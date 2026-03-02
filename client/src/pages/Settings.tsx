@@ -1,5 +1,14 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect } from "react";
+
+const NOTIF_STORAGE_KEY = "crm_notification_prefs";
+function loadNotifPrefs() {
+  try {
+    const saved = localStorage.getItem(NOTIF_STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return null;
+}
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -83,12 +92,13 @@ function CompanyTab() {
 }
 
 function NotificationsTab() {
-  const [notifs, setNotifs] = useState({
+  const defaults = {
     newQuoteEmail: true, newQuoteSms: true,
     quoteApprovedEmail: true, quoteApprovedSms: true,
     paymentEmail: true, paymentSms: true,
     jobCompletedEmail: true, jobCompletedSms: false,
-  });
+  };
+  const [notifs, setNotifs] = useState({ ...defaults, ...(loadNotifPrefs() ?? {}) });
 
   return (
     <div className="space-y-5">
@@ -109,14 +119,14 @@ function NotificationsTab() {
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={(notifs as any)[`${key}Email`]}
-                    onCheckedChange={(v) => setNotifs((n) => ({ ...n, [`${key}Email`]: v }))}
+                    onCheckedChange={(v) => setNotifs((n: any) => ({ ...n, [`${key}Email`]: v }))}
                   />
                   <Label className="text-xs text-muted-foreground">Email</Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={(notifs as any)[`${key}Sms`]}
-                    onCheckedChange={(v) => setNotifs((n) => ({ ...n, [`${key}Sms`]: v }))}
+                    onCheckedChange={(v) => setNotifs((n: any) => ({ ...n, [`${key}Sms`]: v }))}
                   />
                   <Label className="text-xs text-muted-foreground">SMS</Label>
                 </div>
@@ -126,7 +136,10 @@ function NotificationsTab() {
         </CardContent>
       </Card>
       <div className="flex justify-end">
-        <Button onClick={() => toast.success("Notification preferences saved")}>
+        <Button onClick={() => {
+          try { localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(notifs)); } catch {}
+          toast.success("Notification preferences saved");
+        }}>
           <Save className="h-4 w-4 mr-1.5" /> Save Preferences
         </Button>
       </div>
@@ -220,11 +233,12 @@ function UsersTab() {
           <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
           <p className="font-medium">Team Management</p>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            You are currently the only user. Team member management will be available when you are ready to add technicians or dispatchers.
+            Multi-user team access is coming soon. You'll be able to invite technicians and dispatchers
+            who can log into the CRM with their own accounts and roles.
           </p>
-          <Button className="mt-4" variant="outline" onClick={() => toast.info("Team management coming soon")}>
-            Invite Team Member
-          </Button>
+          <div className="mt-4 px-4 py-2 rounded-lg bg-muted text-xs text-muted-foreground">
+            Feature in development
+          </div>
         </CardContent>
       </Card>
     </div>

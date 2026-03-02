@@ -27,7 +27,7 @@ import {
   Zap,
   Calculator,
 } from "lucide-react";
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -149,6 +149,7 @@ export default function CrmLayout({ children }: { children: ReactNode }) {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
   const { data: company } = trpc.company.get.useQuery(undefined, { enabled: isAuthenticated });
   const { data: smsUnread = 0 } = trpc.sms.unreadCount.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -175,11 +176,17 @@ export default function CrmLayout({ children }: { children: ReactNode }) {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-4 border-b border-sidebar-border">
-        <img
-          src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663366996886/dKqGhiVvDbWjCuzb.png"
-          alt="Exterior Experts"
-          className="h-10 w-10 rounded-lg object-contain shrink-0 bg-white p-0.5"
-        />
+        {company?.logoUrl ? (
+          <img
+            src={company.logoUrl}
+            alt={company.name ?? "Company"}
+            className="h-10 w-10 rounded-lg object-contain shrink-0 bg-white p-0.5"
+          />
+        ) : (
+          <div className="h-10 w-10 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
+            <Building2 className="h-5 w-5 text-sidebar-primary-foreground" />
+          </div>
+        )}
         {!collapsed && (
           <div className="min-w-0">
             <p className="text-sm font-semibold text-sidebar-foreground truncate">
@@ -294,6 +301,13 @@ export default function CrmLayout({ children }: { children: ReactNode }) {
               <Input
                 className="pl-10 pr-3 h-10 bg-muted/60 border-border focus-visible:ring-1 focus-visible:ring-primary"
                 placeholder="Search leads, clients, quotes… (Ctrl/Cmd + K)"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && searchValue.trim()) {
+                    window.location.href = `/admin/clients?search=${encodeURIComponent(searchValue.trim())}`;
+                  }
+                }}
               />
             </div>
             <DropdownMenu>
@@ -318,7 +332,13 @@ export default function CrmLayout({ children }: { children: ReactNode }) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              onClick={() => window.location.href = "/admin/messages"}
+              title="Messages"
+            >
               <Bell className="h-5 w-5 text-muted-foreground" />
               {smsUnread > 0 && (
                 <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-white text-[10px] flex items-center justify-center">

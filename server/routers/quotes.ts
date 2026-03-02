@@ -6,6 +6,7 @@ import {
   getNextQuoteNumber,
   getOrCreateCompany,
   getQuote,
+  getQuoteByToken,
   getQuoteWithLineItems,
   listQuoteTemplates,
   listQuotes,
@@ -14,7 +15,7 @@ import {
 import { getDb } from "../db";
 import { quoteOptionSets, quoteOptionItems } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
 const lineItemSchema = z.object({
   description: z.string().min(1),
@@ -32,6 +33,15 @@ async function getCompanyId(userId: number, userName: string) {
 }
 
 export const quotesRouter = router({
+  // Public: get quote by shareable token (no auth required)
+  getByToken: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const quote = await getQuoteByToken(input.token);
+      if (!quote) throw new TRPCError({ code: "NOT_FOUND" });
+      return quote;
+    }),
+
   list: protectedProcedure
     .input(z.object({ status: z.string().optional() }))
     .query(async ({ ctx, input }) => {

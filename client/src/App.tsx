@@ -52,6 +52,8 @@ import Messages from "./pages/Messages";
 import Portal from "./pages/Portal";
 import ExpertCam from "./pages/ExpertCam";
 import ShareGallery from "./pages/ShareGallery";
+import PublicQuote from "./pages/PublicQuote";
+import LeadDetail from "./pages/LeadDetail";
 
 function Router() {
   return (
@@ -73,6 +75,9 @@ function Router() {
       {/* ── Expert Cam public share ── */}
       <Route path="/share/:token" component={ShareGallery} />
 
+      {/* ── Public quote client view ── */}
+      <Route path="/quote/:token" component={PublicQuote} />
+
       {/* ── Shared / no-sidebar routes ── */}
       <Route path="/field" component={FieldTimer} />
       <Route path="/field/:visitId" component={FieldTimer} />
@@ -85,6 +90,7 @@ function Router() {
       <Route path="/admin/clients" component={() => <CrmLayout><Clients /></CrmLayout>} />
       <Route path="/admin/clients/:id" component={() => <CrmLayout><ClientDetail /></CrmLayout>} />
       <Route path="/admin/leads" component={() => <CrmLayout><Leads /></CrmLayout>} />
+      <Route path="/admin/leads/:id" component={() => <CrmLayout><LeadDetail /></CrmLayout>} />
       <Route path="/admin/requests" component={() => <CrmLayout><Requests /></CrmLayout>} />
       <Route path="/admin/quotes" component={() => <CrmLayout><Quotes /></CrmLayout>} />
       <Route path="/admin/quotes/new" component={() => <CrmLayout><NewQuote /></CrmLayout>} />

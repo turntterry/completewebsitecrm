@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Phone, Mail, ChevronRight, Filter } from "lucide-react";
+import { Plus, Search, Phone, Mail, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 
@@ -31,6 +32,7 @@ export default function Leads() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const utils = trpc.useUtils();
+  const [, navigate] = useLocation();
 
   const { data: leads = [], isLoading } = trpc.leads.list.useQuery({ status: statusFilter === "all" ? undefined : statusFilter });
   const createMutation = trpc.leads.create.useMutation({
@@ -63,10 +65,6 @@ export default function Leads() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search leads..." className="pl-9 w-64" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Button variant="outline" className="gap-2">
-            <Filter className="h-4 w-4" />
-            {statusFilter === "all" ? "All statuses" : statusFilter.replace("_", " ")}
-          </Button>
           <Button onClick={() => { reset(); setShowCreate(true); }}>
             <Plus className="h-4 w-4 mr-1.5" /> New Lead
           </Button>
@@ -129,7 +127,10 @@ export default function Leads() {
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Last updated: {new Date(lead.updatedAt || lead.createdAt || Date.now()).toLocaleDateString()}</span>
-                  <span className="flex items-center gap-1 text-primary cursor-pointer text-xs">
+                  <span
+                    className="flex items-center gap-1 text-primary cursor-pointer text-xs hover:underline"
+                    onClick={() => navigate(`/admin/leads/${lead.id}`)}
+                  >
                     View <ChevronRight className="h-3 w-3" />
                   </span>
                 </div>

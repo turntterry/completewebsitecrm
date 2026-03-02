@@ -40,6 +40,11 @@ export default function NewQuote() {
 
   const params = new URLSearchParams(window.location.search);
   const prefilledCustomerId = params.get("customerId") ? parseInt(params.get("customerId")!) : undefined;
+  const prefilledFirstName = params.get("firstName") ?? "";
+  const prefilledLastName = params.get("lastName") ?? "";
+  const prefilledPhone = params.get("phone") ?? "";
+  const prefilledEmail = params.get("email") ?? "";
+  const hasPrefilledContact = !!(prefilledFirstName || prefilledPhone || prefilledEmail);
 
   const [customerId, setCustomerId] = useState<number | undefined>(prefilledCustomerId);
   const [propertyId, setPropertyId] = useState<number | undefined>();
@@ -285,6 +290,15 @@ export default function NewQuote() {
         <Card>
           <CardHeader><CardTitle className="text-base">Client & Property</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+            {hasPrefilledContact && (
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-blue-800">
+                <span className="font-medium">From request:</span>{" "}
+                {[prefilledFirstName, prefilledLastName].filter(Boolean).join(" ")}
+                {prefilledPhone && ` · ${prefilledPhone}`}
+                {prefilledEmail && ` · ${prefilledEmail}`}
+                <p className="text-xs text-blue-600 mt-0.5">Select the matching client below, or create a new client first.</p>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Client *</Label>
@@ -293,7 +307,7 @@ export default function NewQuote() {
                     <SelectValue placeholder="Select a client..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(customers as any[]).map((c) => (
+                    {(customers as any[]).map((c: any) => (
                       <SelectItem key={c.id} value={c.id.toString()}>
                         {c.firstName} {c.lastName}
                         {c.phone && ` · ${c.phone}`}

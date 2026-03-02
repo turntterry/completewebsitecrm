@@ -168,6 +168,7 @@ export const quotes = mysqlTable("quotes", {
     "0.00"
   ),
   total: decimal("total", { precision: 10, scale: 2 }).default("0.00"),
+  publicToken: varchar("publicToken", { length: 64 }),
   message: text("message"),
   internalNotes: text("internalNotes"),
   expiresAt: timestamp("expiresAt"),

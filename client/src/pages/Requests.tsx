@@ -176,7 +176,10 @@ function InstantQuoteCard({ quote }: { quote: any }) {
                 </Button>
               )}
               <Button size="sm" variant="ghost" asChild>
-                <a href="/admin/quotes/new" className="flex items-center gap-1">
+                <a
+                  href={`/admin/quotes/new?firstName=${encodeURIComponent(quote.firstName ?? "")}&lastName=${encodeURIComponent(quote.lastName ?? "")}&phone=${encodeURIComponent(quote.phone ?? "")}&email=${encodeURIComponent(quote.email ?? "")}`}
+                  className="flex items-center gap-1"
+                >
                   <FilePlus2 className="h-3.5 w-3.5" /> Create Quote
                 </a>
               </Button>
@@ -416,13 +419,20 @@ export default function Requests() {
                             </Button>
                           )}
                           <Button size="sm" variant="ghost" asChild>
-                            <a href="/admin/quotes/new" className="flex items-center gap-1"><FilePlus2 className="h-3.5 w-3.5" /> Create Quote</a>
+                            <a
+                              href={`/admin/quotes/new?firstName=${encodeURIComponent(r.firstName ?? "")}&lastName=${encodeURIComponent(r.lastName ?? "")}&phone=${encodeURIComponent(r.phone ?? "")}&email=${encodeURIComponent(r.email ?? "")}`}
+                              className="flex items-center gap-1"
+                            >
+                              <FilePlus2 className="h-3.5 w-3.5" /> Create Quote
+                            </a>
                           </Button>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground shrink-0">
                         <span>{new Date(r.createdAt).toLocaleDateString()}</span>
-                        <span className="text-[11px] bg-muted px-2 py-0.5 rounded-full">Website request</span>
+                        <span className="text-[11px] bg-muted px-2 py-0.5 rounded-full capitalize">
+                          {r.source ? r.source.replace(/_/g, " ") : "Request"}
+                        </span>
                       </div>
                     </div>
                   </CardContent>

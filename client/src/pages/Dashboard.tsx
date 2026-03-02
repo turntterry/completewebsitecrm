@@ -53,7 +53,9 @@ function StarRating({ rating }: { rating: number }) {
 
 function GoogleReviewsWidget() {
   const { data: reviews } = trpc.company.getGoogleReviews.useQuery();
+  const { data: company } = trpc.company.get.useQuery();
   if (!reviews) return null;
+  const placeId = (company as any)?.googlePlaceId ?? "";
   return (
     <Card className="lg:col-span-3">
       <CardHeader className="pb-2">
@@ -66,14 +68,16 @@ function GoogleReviewsWidget() {
               <span className="text-xs text-muted-foreground">({reviews.userRatingsTotal?.toLocaleString()} reviews)</span>
             </div>
           </div>
-          <a
-            href={`https://search.google.com/local/reviews?placeid=${encodeURIComponent("")}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground"
-          >
-            View on Google <ExternalLink className="h-3 w-3" />
-          </a>
+          {placeId && (
+            <a
+              href={`https://search.google.com/local/reviews?placeid=${encodeURIComponent(placeId)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground"
+            >
+              View on Google <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
         </div>
       </CardHeader>
       <CardContent>

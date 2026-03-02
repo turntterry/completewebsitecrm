@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -174,7 +175,33 @@ function InvoicesInsightsTab() {
   );
 }
 
+function exportCSV(filename: string, rows: string[][]) {
+  const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Insights() {
+  const [activeTab, setActiveTab] = useState("revenue");
+  const currentYear = new Date().getFullYear();
+  const { data: revenueData = [] } = trpc.dashboard.revenueByMonth.useQuery({ year: currentYear });
+
+  const handleExport = () => {
+    if (activeTab === "revenue") {
+      exportCSV(`revenue_${currentYear}.csv`, [
+        ["Month", "Revenue"],
+        ...(revenueData as any[]).map((r: any) => [r.month, r.revenue ?? 0]),
+      ]);
+    } else {
+      window.print();
+    }
+  };
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -182,11 +209,11 @@ export default function Insights() {
           <h1 className="text-2xl font-bold text-foreground">Insights</h1>
           <p className="text-sm text-muted-foreground">Business performance analytics</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Download className="h-4 w-4 mr-1.5" /> Export
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="h-4 w-4 mr-1.5" /> Export CSV
         </Button>
       </div>
-      <Tabs defaultValue="revenue">
+      <Tabs defaultValue="revenue" onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="revenue" className="flex items-center gap-1.5"><TrendingUp className="h-4 w-4" />Revenue</TabsTrigger>
           <TabsTrigger value="jobs" className="flex items-center gap-1.5"><Briefcase className="h-4 w-4" />Jobs</TabsTrigger>

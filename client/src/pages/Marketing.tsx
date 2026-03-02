@@ -544,13 +544,25 @@ function ReferralsTab() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Marketing() {
+  const tabFromUrl = new URLSearchParams(window.location.search).get("tab");
+  const validTabs = ["reviews", "campaigns", "referrals"];
+  const initialTab = validTabs.includes(tabFromUrl ?? "") ? (tabFromUrl as string) : "reviews";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    window.history.replaceState({}, "", url.toString());
+  };
+
   return (
     <div className="p-6 space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Marketing</h1>
         <p className="text-sm text-muted-foreground">Reviews, campaigns, and referrals</p>
       </div>
-      <Tabs defaultValue="reviews">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="reviews" className="flex items-center gap-1.5">
             <Star className="h-4 w-4" /> Reviews
