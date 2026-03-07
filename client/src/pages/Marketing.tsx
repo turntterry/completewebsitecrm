@@ -545,8 +545,9 @@ function ReferralsTab() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Marketing() {
   const tabFromUrl = new URLSearchParams(window.location.search).get("tab");
-  const validTabs = ["reviews", "campaigns", "referrals"];
-  const initialTab = validTabs.includes(tabFromUrl ?? "") ? (tabFromUrl as string) : "reviews";
+  // STUBBED: Reviews tab (review automation not integrated) — hidden from UI
+  const validTabs = ["campaigns", "referrals"];
+  const initialTab = validTabs.includes(tabFromUrl ?? "") ? (tabFromUrl as string) : "campaigns";
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const handleTabChange = (tab: string) => {
@@ -560,13 +561,11 @@ export default function Marketing() {
     <div className="p-6 space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Marketing</h1>
-        <p className="text-sm text-muted-foreground">Reviews, campaigns, and referrals</p>
+        <p className="text-sm text-muted-foreground">Campaigns and referral programs</p>
       </div>
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
-          <TabsTrigger value="reviews" className="flex items-center gap-1.5">
-            <Star className="h-4 w-4" /> Reviews
-          </TabsTrigger>
+          {/* STUBBED: Reviews tab hidden (review automation not yet integrated) */}
           <TabsTrigger value="campaigns" className="flex items-center gap-1.5">
             <Megaphone className="h-4 w-4" /> Campaigns
           </TabsTrigger>
@@ -574,7 +573,8 @@ export default function Marketing() {
             <Users className="h-4 w-4" /> Referrals
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="reviews" className="mt-5"><ReviewsTab /></TabsContent>
+        {/* Reviews tab content hidden but component kept for reference */}
+        {/* <TabsContent value="reviews" className="mt-5"><ReviewsTab /></TabsContent> */}
         <TabsContent value="campaigns" className="mt-5"><CampaignsTab /></TabsContent>
         <TabsContent value="referrals" className="mt-5"><ReferralsTab /></TabsContent>
       </Tabs>

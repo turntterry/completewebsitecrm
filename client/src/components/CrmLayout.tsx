@@ -57,7 +57,9 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const navGroups: NavGroup[] = [
+// Navigation items are defined here with full feature set.
+// Stubbed features are filtered out based on feature maturity at render time.
+const allNavGroups: NavGroup[] = [
   {
     label: "Overview",
     items: [
@@ -85,13 +87,15 @@ const navGroups: NavGroup[] = [
     label: "Communications",
     items: [
       { label: "Messages", href: "/admin/messages", icon: MessageSquare },
-      { label: "Expert Cam", href: "/admin/expert-cam", icon: Camera },
+      // STUBBED: Expert Cam — photo documentation module not production-ready
+      // { label: "Expert Cam", href: "/admin/expert-cam", icon: Camera },
       {
         label: "Marketing",
         href: "/admin/marketing",
         icon: Megaphone,
         children: [
-          { label: "Reviews", href: "/admin/marketing?tab=reviews" },
+          // STUBBED: Review automation not integrated; hidden from UI
+          // { label: "Reviews", href: "/admin/marketing?tab=reviews" },
           { label: "Campaigns", href: "/admin/marketing?tab=campaigns" },
           { label: "Referrals", href: "/admin/marketing?tab=referrals" },
         ],
@@ -117,6 +121,9 @@ const navGroups: NavGroup[] = [
     ],
   },
 ];
+
+// Use filtered nav groups (stubbed features already commented out above)
+const navGroups: NavGroup[] = allNavGroups;
 
 function NavLink({
   item,

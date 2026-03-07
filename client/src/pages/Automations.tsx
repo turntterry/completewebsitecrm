@@ -54,7 +54,8 @@ const TRIGGERS = [
 
 const ACTION_TYPES = [
   { value: "send_sms", label: "Send SMS", icon: MessageSquare },
-  { value: "send_email", label: "Send Email", icon: Mail },
+  // STUBBED: send_email — email provider not configured
+  // { value: "send_email", label: "Send Email", icon: Mail },
   { value: "add_note", label: "Add Note", icon: FileText },
 ] as const;
 
@@ -204,7 +205,8 @@ function ActionEditor({
         </div>
       )}
 
-      {action.type === "send_email" && (
+      {/* STUBBED: send_email — email provider not configured; hidden from UI */}
+      {/* {action.type === "send_email" && (
         <div className="space-y-2">
           <Input
             placeholder="Subject line"
@@ -224,7 +226,7 @@ function ActionEditor({
             className="text-sm"
           />
         </div>
-      )}
+      )} */}
 
       {action.type === "add_note" && (
         <Textarea

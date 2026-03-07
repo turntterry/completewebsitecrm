@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +163,14 @@ export default function ExpertCam() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
+      {/* Feature Status */}
+      <Alert className="border-yellow-200 bg-yellow-50">
+        <AlertCircle className="h-4 w-4 text-yellow-600" />
+        <AlertDescription className="text-yellow-800">
+          <strong>Feature Status: Stubbed</strong> — Photo documentation module is not production-ready. This feature is available for testing but not yet recommended for regular use. Full integration into field workflows is planned for a future release.
+        </AlertDescription>
+      </Alert>
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
