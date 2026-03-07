@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { logger } from "../_core/observability";
+import { getActiveCompanyId, DEFAULT_COMPANY_ID } from "../_core/tenancy";
 import {
   instantQuotes,
   leads,
@@ -24,11 +25,11 @@ const quoteRouter = router({
     .input(
       z.object({ companyId: z.number().int().positive().optional() }).optional()
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return { settings: null, services: [] };
 
-      const companyId = input?.companyId ?? 1;
+      const companyId = input?.companyId ?? getActiveCompanyId(ctx.user);
       const [settings] = await db
         .select()
         .from(quoteToolSettings)
@@ -58,12 +59,12 @@ const quoteRouter = router({
         utmCampaign: z.string().max(120).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
 
       const sessionToken = nanoid(24);
-      const companyId = input.companyId ?? 1;
+      const companyId = input.companyId ?? getActiveCompanyId(ctx.user);
       const [result] = await db.insert(quoteSessions).values({
         companyId,
         sessionToken,
@@ -243,9 +244,9 @@ const quoteRouter = router({
           .default([]),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
-      const companyId = input.companyId ?? 1;
+      const companyId = input.companyId ?? getActiveCompanyId(ctx.user);
 
       let jobMinimum = 0;
       let bundleDiscountPercent = 0;
@@ -444,7 +445,7 @@ const quoteRouter = router({
             ? "range"
             : "exact";
 
-      let sessionCompanyId = 1;
+      let sessionCompanyId = getActiveCompanyId(null); // Start with default single-tenant company
       let sessionRow:
         | (typeof quoteSessions.$inferSelect)
         | undefined;
@@ -456,7 +457,7 @@ const quoteRouter = router({
           .limit(1);
         if (session) {
           sessionRow = session;
-          sessionCompanyId = Number(session.companyId ?? 1);
+          sessionCompanyId = Number(session.companyId ?? getActiveCompanyId(null));
         }
       }
 
@@ -1054,7 +1055,7 @@ const contactRouter = router({
           notes: input.message ?? null,
           source: "website_contact",
           status: "new",
-          companyId: 1, // default company
+          companyId: DEFAULT_COMPANY_ID, // single-tenant default company
         } as any,
       ]);
 
@@ -1076,7 +1077,7 @@ const contactRouter = router({
         address: z.string().optional(),
         services: z.array(z.string()).max(20).optional(),
         message: z.string().optional(),
-        companyId: z.number().optional().default(1),
+        companyId: z.number().optional().default(DEFAULT_COMPANY_ID),
       })
     )
     .mutation(async ({ input }) => {
