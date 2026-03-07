@@ -36,6 +36,7 @@ export const aiReceptionistRouter = router({
     const company = await getCompany(ctx.user.id);
     return {
       enabled: !!(company as any).aiReceptionistEnabled,
+      autoReplyEnabled: !!(company as any).aiAutoReplyEnabled,
       personaName: (company as any).aiPersonaName ?? "Alex",
       systemPrompt: (company as any).aiSystemPrompt ?? "",
       businessHours: (company as any).aiBusinessHours ?? null,
@@ -49,6 +50,7 @@ export const aiReceptionistRouter = router({
   updateSettings: protectedProcedure
     .input(z.object({
       enabled: z.boolean(),
+      autoReplyEnabled: z.boolean().optional(),
       personaName: z.string().max(80).optional(),
       systemPrompt: z.string().max(2000).optional(),
       businessHours: businessHoursSchema,
@@ -60,6 +62,7 @@ export const aiReceptionistRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(companies).set({
         aiReceptionistEnabled: input.enabled,
+        aiAutoReplyEnabled: input.autoReplyEnabled,
         aiPersonaName: input.personaName,
         aiSystemPrompt: input.systemPrompt,
         aiBusinessHours: input.businessHours as any,

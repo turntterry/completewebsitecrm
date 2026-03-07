@@ -5,6 +5,9 @@ import {
   FEATURE_MATURITY_REGISTRY,
   getProductionFeatures,
   getStubbedFeatures,
+  AUTOMATION_ACTION_MATURITY,
+  getSupportedActions,
+  getUnsupportedActions,
 } from "./featureMaturity";
 
 export const systemRouter = router({
@@ -40,5 +43,15 @@ export const systemRouter = router({
     all: FEATURE_MATURITY_REGISTRY,
     production: getProductionFeatures(),
     stubbed: getStubbedFeatures(),
+  })),
+
+  /**
+   * Get automation action maturity (admin-only)
+   * Shows which automation actions are supported vs stubbed
+   */
+  getAutomationActions: adminProcedure.query(() => ({
+    all: AUTOMATION_ACTION_MATURITY,
+    supported: getSupportedActions(),
+    unsupported: getUnsupportedActions(),
   })),
 });

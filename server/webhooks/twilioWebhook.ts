@@ -7,6 +7,7 @@ import {
 } from "../db";
 import { eq } from "drizzle-orm";
 import { ENV } from "../_core/env";
+import { getTwilioClient } from "../_core/sms";
 import { generateAiReply } from "../services/aiReceptionist";
 
 /**
@@ -81,17 +82,25 @@ export function registerSmsWebhook(app: Express) {
           status: "received",
         });
 
-        // ── AI Receptionist ────────────────────────────────────────────────────
-        const aiEnabled = !!(company as any).aiReceptionistEnabled;
+        // ── AI Receptionist (Optional Auto-Reply) ────────────────────────────────
+        // AI auto-reply is disabled by default. Only enable if:
+        // 1. Company has aiReceptionistEnabled AND aiAutoReplyEnabled flags
+        // 2. ANTHROPIC_API_KEY is configured
+        const aiEnabled = !!(company as any).aiReceptionistEnabled && !!(company as any).aiAutoReplyEnabled;
         let aiReply: string | null = null;
 
-        if (aiEnabled && ENV.ANTHROPIC_API_KEY) {
+        if (!aiEnabled) {
+          console.log("[AI Receptionist] Auto-reply disabled for company", companyId);
+        } else if (!ENV.ANTHROPIC_API_KEY) {
+          console.log("[AI Receptionist] API key not configured; auto-reply disabled");
+        } else {
           const optOutWords = ["stop", "unsubscribe", "quit", "cancel", "end", "optout"];
           const bodyLower = Body.toLowerCase().trim();
           const isOptOut = optOutWords.some((w) => bodyLower === w || bodyLower.startsWith(w + " "));
 
           if (isOptOut) {
             aiReply = "You've been unsubscribed from messages. Reply START to re-subscribe.";
+            console.log("[AI Receptionist] Opt-out detected from", From);
           } else {
             const recentMsgs = (await getSmsMessages(convo.id, companyId)) as any[];
             const history = recentMsgs.slice(-20).map((m) => ({
@@ -137,21 +146,26 @@ export function registerSmsWebhook(app: Express) {
             });
           }
 
-          if (aiReply && ENV.TWILIO_ACCOUNT_SID && ENV.TWILIO_AUTH_TOKEN && ENV.TWILIO_PHONE_NUMBER) {
+          if (aiReply && ENV.TWILIO_PHONE_NUMBER) {
             try {
-              const twilio = require("twilio")(ENV.TWILIO_ACCOUNT_SID, ENV.TWILIO_AUTH_TOKEN);
-              const msg = await twilio.messages.create({ from: ENV.TWILIO_PHONE_NUMBER, to: From, body: aiReply });
-              await insertSmsMessage({
-                conversationId: convo.id,
-                companyId,
-                direction: "outbound",
-                body: aiReply,
-                twilioSid: msg.sid,
-                status: "sent",
-              });
-              console.log("[AI Receptionist] Replied to", From, "—", aiReply.slice(0, 60));
+              const client = await getTwilioClient();
+              if (client) {
+                const msg = await client.messages.create({ from: ENV.TWILIO_PHONE_NUMBER, to: From, body: aiReply });
+                await insertSmsMessage({
+                  conversationId: convo.id,
+                  companyId,
+                  direction: "outbound",
+                  body: aiReply,
+                  twilioSid: msg.sid,
+                  status: "sent",
+                });
+                console.log("[AI Receptionist] Auto-reply sent to", From, "—", aiReply.slice(0, 60));
+              } else {
+                console.warn("[AI Receptionist] Twilio client unavailable; auto-reply not sent");
+              }
             } catch (err: any) {
-              console.error("[AI Receptionist] Twilio send error:", err.message);
+              const errorMsg = err.message || String(err);
+              console.error("[AI Receptionist] Failed to send auto-reply to", From, ":", errorMsg);
             }
           }
         }

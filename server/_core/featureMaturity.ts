@@ -153,3 +153,75 @@ export function getProductionFeatures(): FeatureStatus[] {
     (f) => f.maturity === "production"
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Automation Action Maturity
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ActionStatus {
+  name: string;
+  maturity: FeatureMaturity;
+  description: string;
+  notes?: string;
+}
+
+export const AUTOMATION_ACTION_MATURITY: Record<string, ActionStatus> = {
+  send_sms: {
+    name: "Send SMS",
+    maturity: "production",
+    description: "Send SMS message to customer via Twilio",
+    notes: "Requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER configured",
+  },
+  send_email: {
+    name: "Send Email",
+    maturity: "stubbed",
+    description: "Send email to customer",
+    notes:
+      "NOT IMPLEMENTED — just logs. To enable: wire in email provider (SendGrid, Resend, etc.) in server/services/automationEngine.ts",
+  },
+  add_note: {
+    name: "Add Note",
+    maturity: "internal",
+    description: "Add a note to the job/customer record",
+    notes: "Stored in automation_runs log but not yet displayed in UI",
+  },
+  wait_then_sms: {
+    name: "Wait Then SMS",
+    maturity: "beta",
+    description: "Schedule a delayed SMS (currently runs immediately)",
+    notes: "Delay scheduling not yet implemented — runs same as send_sms",
+  },
+};
+
+/**
+ * Get automation action maturity info
+ */
+export function getActionStatus(actionType: string): ActionStatus | undefined {
+  return AUTOMATION_ACTION_MATURITY[actionType];
+}
+
+/**
+ * Check if an automation action is supported
+ */
+export function isActionSupported(actionType: string): boolean {
+  const status = getActionStatus(actionType);
+  return status?.maturity === "production" || status?.maturity === "beta";
+}
+
+/**
+ * Get all unsupported automation actions
+ */
+export function getUnsupportedActions(): ActionStatus[] {
+  return Object.values(AUTOMATION_ACTION_MATURITY).filter(
+    (a) => a.maturity === "stubbed"
+  );
+}
+
+/**
+ * Get all production/beta automation actions
+ */
+export function getSupportedActions(): ActionStatus[] {
+  return Object.values(AUTOMATION_ACTION_MATURITY).filter(
+    (a) => a.maturity === "production" || a.maturity === "beta"
+  );
+}

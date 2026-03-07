@@ -20,6 +20,7 @@ import {
   logAutomationRun,
 } from "../db";
 import { ENV } from "../_core/env";
+import { getTwilioClient } from "../_core/sms";
 
 export type TriggerEvent =
   | "job_created"
@@ -64,17 +65,6 @@ function evaluateConditions(conditions: any[], data: Record<string, any>): boole
   });
 }
 
-function getTwilioClient() {
-  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = ENV;
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) return null;
-  try {
-    const twilio = require("twilio");
-    return twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) as any;
-  } catch {
-    return null;
-  }
-}
-
 async function executeSendSms(
   action: { message: string },
   entityData: Record<string, any>,
@@ -100,14 +90,16 @@ async function executeSendSms(
   let twilioSid: string | undefined;
   let status: "sent" | "failed" | "queued" = "queued";
 
-  const client = getTwilioClient();
+  const client = await getTwilioClient();
   if (client && fromPhone && convo) {
     try {
       const msg = await client.messages.create({ body, from: fromPhone, to: customer.phone });
       twilioSid = msg.sid;
       status = "sent";
+      console.log(`[Automation] SMS sent to ${customer.phone} (SID: ${msg.sid})`);
     } catch (err: any) {
-      console.error("[Automation] Twilio error:", err.message);
+      const errorMsg = err.message || String(err);
+      console.error(`[Automation] SMS send failed to ${customer.phone}:`, errorMsg);
       status = "failed";
     }
   }

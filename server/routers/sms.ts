@@ -11,21 +11,13 @@ import {
   markConversationRead,
 } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
+import { getTwilioClient } from "../_core/sms";
 import { ENV } from "../_core/env";
 
 async function getCompanyId(userId: number, userName: string) {
   const company = await getOrCreateCompany(userId, userName ?? "Exterior Experts");
   if (!company) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
   return company.id;
-}
-
-function getTwilioClient() {
-  const accountSid = ENV.TWILIO_ACCOUNT_SID;
-  const authToken = ENV.TWILIO_AUTH_TOKEN;
-  if (!accountSid || !authToken) return null;
-  // Dynamic import to avoid crashing when twilio not configured
-  const twilio = require("twilio");
-  return twilio(accountSid, authToken) as any;
 }
 
 export const smsRouter = router({
@@ -77,9 +69,10 @@ export const smsRouter = router({
 
       let twilioSid: string | undefined;
       let status: "queued" | "sent" | "failed" = "queued";
+      let sendError: string | undefined;
 
       // Send via Twilio if configured
-      const client = getTwilioClient();
+      const client = await getTwilioClient();
       if (client && fromPhone) {
         try {
           const msg = await client.messages.create({
@@ -89,11 +82,19 @@ export const smsRouter = router({
           });
           twilioSid = msg.sid;
           status = "sent";
+          console.log(`[SMS] Sent to ${input.toPhone} (SID: ${msg.sid})`);
         } catch (err: any) {
           // Log but don't crash — message is still stored
-          console.error("Twilio send error:", err.message);
+          const errorMsg = err.message || String(err);
+          console.error(`[SMS] Failed to send to ${input.toPhone}:`, errorMsg);
+          sendError = errorMsg;
           status = "failed";
         }
+      } else if (!fromPhone) {
+        console.warn("[SMS] TWILIO_PHONE_NUMBER not configured");
+        sendError = "Twilio not configured (missing TWILIO_PHONE_NUMBER)";
+      } else {
+        console.warn("[SMS] Twilio client unavailable; message queued for retry");
       }
 
       await insertSmsMessage({
@@ -105,7 +106,7 @@ export const smsRouter = router({
         status,
       });
 
-      return { success: true, conversationId: convo.id, status };
+      return { success: status === "sent", conversationId: convo.id, status, error: sendError };
     }),
 
   // Start a new conversation with a phone number

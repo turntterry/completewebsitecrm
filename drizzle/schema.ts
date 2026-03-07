@@ -56,6 +56,7 @@ export const companies = mysqlTable("companies", {
   googleReviewsEnabled: boolean("googleReviewsEnabled").default(false),
   // AI Receptionist
   aiReceptionistEnabled: boolean("aiReceptionistEnabled").default(false),
+  aiAutoReplyEnabled: boolean("aiAutoReplyEnabled").default(false), // Separate flag for auto-reply on inbound
   aiPersonaName: varchar("aiPersonaName", { length: 80 }),
   aiSystemPrompt: text("aiSystemPrompt"),
   aiBusinessHours: json("aiBusinessHours"),
