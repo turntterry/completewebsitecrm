@@ -1,9 +1,15 @@
 import { z } from "zod";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { instantQuotes, quoteToolSettings, quoteToolServices } from "../../drizzle/schema";
+import {
+  instantQuotes,
+  quoteToolSettings,
+  quoteToolServices,
+  leads,
+} from "../../drizzle/schema";
 import { eq, desc, asc } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
+import { getActiveCompanyId } from "../_core/tenancy";
 
 const serviceInputSchema = z.object({
   serviceId: z.string(),
@@ -138,6 +144,7 @@ export const instantQuotesRouter = router({
     }),
 
   // Protected: update status of an instant quote
+  // When marked "converted", creates a CRM lead to ensure quote enters the pipeline
   updateStatus: protectedProcedure
     .input(
       z.object({
@@ -145,14 +152,72 @@ export const instantQuotesRouter = router({
         status: z.enum(["pending", "booked", "declined", "converted"]),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
 
-      await db
-        .update(instantQuotes)
-        .set({ status: input.status })
-        .where(eq(instantQuotes.id, input.id));
-      return { success: true };
+      const companyId = getActiveCompanyId(ctx.user);
+
+      // Fetch the quote to use its data if converting
+      const [quote] = await db
+        .select()
+        .from(instantQuotes)
+        .where(eq(instantQuotes.id, input.id))
+        .limit(1);
+
+      if (!quote) throw new Error("Quote not found");
+
+      // If converting, create a CRM lead from the instant quote
+      let convertedLeadId: number | null = null;
+      if (input.status === "converted" && !quote.convertedToLeadId) {
+        const nameParts = (quote.firstName + " " + quote.lastName)
+          .trim()
+          .split(/\s+/);
+        const firstName = nameParts[0] ?? quote.firstName;
+        const lastName = nameParts.slice(1).join(" ") || quote.lastName || "";
+
+        const [leadResult] = await db.insert(leads).values({
+          companyId,
+          firstName,
+          lastName,
+          email: quote.email ?? null,
+          phone: quote.phone ?? null,
+          address: quote.address ?? null,
+          city: quote.city ?? null,
+          state: quote.state ?? null,
+          zip: quote.zip ?? null,
+          services: (quote.services as any)?.map((s: any) => s.serviceName) ?? [],
+          source: "instant_quote_converted",
+          status: "follow_up",
+          notes: `Converted from instant quote #${quote.id}. Price: $${quote.total}. Services: ${
+            (quote.services as any)?.map((s: any) => s.serviceName).join(", ") ||
+            "N/A"
+          }`,
+        });
+
+        convertedLeadId = (leadResult as any).insertId as number;
+
+        // Update the instant quote to track the conversion
+        await db
+          .update(instantQuotes)
+          .set({
+            status: input.status,
+            convertedToLeadId: convertedLeadId,
+          })
+          .where(eq(instantQuotes.id, input.id));
+
+        notifyOwner({
+          title: `Instant Quote Converted: Lead #${convertedLeadId}`,
+          content: `Quote #${input.id} ($${quote.total}) from ${firstName} ${lastName} has been converted to Lead #${convertedLeadId}.`,
+        }).catch(() => {});
+      } else {
+        // Just update status if not converting or already converted
+        await db
+          .update(instantQuotes)
+          .set({ status: input.status })
+          .where(eq(instantQuotes.id, input.id));
+      }
+
+      return { success: true, convertedLeadId };
     }),
 });
