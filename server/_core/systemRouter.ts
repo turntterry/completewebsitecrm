@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
+import {
+  FEATURE_MATURITY_REGISTRY,
+  getProductionFeatures,
+  getStubbedFeatures,
+} from "./featureMaturity";
 
 export const systemRouter = router({
   health: publicProcedure
@@ -26,4 +31,14 @@ export const systemRouter = router({
         success: delivered,
       } as const;
     }),
+
+  /**
+   * Get feature maturity status (admin-only)
+   * Shows which features are production-ready vs stubbed
+   */
+  getFeatureStatus: adminProcedure.query(() => ({
+    all: FEATURE_MATURITY_REGISTRY,
+    production: getProductionFeatures(),
+    stubbed: getStubbedFeatures(),
+  })),
 });
