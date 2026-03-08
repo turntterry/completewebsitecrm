@@ -256,68 +256,117 @@ function buildCoveredFeatures(
   return covered;
 }
 
+/**
+ * Default upsell catalog.
+ *
+ * Structure follows the QuoteIQ-style offer engine:
+ *   - category:    add_on | cross_sell | bundle
+ *   - pricingMode: flat | per_unit | service_multiplier | package_delta | bundle_discount
+ *   - priceConfig: admin-editable pricing parameters (no code change needed to update prices)
+ *
+ * Admin override order: manualPriceOverride → priceConfig → item.price fallback.
+ */
 const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
-  // ── Micro upsells ──────────────────────────────────────────────────────
+
+  // ── Add-ons: small extras attached to an existing service ──────────────────
+
   {
     id: "window_screen_deep_clean",
     title: "Screen Deep Clean",
-    description: "Full screen scrub and rinse for better clarity and airflow.",
+    description: "Full screen scrub and rinse — removes built-up grime for better clarity and airflow.",
     price: 89,
     appliesTo: ["window_cleaning"],
     badge: "Popular",
-    category: "micro",
+    category: "add_on",
+    pricingMode: "flat",
+    priceConfig: { amount: 89 },
     priority: 80,
-    exclusiveGroup: "window-micro",
-    // Suppress when Platinum Perfection's deep_screen_washing already covers this
+    exclusiveGroup: "window-addon",
+    // Platinum Perfection (best tier) includes deep_screen_washing — suppress there
     suppressIfFeatureCovered: ["deep_screen_washing"],
   },
   {
     id: "window_track_sill_detail",
     title: "Track + Sill Detailing",
-    description: "Premium detailing for tracks, sills, and frame edges.",
+    description: "Deep clean of tracks, sills, and frame edges — the spots regular cleaning misses.",
     price: 129,
     appliesTo: ["window_cleaning"],
-    category: "micro",
+    category: "add_on",
+    pricingMode: "flat",
+    priceConfig: { amount: 129 },
     priority: 70,
-    exclusiveGroup: "window-micro",
-    // Suppress only when Platinum Perfection covers deep track detailing AND sills.
-    // Signature Sparkle includes frame wiping but NOT sills or deep track — valid upsell there.
+    exclusiveGroup: "window-addon",
+    // Suppress only for Platinum Perfection (covers deep_track_detailing + sills).
+    // Signature Sparkle only wipes frames — Track + Sill is still a valid upsell there.
     suppressIfFeatureCovered: ["deep_track_detailing", "sills"],
   },
   {
     id: "gutter_brightening_addon",
     title: "Gutter Brightening",
-    description: "Restore exterior gutter appearance with targeted brightening.",
+    description: "Remove oxidation and tiger-stripe staining from exterior gutter faces — restores the look without a full replacement.",
     price: 79,
-    // Only show when gutter cleaning is already in cart
     appliesTo: ["gutter_cleaning"],
     requiresAnyServices: ["gutter_cleaning"],
-    category: "micro",
+    category: "add_on",
+    pricingMode: "flat",
+    priceConfig: { amount: 79 },
     priority: 75,
   },
-  // ── Adjacent-service cross-sells ───────────────────────────────────────
+  {
+    id: "oil_stain_removal",
+    title: "Oil Stain Treatment",
+    description: "Targeted degreaser pre-treatment for oil and fluid stains on concrete — works best when combined with a full driveway clean.",
+    price: 69,
+    appliesTo: ["driveway_cleaning"],
+    requiresAnyServices: ["driveway_cleaning"],
+    category: "add_on",
+    pricingMode: "flat",
+    priceConfig: { amount: 69 },
+    priority: 72,
+  },
+  {
+    id: "hard_water_treatment",
+    title: "Hard Water Spot Treatment",
+    description: "Mineral deposit remover applied after cleaning — clears stubborn calcium and rust rings that regular washing leaves behind.",
+    price: 79,
+    appliesTo: ["window_cleaning"],
+    requiresAnyServices: ["window_cleaning"],
+    category: "add_on",
+    pricingMode: "flat",
+    priceConfig: { amount: 79 },
+    priority: 65,
+    exclusiveGroup: "window-addon",
+    // Hard water treatment is a separate chemical process — not suppressed by any tier
+  },
+
+  // ── Cross-sells: adjacent services that pair naturally with current selection ─
+
   {
     id: "driveway_crosssell",
     title: "Add Driveway Cleaning",
-    description: "Most customers add driveway cleaning while we're already on site — saves a trip and keeps pricing sharp.",
+    description: "Most customers add driveway cleaning while we're on site — one trip, sharper pricing, noticeably cleaner curb.",
     price: 119,
     appliesTo: ["house_washing"],
     requiresAnyServices: ["house_washing"],
     excludeIfServicesSelected: ["driveway_cleaning"],
     badge: "Recommended",
-    category: "cross-sell",
+    category: "cross_sell",
+    pricingMode: "flat",
+    priceConfig: { amount: 119 },
     priority: 85,
   },
   {
     id: "gutter_cleaning_crosssell",
     title: "Add Gutter Cleaning",
-    description: "Roof wash loosens debris that settles in gutters. Clean them in the same visit for best results.",
+    description: "Roof wash loosens debris that settles straight into your gutters. Cleaning them in the same visit prevents the mess from re-entering.",
     price: 129,
     appliesTo: ["roof_cleaning"],
     requiresAnyServices: ["roof_cleaning"],
     excludeIfServicesSelected: ["gutter_cleaning"],
     badge: "Recommended",
-    category: "cross-sell",
+    category: "cross_sell",
+    pricingMode: "flat",
+    priceConfig: { amount: 129 },
     priority: 85,
   },
   {
@@ -329,23 +378,61 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     requiresAnyServices: ["window_cleaning"],
     excludeIfServicesSelected: ["interior_window_cleaning"],
     badge: "Recommended",
-    category: "cross-sell",
+    category: "cross_sell",
+    pricingMode: "flat",
+    priceConfig: { amount: 99 },
     priority: 80,
-    // Suppress when Signature Sparkle or Platinum Perfection already include interior glass
+    // Suppress for Signature Sparkle and Platinum Perfection — both include interior_glass
     suppressIfFeatureCovered: ["interior_glass"],
   },
-  // ── Bundles ────────────────────────────────────────────────────────────
+  {
+    id: "house_washing_crosssell",
+    title: "Add House Washing",
+    description: "Since we're already treating your roof, add a full soft-wash house exterior — same crew, same visit, cleaner result overall.",
+    price: 199,
+    appliesTo: ["roof_cleaning"],
+    requiresAnyServices: ["roof_cleaning"],
+    excludeIfServicesSelected: ["house_washing"],
+    badge: "Recommended",
+    category: "cross_sell",
+    pricingMode: "flat",
+    priceConfig: { amount: 199 },
+    priority: 78,
+  },
+
+  // ── Bundles: named packages with visible savings or value framing ───────────
+
   {
     id: "curb_appeal_bundle",
-    title: "Curb Appeal Bundle",
-    description: "Add walkway touch-up and edge rinse for a polished full-front finish.",
+    title: "Curb Appeal Package",
+    description: "Includes walkway touch-up and edge rinse alongside your house wash — polished full-front look in one visit.",
     price: 99,
     appliesTo: ["house_washing"],
     requiresAnyServices: ["house_washing"],
     excludeIfServicesSelected: ["driveway_cleaning", "walkway_cleaning"],
     badge: "Bundle",
     category: "bundle",
+    pricingMode: "bundle_discount",
+    priceConfig: { bundlePrice: 99, discountAmount: 30 },
+    displaySavingsText: "Save ~$30 vs adding separately",
     priority: 90,
+  },
+  {
+    id: "roof_house_gutter_combo",
+    title: "Roof + House + Gutters Combo",
+    description: "Full exterior treatment in one visit — roof soft-wash, house wash, and gutter cleaning together. Best value when combining all three.",
+    price: 249,
+    appliesTo: ["roof_cleaning"],
+    requiresAnyServices: ["roof_cleaning"],
+    // Suppress if they've already independently chosen house or gutters
+    excludeIfServicesSelected: ["house_washing", "gutter_cleaning"],
+    badge: "Best Value",
+    category: "bundle",
+    pricingMode: "bundle_discount",
+    priceConfig: { bundlePrice: 249, discountAmount: 79 },
+    displaySavingsText: "Save ~$79 vs booking each separately",
+    priority: 88,
+    includesServices: ["house_washing", "gutter_cleaning"],
   },
 ];
 
@@ -639,7 +726,7 @@ export default function QuoteTool() {
     const totalPrice = Math.max(0, rawQuoteSummary.totalPrice - bundleChoiceSavings);
     return { ...rawQuoteSummary, subtotal, totalPrice, bundleChoiceSavings };
   }, [bundleChoiceSavings, rawQuoteSummary]);
-  const { displayOffers: displayUpsells, micro: _microOffer } = useMemo(() =>
+  const { displayOffers: displayUpsells, addOn: _addOnOffer } = useMemo(() =>
     evaluateUpsells(upsellCatalog, {
       selectedServices,
       sqft: propertyIntel?.livingAreaSqft ?? undefined,
@@ -2610,9 +2697,12 @@ const SERVICE_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
+  "add_on": "Add-on",
+  "cross_sell": "Recommended Extra",
+  "bundle": "Package",
+  // legacy aliases kept for any admin-sourced catalog rows
   "micro": "Add-on",
   "cross-sell": "Recommended Extra",
-  "bundle": "Package",
 };
 
 function StepUpsells({
@@ -2706,6 +2796,11 @@ function StepUpsells({
                     <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                       {upsell.description}
                     </p>
+                    {upsell.displaySavingsText && (
+                      <p className="text-[11px] text-green-600 font-medium mt-1">
+                        {upsell.displaySavingsText}
+                      </p>
+                    )}
                     {upsell.category && (
                       <p className="text-[10px] text-muted-foreground/60 mt-1 uppercase tracking-wide">
                         {CATEGORY_LABEL[upsell.category] ?? upsell.category}
