@@ -205,12 +205,41 @@ const SLIDER_DEFAULTS: Record<
 };
 
 /**
- * Build the set of features already covered by the user's current selections.
- * This lets the upsell engine suppress offers for capabilities the user's
- * package tier already includes — e.g. don't offer "Add Interior Windows"
- * when the user picked Signature Sparkle or Platinum Perfection.
+ * Machine-readable source of truth for window package tier inclusions.
+ * Feature keys here must exactly match suppressIfFeatureCovered values on
+ * catalog items. Keep in sync with WindowPackageSelector display copy.
  *
- * Feature keys must match the suppressIfFeatureCovered values on catalog items.
+ * good   = Expert Essential
+ * better = Signature Sparkle
+ * best   = Platinum Perfection
+ */
+const WINDOW_PACKAGE_FEATURES: Record<string, string[]> = {
+  good: [
+    "exterior_glass",
+    "screen_removal_replacement",
+  ],
+  better: [
+    "exterior_glass",
+    "interior_glass",
+    "frames_wiped",
+    "interior_ledges_wiped",
+  ],
+  best: [
+    "exterior_glass",
+    "interior_glass",
+    "frames_wiped",
+    "interior_ledges_wiped",
+    "sills",
+    "ledges",
+    "deep_screen_washing",
+    "deep_track_detailing",
+  ],
+};
+
+/**
+ * Derive the set of features already covered by the user's current selections.
+ * Coverage comes from selected window package tiers.
+ * Feature keys produced here must match suppressIfFeatureCovered on catalog items.
  */
 function buildCoveredFeatures(
   selectedServices: Set<string>,
@@ -219,19 +248,9 @@ function buildCoveredFeatures(
   const covered = new Set<string>();
 
   if (selectedServices.has("window_cleaning")) {
-    const tier = serviceInputs["window_cleaning"]?.packageTier as string | undefined;
-    // "better" = Signature Sparkle: includes interior glass + frames
-    if (tier === "better") {
-      covered.add("interior_windows");
-      covered.add("frames_and_sills");
-    }
-    // "best" = Platinum Perfection: includes everything
-    if (tier === "best") {
-      covered.add("interior_windows");
-      covered.add("frames_and_sills");
-      covered.add("screens");
-      covered.add("tracks");
-    }
+    const tier = (serviceInputs["window_cleaning"]?.packageTier as string | undefined) ?? "good";
+    const features = WINDOW_PACKAGE_FEATURES[tier] ?? [];
+    features.forEach(f => covered.add(f));
   }
 
   return covered;
@@ -249,8 +268,8 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     category: "micro",
     priority: 80,
     exclusiveGroup: "window-micro",
-    // Platinum Perfection already includes deep screen washing
-    suppressIfFeatureCovered: ["screens"],
+    // Suppress when Platinum Perfection's deep_screen_washing already covers this
+    suppressIfFeatureCovered: ["deep_screen_washing"],
   },
   {
     id: "window_track_sill_detail",
@@ -261,8 +280,9 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     category: "micro",
     priority: 70,
     exclusiveGroup: "window-micro",
-    // Platinum Perfection already includes deep track detailing and sill work
-    suppressIfFeatureCovered: ["tracks"],
+    // Suppress only when Platinum Perfection covers deep track detailing AND sills.
+    // Signature Sparkle includes frame wiping but NOT sills or deep track — valid upsell there.
+    suppressIfFeatureCovered: ["deep_track_detailing", "sills"],
   },
   {
     id: "gutter_brightening_addon",
@@ -311,8 +331,8 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     badge: "Recommended",
     category: "cross-sell",
     priority: 80,
-    // Signature Sparkle and Platinum Perfection already include interior glass
-    suppressIfFeatureCovered: ["interior_windows"],
+    // Suppress when Signature Sparkle or Platinum Perfection already include interior glass
+    suppressIfFeatureCovered: ["interior_glass"],
   },
   // ── Bundles ────────────────────────────────────────────────────────────
   {
