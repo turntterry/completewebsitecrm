@@ -132,8 +132,8 @@ export async function autoCreateInvoiceFromJob(
     // Step 5: Create draft invoice
     const invoiceResult = await db.execute(sql`
       INSERT INTO invoices (
-        companyId, customerId, jobId, invoiceNumber, status,
-        subtotal, taxRate, taxAmount, tipAmount, total
+        "companyId", "customerId", "jobId", "invoiceNumber", status,
+        subtotal, "taxRate", "taxAmount", "tipAmount", total
       )
       VALUES (
         ${input.companyId}, ${job.customerId}, ${input.jobId},
@@ -163,7 +163,7 @@ export async function autoCreateInvoiceFromJob(
           const cost = jobCostData[i];
           await db.execute(sql`
             INSERT INTO invoice_line_items (
-              invoiceId, sortOrder, description, unitPrice, quantity, total
+              "invoiceId", "sortOrder", description, "unitPrice", quantity, total
             )
             VALUES (
               ${invoiceId}, ${i}, ${cost.description}, ${cost.amount}, '1', ${cost.amount}
@@ -174,7 +174,7 @@ export async function autoCreateInvoiceFromJob(
         // Fallback: use job title as single line item
         await db.execute(sql`
           INSERT INTO invoice_line_items (
-            invoiceId, sortOrder, description, unitPrice, quantity, total
+            "invoiceId", "sortOrder", description, "unitPrice", quantity, total
           )
           VALUES (
             ${invoiceId}, 0, ${job.title || "Job Services"}, ${total}, '1', ${total}

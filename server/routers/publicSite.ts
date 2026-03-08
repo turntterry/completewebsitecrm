@@ -595,7 +595,7 @@ const quoteRouter = router({
         // Update session with raw SQL to avoid datetime formatting issues
         await db.execute(sql`
           UPDATE quote_sessions
-          SET submittedAt = NOW()
+          SET "submittedAt" = NOW()
           WHERE id = ${sessionRow.id}
         `);
 

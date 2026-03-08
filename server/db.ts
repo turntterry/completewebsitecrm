@@ -79,17 +79,18 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const email = user.email ?? null;
   const loginMethod = user.loginMethod ?? null;
   const role = user.role ?? (openId === ENV.ownerOpenId ? "admin" : "user");
-  const lastSignedIn = user.lastSignedIn ?? new Date();
+  const lastSignedIn = (user.lastSignedIn ?? new Date()).toISOString();
 
   // PostgreSQL upsert: ON CONFLICT ... DO UPDATE
+  // Note: camelCase column names must be double-quoted in PostgreSQL raw SQL
   await db.execute(sql`
-    INSERT INTO users (openId, name, email, loginMethod, role, lastSignedIn)
+    INSERT INTO users ("openId", name, email, "loginMethod", role, "lastSignedIn")
     VALUES (${openId}, ${name}, ${email}, ${loginMethod}, ${role}, ${lastSignedIn})
-    ON CONFLICT (openId) DO UPDATE SET
+    ON CONFLICT ("openId") DO UPDATE SET
       name = EXCLUDED.name,
       email = EXCLUDED.email,
-      loginMethod = EXCLUDED.loginMethod,
-      lastSignedIn = EXCLUDED.lastSignedIn
+      "loginMethod" = EXCLUDED."loginMethod",
+      "lastSignedIn" = EXCLUDED."lastSignedIn"
   `);
 }
 
