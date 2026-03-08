@@ -479,7 +479,8 @@ export async function getInvoiceWithLineItems(id: number, companyId: number) {
   const invoice = await getInvoice(id, companyId);
   if (!invoice) return null;
   const lineItems = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id)).orderBy(invoiceLineItems.sortOrder);
-  return { ...invoice, lineItems };
+  const customer = await getCustomer(invoice.customerId, companyId);
+  return { ...invoice, lineItems, customer };
 }
 
 export async function getNextInvoiceNumber(companyId: number) {
