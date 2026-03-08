@@ -33,6 +33,18 @@ export interface UpsellItem {
   minSqft?: number;
   /** Maximum living area sqft allowed. */
   maxSqft?: number;
+  /**
+   * Services this bundle/offer effectively contains.
+   * If any listed service is already directly selected, the offer is suppressed
+   * (prevents showing a "House Wash Combo" when house washing is already in cart).
+   */
+  includesServices?: string[];
+  /**
+   * Suppress this offer when any of these feature keys are already covered
+   * by the user's current selection (e.g. package tier, another bundle).
+   * Example: ["interior_windows"] on Add Interior Windows upsell.
+   */
+  suppressIfFeatureCovered?: string[];
   /** Passthrough storage for admin-defined rule overrides. */
   rules?: Record<string, unknown>;
 }
@@ -42,6 +54,12 @@ export interface UpsellContext {
   sqft?: number | null;
   stories?: number | null;
   subtotal: number;
+  /**
+   * Derived features already covered by the user's selection.
+   * Built from selected package tiers, bundle choices, and service defaults.
+   * Used to suppress offers that are redundant with current package coverage.
+   */
+  coveredFeatures?: Set<string>;
 }
 
 export interface EvaluatedOffers {
@@ -59,6 +77,18 @@ function isEligible(item: UpsellItem, ctx: UpsellContext): boolean {
 
   // Suppression: conflicting service already selected
   if (item.excludeIfServicesSelected?.some(s => ctx.selectedServices.has(s))) return false;
+
+  // Bundle component suppression: if this offer "includes" a service the user
+  // already has, showing it would imply double-charging for that service.
+  if (item.includesServices?.some(s => ctx.selectedServices.has(s))) return false;
+
+  // Feature-coverage suppression: hide offers when the user's selected package
+  // tier (or another bundle) already covers the advertised capability.
+  if (
+    item.suppressIfFeatureCovered &&
+    ctx.coveredFeatures &&
+    item.suppressIfFeatureCovered.some(f => ctx.coveredFeatures!.has(f))
+  ) return false;
 
   // Property size guards
   if (item.minSqft != null && ctx.sqft != null && ctx.sqft < item.minSqft) return false;

@@ -204,6 +204,39 @@ const SLIDER_DEFAULTS: Record<
   },
 };
 
+/**
+ * Build the set of features already covered by the user's current selections.
+ * This lets the upsell engine suppress offers for capabilities the user's
+ * package tier already includes — e.g. don't offer "Add Interior Windows"
+ * when the user picked Signature Sparkle or Platinum Perfection.
+ *
+ * Feature keys must match the suppressIfFeatureCovered values on catalog items.
+ */
+function buildCoveredFeatures(
+  selectedServices: Set<string>,
+  serviceInputs: Record<string, BundleAwarePricingInput>
+): Set<string> {
+  const covered = new Set<string>();
+
+  if (selectedServices.has("window_cleaning")) {
+    const tier = serviceInputs["window_cleaning"]?.packageTier as string | undefined;
+    // "better" = Signature Sparkle: includes interior glass + frames
+    if (tier === "better") {
+      covered.add("interior_windows");
+      covered.add("frames_and_sills");
+    }
+    // "best" = Platinum Perfection: includes everything
+    if (tier === "best") {
+      covered.add("interior_windows");
+      covered.add("frames_and_sills");
+      covered.add("screens");
+      covered.add("tracks");
+    }
+  }
+
+  return covered;
+}
+
 const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
   // ── Micro upsells ──────────────────────────────────────────────────────
   {
@@ -216,6 +249,8 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     category: "micro",
     priority: 80,
     exclusiveGroup: "window-micro",
+    // Platinum Perfection already includes deep screen washing
+    suppressIfFeatureCovered: ["screens"],
   },
   {
     id: "window_track_sill_detail",
@@ -226,6 +261,8 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     category: "micro",
     priority: 70,
     exclusiveGroup: "window-micro",
+    // Platinum Perfection already includes deep track detailing and sill work
+    suppressIfFeatureCovered: ["tracks"],
   },
   {
     id: "gutter_brightening_addon",
@@ -274,6 +311,8 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     badge: "Recommended",
     category: "cross-sell",
     priority: 80,
+    // Signature Sparkle and Platinum Perfection already include interior glass
+    suppressIfFeatureCovered: ["interior_windows"],
   },
   // ── Bundles ────────────────────────────────────────────────────────────
   {
@@ -340,6 +379,7 @@ export default function QuoteTool() {
   );
   const lastLookupKeyRef = useRef<string | null>(null);
   const autoPrefilledServicesRef = useRef<Set<string>>(new Set());
+  const newlyAddedServicesRef = useRef<Set<string>>(new Set());
 
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
@@ -585,8 +625,9 @@ export default function QuoteTool() {
       sqft: propertyIntel?.livingAreaSqft ?? undefined,
       stories: propertyIntel?.stories ?? undefined,
       subtotal: quoteSummary?.subtotal ?? 0,
+      coveredFeatures: buildCoveredFeatures(selectedServices, serviceInputs),
     }),
-    [upsellCatalog, selectedServices, propertyIntel, quoteSummary?.subtotal]
+    [upsellCatalog, selectedServices, serviceInputs, propertyIntel, quoteSummary?.subtotal]
   );
 
   // eligibleUpsells kept for any legacy checks (e.g. empty-state messaging)
@@ -691,6 +732,7 @@ export default function QuoteTool() {
         });
       } else {
         next.add(id);
+        newlyAddedServicesRef.current.add(id);
         if (!serviceInputs[id]) {
           setServiceInputs(prev => ({ ...prev, [id]: getDefaultInputs(id) }));
         }
@@ -963,7 +1005,9 @@ export default function QuoteTool() {
       selectedServices.forEach(id => {
         const existing = next[id] ?? getDefaultInputs(id);
         const wasAuto =
-          !prev[id] || autoPrefilledServicesRef.current.has(id);
+          newlyAddedServicesRef.current.has(id) ||
+          autoPrefilledServicesRef.current.has(id);
+        newlyAddedServicesRef.current.delete(id);
         if (!wasAuto) return;
 
         const updates: Record<string, unknown> = {};
