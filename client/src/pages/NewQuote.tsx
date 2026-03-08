@@ -817,7 +817,7 @@ export default function NewQuote() {
               ) : (
                 <p className="text-sm text-muted-foreground">Switch to Preview to see the client-facing layout.</p>
               )}
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-6">
                 <Button
                   type="button"
                   variant="outline"
