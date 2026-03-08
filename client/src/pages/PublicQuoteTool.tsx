@@ -60,6 +60,7 @@ import { usePageMeta } from "@/hooks/usePageMeta";
 import { toast } from "sonner";
 import { Slot } from "@shared/availability";
 import { trackEvent } from "@/lib/analytics";
+import { evaluateUpsells, type UpsellItem } from "@shared/upsellRules";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Home: HomeIcon,
@@ -203,14 +204,8 @@ const SLIDER_DEFAULTS: Record<
   },
 };
 
-const DEFAULT_UPSELL_CATALOG: {
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  appliesTo: string[];
-  badge?: string;
-}[] = [
+const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
+  // ── Micro upsells ──────────────────────────────────────────────────────
   {
     id: "window_screen_deep_clean",
     title: "Screen Deep Clean",
@@ -218,6 +213,9 @@ const DEFAULT_UPSELL_CATALOG: {
     price: 89,
     appliesTo: ["window_cleaning"],
     badge: "Popular",
+    category: "micro",
+    priority: 80,
+    exclusiveGroup: "window-micro",
   },
   {
     id: "window_track_sill_detail",
@@ -225,22 +223,70 @@ const DEFAULT_UPSELL_CATALOG: {
     description: "Premium detailing for tracks, sills, and frame edges.",
     price: 129,
     appliesTo: ["window_cleaning"],
-  },
-  {
-    id: "curb_appeal_bundle",
-    title: "Curb Appeal Bundle",
-    description: "Add walkway touch-up and edge rinse for a full-front finish.",
-    price: 99,
-    appliesTo: ["house_washing", "driveway_cleaning", "walkway_cleaning"],
-    badge: "Bundle",
+    category: "micro",
+    priority: 70,
+    exclusiveGroup: "window-micro",
   },
   {
     id: "gutter_brightening_addon",
     title: "Gutter Brightening",
-    description:
-      "Restore exterior gutter appearance with targeted brightening.",
+    description: "Restore exterior gutter appearance with targeted brightening.",
     price: 79,
-    appliesTo: ["house_washing", "gutter_cleaning"],
+    // Only show when gutter cleaning is already in cart
+    appliesTo: ["gutter_cleaning"],
+    requiresAnyServices: ["gutter_cleaning"],
+    category: "micro",
+    priority: 75,
+  },
+  // ── Adjacent-service cross-sells ───────────────────────────────────────
+  {
+    id: "driveway_crosssell",
+    title: "Add Driveway Cleaning",
+    description: "Most customers add driveway cleaning while we're already on site — saves a trip and keeps pricing sharp.",
+    price: 119,
+    appliesTo: ["house_washing"],
+    requiresAnyServices: ["house_washing"],
+    excludeIfServicesSelected: ["driveway_cleaning"],
+    badge: "Recommended",
+    category: "cross-sell",
+    priority: 85,
+  },
+  {
+    id: "gutter_cleaning_crosssell",
+    title: "Add Gutter Cleaning",
+    description: "Roof wash loosens debris that settles in gutters. Clean them in the same visit for best results.",
+    price: 129,
+    appliesTo: ["roof_cleaning"],
+    requiresAnyServices: ["roof_cleaning"],
+    excludeIfServicesSelected: ["gutter_cleaning"],
+    badge: "Recommended",
+    category: "cross-sell",
+    priority: 85,
+  },
+  {
+    id: "interior_windows_crosssell",
+    title: "Add Interior Windows",
+    description: "While we clean the outside, add interior glass for a complete clear view — no second appointment needed.",
+    price: 99,
+    appliesTo: ["window_cleaning"],
+    requiresAnyServices: ["window_cleaning"],
+    excludeIfServicesSelected: ["interior_window_cleaning"],
+    badge: "Recommended",
+    category: "cross-sell",
+    priority: 80,
+  },
+  // ── Bundles ────────────────────────────────────────────────────────────
+  {
+    id: "curb_appeal_bundle",
+    title: "Curb Appeal Bundle",
+    description: "Add walkway touch-up and edge rinse for a polished full-front finish.",
+    price: 99,
+    appliesTo: ["house_washing"],
+    requiresAnyServices: ["house_washing"],
+    excludeIfServicesSelected: ["driveway_cleaning", "walkway_cleaning"],
+    badge: "Bundle",
+    category: "bundle",
+    priority: 90,
   },
 ];
 
@@ -533,25 +579,18 @@ export default function QuoteTool() {
     const totalPrice = Math.max(0, rawQuoteSummary.totalPrice - bundleChoiceSavings);
     return { ...rawQuoteSummary, subtotal, totalPrice, bundleChoiceSavings };
   }, [bundleChoiceSavings, rawQuoteSummary]);
-  const eligibleUpsells = useMemo(() => {
-    const selected = new Set(Array.from(selectedServices));
-    return upsellCatalog.filter(upsell =>
-      upsell.appliesTo.some(service => selected.has(service))
-    );
-  }, [selectedServices, upsellCatalog]);
+  const { displayOffers: displayUpsells, micro: _microOffer } = useMemo(() =>
+    evaluateUpsells(upsellCatalog, {
+      selectedServices,
+      sqft: propertyIntel?.livingAreaSqft ?? undefined,
+      stories: propertyIntel?.stories ?? undefined,
+      subtotal: quoteSummary?.subtotal ?? 0,
+    }),
+    [upsellCatalog, selectedServices, propertyIntel, quoteSummary?.subtotal]
+  );
 
-  const displayUpsells = useMemo(() => {
-    if (eligibleUpsells.length === 0) return [];
-    const sorted = [...eligibleUpsells].sort((a, b) => {
-      if (a.badge === "Bundle" && b.badge !== "Bundle") return -1;
-      if (b.badge === "Bundle" && a.badge !== "Bundle") return 1;
-      return a.price - b.price;
-    });
-    const limited = sorted.slice(0, 3).map((item, idx) =>
-      idx === 0 && !item.badge ? { ...item, badge: "Most Popular" } : item
-    );
-    return limited;
-  }, [eligibleUpsells]);
+  // eligibleUpsells kept for any legacy checks (e.g. empty-state messaging)
+  const eligibleUpsells = displayUpsells;
 
   const acceptedUpsellItems = useMemo(
     () => displayUpsells.filter(upsell => acceptedUpsells[upsell.id]),
@@ -680,15 +719,18 @@ export default function QuoteTool() {
   const toggleUpsell = (upsellId: string) => {
     setAcceptedUpsells(prev => {
       const next = { ...prev, [upsellId]: !prev[upsellId] };
-      if (sessionToken && next[upsellId]) {
-        const upsell = upsellCatalog.find(item => item.id === upsellId);
-        if (upsell) {
-          trackEventMutation.mutate({
-            sessionToken,
-            eventName: "upsell_accepted",
-            payload: { upsellId, title: upsell.title, price: upsell.price },
-          });
-        }
+      const upsell = displayUpsells.find(item => item.id === upsellId);
+      if (sessionToken && upsell) {
+        trackEventMutation.mutate({
+          sessionToken,
+          eventName: next[upsellId] ? "upsell_accepted" : "upsell_removed",
+          payload: {
+            upsellId,
+            title: upsell.title,
+            price: upsell.price,
+            category: upsell.category ?? "micro",
+          },
+        });
       }
       return next;
     });
@@ -967,11 +1009,13 @@ export default function QuoteTool() {
     });
   }, [propertyIntel, selectedServices]);
 
+  // Fire upsell_shown only when user actually reaches the Enhance step (step 4)
+  // and only for the exact offers that are rendered — not all eligible items.
   useEffect(() => {
-    if (!sessionToken || eligibleUpsells.length === 0) return;
+    if (step !== 4 || !sessionToken || displayUpsells.length === 0) return;
 
-    for (const upsell of eligibleUpsells) {
-      if (shownUpsellsRef.current.has(upsell.id)) continue;
+    displayUpsells.forEach((upsell, position) => {
+      if (shownUpsellsRef.current.has(upsell.id)) return;
       shownUpsellsRef.current.add(upsell.id);
       trackEventMutation.mutate({
         sessionToken,
@@ -980,10 +1024,13 @@ export default function QuoteTool() {
           upsellId: upsell.id,
           title: upsell.title,
           price: upsell.price,
+          category: upsell.category ?? "micro",
+          position,
+          subtotalBeforeUpsell: quoteSummary?.subtotal ?? 0,
         },
       });
-    }
-  }, [sessionToken, eligibleUpsells, trackEventMutation]);
+    });
+  }, [step, sessionToken, displayUpsells, quoteSummary?.subtotal, trackEventMutation]);
 
   const handleScheduleHandoffStart = () => {
     if (!sessionToken || !quoteResult?.schedulingEligible) return;
@@ -1367,7 +1414,7 @@ export default function QuoteTool() {
               )}
               {step === 4 && (
                 <StepUpsells
-                  eligibleUpsells={eligibleUpsells}
+                  displayUpsells={displayUpsells}
                   acceptedUpsells={acceptedUpsells}
                   toggleUpsell={toggleUpsell}
                   upsellTotal={upsellTotal}
@@ -2498,13 +2545,21 @@ const SERVICE_LABELS: Record<string, string> = {
   detached_structure: "detached structure",
 };
 
+const CATEGORY_LABEL: Record<string, string> = {
+  "micro": "Add-on",
+  "cross-sell": "Recommended Extra",
+  "bundle": "Package",
+};
+
 function StepUpsells({
-  eligibleUpsells,
+  displayUpsells,
   acceptedUpsells,
   toggleUpsell,
   upsellTotal,
   selectedServices,
 }: any) {
+  // Support legacy prop name
+  const eligibleUpsells = displayUpsells;
   const acceptedCount = Object.values(acceptedUpsells).filter(Boolean).length;
 
   // Build a readable list of selected service names for the subtitle
@@ -2587,6 +2642,11 @@ function StepUpsells({
                     <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                       {upsell.description}
                     </p>
+                    {upsell.category && (
+                      <p className="text-[10px] text-muted-foreground/60 mt-1 uppercase tracking-wide">
+                        {CATEGORY_LABEL[upsell.category] ?? upsell.category}
+                      </p>
+                    )}
                   </div>
 
                   <p

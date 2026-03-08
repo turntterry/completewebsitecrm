@@ -92,6 +92,7 @@ const quoteRouter = router({
           "service_removed",
           "upsell_shown",
           "upsell_accepted",
+          "upsell_removed",
           "quote_submitted",
           "schedule_blocked",
           "schedule_started",
