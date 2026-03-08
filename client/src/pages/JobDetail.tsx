@@ -3,7 +3,9 @@ import { useParams, Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Calendar, Clock, CheckCircle, PlayCircle, Camera } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, MapPin, Calendar, Clock, CheckCircle, PlayCircle, Camera, X } from "lucide-react";
 import { toast } from "sonner";
 import JobCostingPanel from "@/components/JobCostingPanel";
 import JobPhotosTab from "@/components/JobPhotosTab";
@@ -23,6 +25,9 @@ export default function JobDetail() {
   const id = parseInt(params.id ?? "0");
   const [activeTab, setActiveTab] = useState<"details" | "photos">("details");
   const [, navigate] = useLocation();
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [scheduledEndAt, setScheduledEndAt] = useState("");
   const utils = trpc.useUtils();
   const { data: job, isLoading } = trpc.jobs.get.useQuery({ id }, { enabled: !!id && id > 0 });
   const { data: jobPhotos = [] } = trpc.attachments.list.useQuery(
@@ -43,6 +48,16 @@ export default function JobDetail() {
       utils.jobs.get.invalidate({ id });
       toast.success(`Invoice #${result.invoiceNumber} created`);
       navigate(`/admin/invoices/${result.invoiceId}`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const addVisitMutation = trpc.jobs.addVisit.useMutation({
+    onSuccess: () => {
+      utils.jobs.get.invalidate({ id });
+      setShowScheduleModal(false);
+      setScheduledAt("");
+      setScheduledEndAt("");
+      toast.success("Job scheduled!");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -87,8 +102,8 @@ export default function JobDetail() {
             </Button>
           )}
           {j.status === "draft" && (
-            <Button size="sm" onClick={() => updateMutation.mutate({ id, status: "scheduled" })} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Scheduling..." : "Schedule Job"}
+            <Button size="sm" onClick={() => setShowScheduleModal(true)}>
+              Schedule Job
             </Button>
           )}
           {(j.status === "completed" || j.status === "requires_invoicing") && (
@@ -280,6 +295,63 @@ export default function JobDetail() {
             <JobCostingPanel jobId={id} />
           </div>
         </>
+      )}
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="flex items-center justify-between pb-3">
+              <CardTitle>Schedule First Visit</CardTitle>
+              <button onClick={() => setShowScheduleModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Start Date & Time</Label>
+                <Input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date & Time (optional)</Label>
+                <Input
+                  type="datetime-local"
+                  value={scheduledEndAt}
+                  onChange={(e) => setScheduledEndAt(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-4">
+                <Button variant="outline" onClick={() => setShowScheduleModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!scheduledAt) {
+                      toast.error("Please select a start date and time");
+                      return;
+                    }
+                    updateMutation.mutate({ id, status: "scheduled" }, {
+                      onSuccess: () => {
+                        addVisitMutation.mutate({
+                          jobId: id,
+                          scheduledAt,
+                          scheduledEndAt: scheduledEndAt || undefined,
+                        });
+                      },
+                    });
+                  }}
+                  disabled={updateMutation.isPending || addVisitMutation.isPending}
+                >
+                  {updateMutation.isPending || addVisitMutation.isPending ? "Scheduling..." : "Schedule"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
