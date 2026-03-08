@@ -13,7 +13,7 @@ import {
   quoteToolSettings,
   serviceConfigs,
 } from "../../drizzle/schema";
-import { asc, desc, eq, and, inArray } from "drizzle-orm";
+import { asc, desc, eq, and, inArray, sql } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { SEED_GALLERY } from "@shared/data";
 import { nanoid } from "nanoid";
@@ -592,10 +592,12 @@ const quoteRouter = router({
       const quoteId = (result as any).insertId as number;
 
       if (sessionRow) {
-        await db
-          .update(quoteSessions)
-          .set({ submittedAt: new Date() })
-          .where(eq(quoteSessions.id, sessionRow.id));
+        // Update session with raw SQL to avoid datetime formatting issues
+        await db.execute(sql`
+          UPDATE quote_sessions
+          SET submittedAt = NOW()
+          WHERE id = ${sessionRow.id}
+        `);
 
         await db.insert(quoteSessionEvents).values({
           sessionId: sessionRow.id,
