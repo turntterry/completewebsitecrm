@@ -20,21 +20,12 @@ import {
 } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 import { ENV } from "../_core/env";
+import { getTwilioClient } from "../_core/sms";
 
 async function getCompanyId(userId: number, userName: string) {
   const company = await getOrCreateCompany(userId, userName ?? "Exterior Experts");
   if (!company) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
   return company.id;
-}
-
-function getTwilioClient() {
-  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = ENV;
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) return null;
-  try {
-    return require("twilio")(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) as any;
-  } catch {
-    return null;
-  }
 }
 
 /** Build the Google review link from a Place ID */
@@ -125,7 +116,7 @@ export const marketingRouter = router({
         let twilioSid: string | undefined;
         let status: "sent" | "failed" | "queued" = "queued";
 
-        const client = getTwilioClient();
+        const client = await getTwilioClient();
         if (client && ENV.TWILIO_PHONE_NUMBER && convo) {
           try {
             const msg = await client.messages.create({
@@ -199,7 +190,7 @@ export const marketingRouter = router({
       const customerList = await sendCampaignToAllCustomers(input.id, companyId);
 
       let sentCount = 0;
-      const client = getTwilioClient();
+      const client = await getTwilioClient();
 
       if (campaign.type === "sms" && client && ENV.TWILIO_PHONE_NUMBER) {
         for (const customer of customerList) {
