@@ -1,5 +1,7 @@
 import SiteLayout from "@/components/SiteLayout";
 import { DEFAULT_COMPANY_ID } from "@/lib/tenancy";
+import { AddressAutocompleteInput } from "@/components/AddressAutocompleteInput";
+import { geocodeAddress } from "@/lib/maps";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -1032,12 +1034,41 @@ export default function QuoteTool() {
     });
   }, [sessionToken, slots.length, slotsQuery.isFetching, step, trackEventMutation]);
 
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState("");
+
+  // On step 0 Next: if city/zip not yet filled (user typed but didn't pick autocomplete),
+  // geocode the typed address to fill them before advancing.
+  const handleNext = async () => {
+    if (step === 0 && (!city.trim() || !zip.trim())) {
+      if (!address.trim()) return;
+      setGeocoding(true);
+      setGeocodeError("");
+      try {
+        const parsed = await geocodeAddress(address);
+        if (parsed.city) setCity(parsed.city);
+        if (parsed.state) setStateVal(parsed.state);
+        if (parsed.zip) setZip(parsed.zip);
+        if (parsed.lat) setLat(parsed.lat);
+        if (parsed.lng) setLng(parsed.lng);
+        if (parsed.street) setAddress(parsed.street);
+        setStep(step + 1);
+      } catch {
+        setGeocodeError("Couldn't find that address. Please check it and try again.");
+      } finally {
+        setGeocoding(false);
+      }
+      return;
+    }
+    setStep(step + 1);
+  };
+
   const canProceed = () => {
     switch (step) {
       case 0:
+        // City/zip not required here — handleNext geocodes them if missing
         return (
           address.trim().length > 0 &&
-          city.trim().length > 0 &&
           name.trim().length > 0 &&
           email.trim().length > 0 &&
           phone.trim().length > 0 &&
@@ -1302,6 +1333,7 @@ export default function QuoteTool() {
                 outOfRange={outOfRange}
                 setOutOfRange={setOutOfRange}
                 globalConfig={globalConfig}
+                geocodeError={geocodeError}
               />
             )}
             {step === 1 && (
@@ -1455,11 +1487,15 @@ export default function QuoteTool() {
                 )}
                 {step < STEPS.length - 1 ? (
                   <Button
-                    onClick={() => setStep(step + 1)}
-                    disabled={!canProceed()}
+                    onClick={handleNext}
+                    disabled={!canProceed() || geocoding}
                     className="bg-primary hover:bg-navy-light text-white font-semibold"
                   >
-                    Next <ArrowRight className="w-4 h-4 ml-1" />
+                    {geocoding ? (
+                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Checking…</>
+                    ) : (
+                      <>Next <ArrowRight className="w-4 h-4 ml-1" /></>
+                    )}
                   </Button>
                 ) : null}
               </div>
@@ -1513,6 +1549,7 @@ function StepAddress({
   outOfRange,
   setOutOfRange,
   globalConfig,
+  geocodeError,
 }: any) {
   return (
     <div>
@@ -1567,14 +1604,23 @@ function StepAddress({
             <MapPin className="w-4 h-4 inline mr-1" />
             Street Address
           </Label>
-          <Input
+          <AddressAutocompleteInput
             id="address"
             value={address}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setAddress(e.target.value)
-            }
+            onChange={setAddress}
+            onSelect={(parsed) => {
+              if (parsed.street) setAddress(parsed.street);
+              if (parsed.city) setCity(parsed.city);
+              if (parsed.state) setStateVal(parsed.state);
+              if (parsed.zip) setZip(parsed.zip);
+              if (parsed.lat) setLat(parsed.lat);
+              if (parsed.lng) setLng(parsed.lng);
+            }}
             placeholder="123 Main Street"
           />
+          {geocodeError && (
+            <p className="text-red-500 text-sm mt-1">{geocodeError}</p>
+          )}
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-1">
