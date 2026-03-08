@@ -658,9 +658,10 @@ export default function Automations() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Zap className="h-6 w-6 text-amber-500" /> Automations
+            <Badge variant="secondary" className="text-xs font-medium">Beta</Badge>
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Auto-run actions when things happen in your CRM
+            Auto-run actions when things happen in your CRM. SMS delivery requires Twilio to be configured. Email actions are not yet supported.
           </p>
         </div>
         <Button onClick={() => { setEditRule(null); setShowBuilder(true); }}>

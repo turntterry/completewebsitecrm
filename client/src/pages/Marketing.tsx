@@ -560,8 +560,11 @@ export default function Marketing() {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-2xl font-bold">Marketing</h1>
-        <p className="text-sm text-muted-foreground">Campaigns and referral programs</p>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          Marketing
+          <Badge variant="secondary" className="text-xs font-medium">Beta</Badge>
+        </h1>
+        <p className="text-sm text-muted-foreground">Campaigns and referral programs — email delivery not yet supported</p>
       </div>
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>

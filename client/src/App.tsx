@@ -115,7 +115,8 @@ function Router() {
       <Route path="/admin/booking-controls" component={() => <CrmLayout><BookingControls /></CrmLayout>} />
       <Route path="/admin/standalone-link" component={() => <CrmLayout><StandaloneQuoteLink /></CrmLayout>} />
       <Route path="/admin/ai-receptionist" component={() => <CrmLayout><AiReceptionist /></CrmLayout>} />
-      <Route path="/admin/expert-cam" component={() => <CrmLayout><ExpertCam /></CrmLayout>} />
+      {/* ExpertCam: stubbed — route disabled until feature is implemented */}
+      {/* <Route path="/admin/expert-cam" component={() => <CrmLayout><ExpertCam /></CrmLayout>} /> */}
 
       <Route component={NotFound} />
     </Switch>

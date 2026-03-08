@@ -1,4 +1,5 @@
 import SiteLayout from "@/components/SiteLayout";
+import { DEFAULT_COMPANY_ID } from "@/lib/tenancy";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -571,7 +572,7 @@ export default function QuoteTool() {
 
   const previewInput = useMemo(
     () => ({
-      companyId: experienceConfig?.settings?.companyId ?? 1,
+      companyId: experienceConfig?.settings?.companyId ?? DEFAULT_COMPANY_ID,
       distanceMiles,
       travelFee: quoteSummary.travelFee,
       items: pricingResults.map(item => ({
@@ -805,7 +806,7 @@ export default function QuoteTool() {
 
     startSessionMutation
       .mutateAsync({
-        companyId: experienceConfig?.settings?.companyId ?? 1,
+        companyId: experienceConfig?.settings?.companyId ?? DEFAULT_COMPANY_ID,
         source: "public_quote_tool",
         referrer:
           typeof document !== "undefined"

@@ -197,11 +197,15 @@ export default function Portal() {
           });
         }
       } else if (pay.data.remainingBalance !== undefined) {
+        const isStub = (pay.data as any).provider === "stub";
+        const providerNote = isStub
+          ? " (recorded manually — no external payment processor was charged)"
+          : "";
         setPayNotices(n => ({
           ...n,
           [payingInvoiceId]: {
             type: "success",
-            message: `Payment recorded. Remaining balance: $${pay.data.remainingBalance?.toFixed?.(2) ?? pay.data.remainingBalance}`,
+            message: `Payment recorded${providerNote}. Remaining balance: $${pay.data.remainingBalance?.toFixed?.(2) ?? pay.data.remainingBalance}`,
           },
         }));
         setPayAmounts(a => ({

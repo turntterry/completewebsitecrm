@@ -50,6 +50,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   children?: { label: string; href: string }[];
+  badge?: string;
 }
 
 interface NavGroup {
@@ -109,7 +110,7 @@ const allNavGroups: NavGroup[] = [
       { label: "Instant Quotes", href: "/admin/quote-tool", icon: Calculator },
       { label: "Booking Controls", href: "/admin/booking-controls", icon: Globe },
       { label: "Standalone Link", href: "/admin/standalone-link", icon: Share2 },
-      { label: "Automations", href: "/admin/automations", icon: Zap },
+      { label: "Automations", href: "/admin/automations", icon: Zap, badge: "Beta" },
       { label: "AI Receptionist", href: "/admin/ai-receptionist", icon: Bot },
     ],
   },
@@ -222,6 +223,11 @@ function NavLink({
           )}
         />
         {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+        {!collapsed && item.badge && (
+          <span className="ml-auto text-[10px] font-medium bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 leading-none shrink-0">
+            {item.badge}
+          </span>
+        )}
         {badge !== undefined && badge > 0 && (
           <span className="ml-auto bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center leading-none shrink-0 font-medium">
             {badge > 99 ? "99+" : badge}

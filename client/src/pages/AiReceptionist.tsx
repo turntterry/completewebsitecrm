@@ -267,7 +267,7 @@ export default function AiReceptionist() {
             <Bot className="h-6 w-6 text-primary" /> AI Receptionist
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Automatically reply to inbound customer SMS messages 24/7 using Claude AI
+            Can reply to inbound customer SMS messages using Claude AI. Review live behavior before enabling broadly.
           </p>
         </div>
         <Badge className={enabled && fullyConfigured ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}>
@@ -310,11 +310,16 @@ export default function AiReceptionist() {
             <div>
               <p className="font-medium">Enable AI Receptionist</p>
               <p className="text-sm text-muted-foreground mt-0.5">
-                When on, all inbound SMS messages receive an AI-generated reply automatically
+                When on, inbound SMS messages may receive an AI-generated reply. Recommended only after testing with real messages.
               </p>
               {!fullyConfigured && (
                 <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" /> Complete setup above before enabling
+                </p>
+              )}
+              {fullyConfigured && enabled && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> Active — monitor Messages inbox to review AI replies
                 </p>
               )}
             </div>
