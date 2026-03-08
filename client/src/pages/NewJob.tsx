@@ -24,6 +24,7 @@ export default function NewJob() {
   const params = new URLSearchParams(window.location.search);
   const prefilledCustomerId = params.get("customerId") ? parseInt(params.get("customerId")!) : undefined;
   const preferredSlotLabel = params.get("preferredSlotLabel") || "";
+  const quoteId = params.get("quoteId") ? parseInt(params.get("quoteId")!) : undefined;
 
   const [customerId, setCustomerId] = useState<number | undefined>(prefilledCustomerId);
   const [propertyId, setPropertyId] = useState<number | undefined>();
@@ -33,11 +34,16 @@ export default function NewJob() {
   const [scheduleNow, setScheduleNow] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
   const [scheduledEndAt, setScheduledEndAt] = useState("");
+  const [quoteLineItems, setQuoteLineItems] = useState<any[]>([]);
 
   const { data: customers = [] } = trpc.customers.list.useQuery({ search: "" });
   const { data: customerDetail } = trpc.customers.get.useQuery(
     { id: customerId! },
     { enabled: !!customerId }
+  );
+  const { data: quoteData } = trpc.quotes.get.useQuery(
+    { id: quoteId! },
+    { enabled: !!quoteId }
   );
 
   const properties = (customerDetail as any)?.properties ?? [];
@@ -50,6 +56,20 @@ export default function NewJob() {
       setPropertyId(undefined);
     }
   }, [customerId, properties.length]);
+
+  // Load quote line items and auto-generate title
+  useEffect(() => {
+    if (quoteData && (quoteData as any).lineItems) {
+      const items = (quoteData as any).lineItems || [];
+      setQuoteLineItems(items);
+
+      // Auto-generate job title from line items if not already set
+      if (!title && items.length > 0) {
+        const serviceNames = items.map((item: any) => item.description).join(", ");
+        setTitle(serviceNames);
+      }
+    }
+  }, [quoteData, title]);
 
   // Prefill from preferred slot if provided
   useEffect(() => {
@@ -150,6 +170,29 @@ export default function NewJob() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Quote Services (if converting from quote) */}
+        {quoteLineItems.length > 0 && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardHeader><CardTitle className="text-base text-blue-900">Services from Quote</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {quoteLineItems.map((item: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-start p-2 bg-white rounded border border-blue-100">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{item.description}</p>
+                      {item.details && <p className="text-xs text-gray-600 mt-1">{item.details}</p>}
+                    </div>
+                    <p className="font-medium text-sm ml-4">${item.total}</p>
+                  </div>
+                ))}
+                <p className="text-xs text-blue-700 mt-3 pt-2 border-t border-blue-200">
+                  Services have been auto-populated from the quote. Edit the job title below if needed.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Job Details */}
         <Card>
