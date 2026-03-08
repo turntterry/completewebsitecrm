@@ -70,33 +70,23 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
-  const values: InsertUser = { openId: user.openId };
-  const updateSet: Record<string, unknown> = {};
+  const openId = user.openId;
+  const name = user.name ?? null;
+  const email = user.email ?? null;
+  const loginMethod = user.loginMethod ?? null;
+  const role = user.role ?? (openId === ENV.ownerOpenId ? "admin" : "user");
+  const lastSignedIn = user.lastSignedIn ?? new Date();
 
-  const textFields = ["name", "email", "loginMethod"] as const;
-  for (const field of textFields) {
-    const value = user[field];
-    if (value === undefined) continue;
-    const normalized = value ?? null;
-    values[field] = normalized;
-    updateSet[field] = normalized;
-  }
-
-  if (user.lastSignedIn !== undefined) {
-    values.lastSignedIn = user.lastSignedIn;
-    updateSet.lastSignedIn = user.lastSignedIn;
-  }
-  if (user.role !== undefined) {
-    values.role = user.role;
-    updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
-    values.role = "admin";
-    updateSet.role = "admin";
-  }
-  if (!values.lastSignedIn) values.lastSignedIn = new Date();
-  if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  // Use raw SQL for MySQL INSERT ... ON DUPLICATE KEY UPDATE
+  await db.execute(sql`
+    INSERT INTO users (openId, name, email, loginMethod, role, lastSignedIn)
+    VALUES (${openId}, ${name}, ${email}, ${loginMethod}, ${role}, ${lastSignedIn})
+    ON DUPLICATE KEY UPDATE
+      name = VALUES(name),
+      email = VALUES(email),
+      loginMethod = VALUES(loginMethod),
+      lastSignedIn = VALUES(lastSignedIn)
+  `);
 }
 
 export async function getUserByOpenId(openId: string) {

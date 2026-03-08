@@ -18,6 +18,7 @@ import { notifyOwner } from "../_core/notification";
 import { SEED_GALLERY } from "@shared/data";
 import { nanoid } from "nanoid";
 import { mockAvailabilityProvider } from "@shared/availability";
+import { initiateQuoteWorkflow } from "../services/workflowEngine";
 
 // ─── Public Quote Router ──────────────────────────────────────────────────────
 const quoteRouter = router({
@@ -692,6 +693,40 @@ const quoteRouter = router({
         schedulingBlockedReasons,
       });
 
+      // Trigger automation workflow: customer → draft quote → SMS
+      let autoWorkflowResult: any = null;
+      let workflowErrors: string[] = [];
+      try {
+        // Only auto-create on high-confidence submissions (not manual review)
+        if (finalConfidenceMode !== "manual_review") {
+          autoWorkflowResult = await initiateQuoteWorkflow({
+            companyId: sessionCompanyId,
+            customerName: input.customerName,
+            customerEmail: input.customerEmail,
+            customerPhone: input.customerPhone,
+            address: input.address,
+            city: input.city,
+            state: input.state,
+            zip: input.zip,
+            instantQuoteId: quoteId,
+            subtotal: input.subtotal,
+            total: input.totalPrice,
+            services: input.items.map(item => ({
+              serviceId: item.serviceType,
+              serviceName: item.serviceType.replace(/_/g, " "),
+              price: item.finalPrice,
+            })),
+          });
+          workflowErrors = autoWorkflowResult.errors;
+        }
+      } catch (workflowErr) {
+        workflowErrors.push(`Workflow initialization failed: ${String(workflowErr)}`);
+        logger.warn("quote.submitV2.workflowError", {
+          quoteId,
+          error: String(workflowErr),
+        });
+      }
+
       return {
         quoteId,
         totalPrice: input.totalPrice,
@@ -700,6 +735,10 @@ const quoteRouter = router({
         manualReviewLeadId,
         lowConfidenceReasons,
         schedulingBlockedReasons,
+        // New fields from automation workflow
+        autoCustomerId: autoWorkflowResult?.customerId ?? null,
+        autoDraftQuoteId: autoWorkflowResult?.quoteId ?? null,
+        autoWorkflowErrors: workflowErrors,
       };
     }),
 

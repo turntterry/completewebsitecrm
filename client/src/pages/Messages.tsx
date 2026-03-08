@@ -316,11 +316,6 @@ export default function Messages() {
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
-              {!process.env.TWILIO_ACCOUNT_SID && (
-                <p className="text-xs text-amber-600 mt-1.5">
-                  ⚠ Twilio not configured — messages will be saved but not sent. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to your .env.
-                </p>
-              )}
             </div>
           </>
         )}
