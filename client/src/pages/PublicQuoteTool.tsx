@@ -1651,12 +1651,13 @@ function StepPropertyIntel({
         We found these details
       </h2>
       <p className="text-sm text-muted-foreground mb-4">
-        Pulled from public data to speed up your quote. Adjust anything that
-        looks off.
+        {propertyIntel?.source === "mock"
+          ? "These are estimates based on typical homes in this area. Adjust anything that looks off."
+          : "Pulled from public data to speed up your quote. Adjust anything that looks off."}
       </p>
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
         <Badge variant="outline" className="text-xs">
-          Source: {propertyIntel?.source ?? "Auto lookup"}
+          {propertyIntel?.source === "mock" ? "Estimated" : "Auto lookup"}
         </Badge>
         {propertyIntel?.fetchedAt ? (
           <span>
