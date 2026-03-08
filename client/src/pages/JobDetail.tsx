@@ -86,6 +86,11 @@ export default function JobDetail() {
               <CheckCircle className="h-4 w-4 mr-1.5" /> Complete Job
             </Button>
           )}
+          {j.status === "draft" && (
+            <Button size="sm" onClick={() => updateMutation.mutate({ id, status: "scheduled" })} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Scheduling..." : "Schedule Job"}
+            </Button>
+          )}
           {(j.status === "completed" || j.status === "requires_invoicing") && (
             <Button size="sm" variant="outline" onClick={() => createInvoiceMutation.mutate({ jobId: id })} disabled={createInvoiceMutation.isPending}>
               {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
