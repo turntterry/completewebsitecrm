@@ -57,19 +57,19 @@ export default function NewJob() {
     }
   }, [customerId, properties.length]);
 
-  // Load quote line items and auto-generate title
+  // Load quote line items and auto-generate title (only once)
   useEffect(() => {
     if (quoteData && (quoteData as any).lineItems) {
       const items = (quoteData as any).lineItems || [];
       setQuoteLineItems(items);
 
-      // Auto-generate job title from line items if not already set
-      if (!title && items.length > 0) {
+      // Auto-generate job title from line items (only on first load)
+      if (items.length > 0 && !title) {
         const serviceNames = items.map((item: any) => item.description).join(", ");
         setTitle(serviceNames);
       }
     }
-  }, [quoteData, title]);
+  }, [quoteData]);
 
   // Prefill from preferred slot if provided
   useEffect(() => {
