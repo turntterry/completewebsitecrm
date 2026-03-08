@@ -27,6 +27,7 @@ import {
 import { eq } from "drizzle-orm";
 import { properties } from "../../drizzle/schema";
 import { fireAutomation } from "../services/automationEngine";
+import { autoCreateInvoiceFromJob } from "../services/invoiceEngine";
 import { protectedProcedure, router } from "../_core/trpc";
 
 async function getCompanyId(userId: number, userName: string) {
@@ -107,10 +108,21 @@ export const jobsRouter = router({
       const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
       const { id, ...data } = input;
       await updateJob(id, companyId, data);
+
       // Fire status automations
       if (data.status) {
         const event = data.status === "completed" ? "job_completed" : "job_status_changed";
         fireAutomation(event, { companyId, entityType: "job", entityId: id, data: { status: data.status } }).catch(() => {});
+
+        // Auto-create draft invoice when job is marked completed
+        if (data.status === "completed") {
+          try {
+            await autoCreateInvoiceFromJob({ companyId, jobId: id });
+          } catch (err) {
+            console.error("Failed to auto-create invoice:", err);
+            // Don't block job completion if invoice creation fails
+          }
+        }
       }
       return true;
     }),
