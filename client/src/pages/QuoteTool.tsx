@@ -1670,22 +1670,34 @@ export default function QuoteTool() {
                     try {
                       const normalized = upsellCatalog
                         .filter(item => item.id.trim() && item.title.trim())
-                        .map((item, orderIdx) => ({
-                          id: item.id.trim(),
-                          title: item.title.trim(),
-                          description: item.description.trim(),
-                          price: Number(item.price || 0),
-                          appliesTo: item.appliesTo
-                            .split(",")
-                            .map(svc => svc.trim())
-                            .filter(Boolean),
-                          badge: item.badge?.trim() || undefined,
-                          active: item.active,
-                          sortOrder: orderIdx,
-                          rules: item.rulesText.trim()
+                        .map((item, orderIdx) => {
+                          const parsedRules = item.rulesText.trim()
                             ? JSON.parse(item.rulesText)
-                            : {},
-                        }))
+                            : {};
+                          const parsedPriceConfig = (item.priceConfigText ?? "{}").trim()
+                            ? JSON.parse(item.priceConfigText ?? "{}")
+                            : {};
+                          return {
+                            id: item.id.trim(),
+                            title: item.title.trim(),
+                            description: item.description.trim(),
+                            price: Number(item.price || 0),
+                            appliesTo: item.appliesTo
+                              .split(",")
+                              .map(svc => svc.trim())
+                              .filter(Boolean),
+                            badge: item.badge?.trim() || undefined,
+                            active: item.active,
+                            sortOrder: orderIdx,
+                            rules: parsedRules,
+                            category: item.category || undefined,
+                            pricingMode: item.pricingMode || undefined,
+                            priceConfig: Object.keys(parsedPriceConfig).length
+                              ? parsedPriceConfig
+                              : undefined,
+                            displaySavingsText: item.displaySavingsText?.trim() || undefined,
+                          };
+                        })
                         .filter(item => item.appliesTo.length > 0);
 
                       await Promise.all(
