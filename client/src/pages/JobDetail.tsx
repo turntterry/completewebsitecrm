@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export default function JobDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id ?? "0");
   const [activeTab, setActiveTab] = useState<"details" | "photos">("details");
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const { data: job, isLoading } = trpc.jobs.get.useQuery({ id }, { enabled: !!id && id > 0 });
   const { data: jobPhotos = [] } = trpc.attachments.list.useQuery(
@@ -41,6 +42,7 @@ export default function JobDetail() {
     onSuccess: (result) => {
       utils.jobs.get.invalidate({ id });
       toast.success(`Invoice #${result.invoiceNumber} created`);
+      navigate(`/admin/invoices/${result.invoiceId}`);
     },
     onError: (err) => toast.error(err.message),
   });
