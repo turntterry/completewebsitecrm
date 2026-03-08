@@ -184,6 +184,11 @@ export default function QuoteTool() {
       active: boolean;
       sortOrder: number;
       rulesText: string;
+      // Pricing model fields
+      category: string;
+      pricingMode: string;
+      priceConfigText: string;
+      displaySavingsText: string;
     }[]
   >([]);
 
@@ -248,13 +253,17 @@ export default function QuoteTool() {
     setMaxWindowsAuto(Number(settings.maxWindowsAuto ?? 120));
     if (Array.isArray(upsells) && upsells.length > 0) {
       setUpsellCatalog(
-        upsells.map((upsell, idx) => ({
+        upsells.map((upsell: any, idx: number) => ({
           ...upsell,
           price: String(upsell.price ?? 0),
           appliesTo: (upsell.appliesTo ?? []).join(", "),
           active: upsell.active !== false,
           sortOrder: Number(upsell.sortOrder ?? idx),
           rulesText: JSON.stringify(upsell.rules ?? {}, null, 2),
+          category: upsell.category ?? "add_on",
+          pricingMode: upsell.pricingMode ?? "flat",
+          priceConfigText: JSON.stringify(upsell.priceConfig ?? {}, null, 2),
+          displaySavingsText: upsell.displaySavingsText ?? "",
         }))
       );
     } else {
@@ -262,14 +271,17 @@ export default function QuoteTool() {
         {
           id: "window_screen_deep_clean",
           title: "Screen Deep Clean",
-          description:
-            "Full screen scrub and rinse for better clarity and airflow.",
+          description: "Full screen scrub and rinse for better clarity and airflow.",
           price: "89",
           appliesTo: "window_cleaning",
           badge: "Popular",
           active: true,
           sortOrder: 0,
           rulesText: "{}",
+          category: "add_on",
+          pricingMode: "flat",
+          priceConfigText: JSON.stringify({ amount: 89 }, null, 2),
+          displaySavingsText: "",
         },
         {
           id: "window_track_sill_detail",
@@ -280,6 +292,10 @@ export default function QuoteTool() {
           active: true,
           sortOrder: 1,
           rulesText: "{}",
+          category: "add_on",
+          pricingMode: "flat",
+          priceConfigText: JSON.stringify({ amount: 129 }, null, 2),
+          displaySavingsText: "",
         },
       ]);
     }
@@ -1426,13 +1442,94 @@ export default function QuoteTool() {
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        Offer Type
+                      </Label>
+                      <select
+                        className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                        value={upsell.category ?? "add_on"}
+                        onChange={e =>
+                          setUpsellCatalog(prev =>
+                            prev.map((u, i) =>
+                              i === idx ? { ...u, category: e.target.value } : u
+                            )
+                          )
+                        }
+                      >
+                        <option value="add_on">Add-on</option>
+                        <option value="cross_sell">Cross-sell</option>
+                        <option value="bundle">Bundle</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        Pricing Mode
+                      </Label>
+                      <select
+                        className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                        value={upsell.pricingMode ?? "flat"}
+                        onChange={e =>
+                          setUpsellCatalog(prev =>
+                            prev.map((u, i) =>
+                              i === idx ? { ...u, pricingMode: e.target.value } : u
+                            )
+                          )
+                        }
+                      >
+                        <option value="flat">Flat</option>
+                        <option value="per_unit">Per Unit</option>
+                        <option value="service_multiplier">Service Multiplier</option>
+                        <option value="package_delta">Package Delta</option>
+                        <option value="bundle_discount">Bundle Discount</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">
+                      Price Config (JSON) — parameters for the selected pricing mode
+                    </Label>
+                    <Textarea
+                      value={upsell.priceConfigText ?? "{}"}
+                      rows={4}
+                      onChange={e =>
+                        setUpsellCatalog(prev =>
+                          prev.map((u, i) =>
+                            i === idx ? { ...u, priceConfigText: e.target.value } : u
+                          )
+                        )
+                      }
+                      placeholder='{"amount": 89} or {"baseService": "driveway_cleaning", "multiplier": 0.85, "basePrice": 140}'
+                      className="font-mono text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      flat: {"{ amount }"}  ·  per_unit: {"{ ratePerUnit, unitKey }"}  ·  service_multiplier: {"{ baseService, multiplier, basePrice }"}  ·  bundle_discount: {"{ bundlePrice, discountAmount }"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">
+                      Savings Text (shown green on bundle cards, optional)
+                    </Label>
+                    <Input
+                      value={upsell.displaySavingsText ?? ""}
+                      onChange={e =>
+                        setUpsellCatalog(prev =>
+                          prev.map((u, i) =>
+                            i === idx ? { ...u, displaySavingsText: e.target.value } : u
+                          )
+                        )
+                      }
+                      placeholder="Save ~$50 vs booking separately"
+                    />
+                  </div>
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">
                       Rules (JSON)
                     </Label>
                     <Textarea
                       value={upsell.rulesText}
-                      rows={5}
+                      rows={3}
                       onChange={e =>
                         setUpsellCatalog(prev =>
                           prev.map((u, i) =>
@@ -1440,7 +1537,8 @@ export default function QuoteTool() {
                           )
                         )
                       }
-                      placeholder='{"minSubtotal": 250, "excludePropertyTypes": ["commercial"]}'
+                      placeholder='{"minSubtotal": 250}'
+                      className="font-mono text-xs"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -1466,6 +1564,9 @@ export default function QuoteTool() {
                             const parsedRules = upsell.rulesText.trim()
                               ? JSON.parse(upsell.rulesText)
                               : {};
+                            const parsedPriceConfig = (upsell.priceConfigText ?? "{}").trim()
+                              ? JSON.parse(upsell.priceConfigText ?? "{}")
+                              : {};
                             await upsertUpsell.mutateAsync({
                               id: upsell.id.trim(),
                               title: upsell.title.trim(),
@@ -1479,10 +1580,16 @@ export default function QuoteTool() {
                               active: upsell.active,
                               sortOrder: idx,
                               rules: parsedRules,
+                              category: upsell.category || undefined,
+                              pricingMode: upsell.pricingMode || undefined,
+                              priceConfig: Object.keys(parsedPriceConfig).length
+                                ? parsedPriceConfig
+                                : undefined,
+                              displaySavingsText: upsell.displaySavingsText?.trim() || undefined,
                             });
                             toast.success(`Saved ${upsell.title || upsell.id}`);
                           } catch (error: any) {
-                            toast.error(error?.message || "Invalid rules JSON");
+                            toast.error(error?.message || "Invalid JSON in price config or rules");
                           }
                         }}
                         disabled={upsertUpsell.isPending}
@@ -1547,6 +1654,10 @@ export default function QuoteTool() {
                         active: true,
                         sortOrder: prev.length,
                         rulesText: "{}",
+                        category: "add_on",
+                        pricingMode: "flat",
+                        priceConfigText: "{}",
+                        displaySavingsText: "",
                       },
                     ])
                   }

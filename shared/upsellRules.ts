@@ -59,6 +59,13 @@ export interface PriceConfig {
   bundlePrice?: number;
   /** bundle_discount: dollar amount saved vs booking separately */
   discountAmount?: number;
+  /**
+   * Fallback base price for service_multiplier mode when the base service is
+   * not yet in the user's cart (typical for cross-sell offers).
+   * Admin sets this to the typical standalone price of that service.
+   * Example: driveway_cleaning basePrice = 140 → 140 × 0.85 = $119 cross-sell price.
+   */
+  basePrice?: number;
 }
 
 // ── Data model ────────────────────────────────────────────────────────────────
@@ -184,11 +191,14 @@ export function computePrice(item: UpsellItem, ctx: UpsellContext): number {
       return cfg.bundlePrice ?? cfg.amount ?? item.price;
 
     case "service_multiplier": {
-      const basePrice = cfg.baseService
+      // Use real service price from quote context if available (service already in cart).
+      // Fall back to admin-set basePrice (typical standalone price) when service is not yet selected.
+      const livePrice = cfg.baseService
         ? (ctx.servicePrices?.[cfg.baseService] ?? 0)
         : 0;
-      return basePrice > 0
-        ? Math.round(basePrice * (cfg.multiplier ?? 1))
+      const base = livePrice > 0 ? livePrice : (cfg.basePrice ?? 0);
+      return base > 0
+        ? Math.round(base * (cfg.multiplier ?? 1))
         : item.price;
     }
 
@@ -295,8 +305,17 @@ export function evaluateUpsells(
   const crossSell = pickBest("cross_sell");
   const bundle = pickBest("bundle");
 
-  // Phase 4: Flat display list — consistent order: add-on, cross-sell, bundle
-  const displayOffers = [addOn, crossSell, bundle].filter(Boolean) as UpsellItem[];
+  // Phase 4: Resolve prices — compute final price from pricingMode + ctx for each selected offer.
+  // This ensures downstream code (totals, review, submission) always reads the real computed price.
+  function withResolvedPrice(item: UpsellItem): UpsellItem {
+    const computed = computePrice(item, ctx);
+    return computed !== item.price ? { ...item, price: computed } : item;
+  }
+
+  // Phase 5: Flat display list — consistent order: add-on, cross-sell, bundle
+  const displayOffers = [addOn, crossSell, bundle]
+    .filter(Boolean)
+    .map(item => withResolvedPrice(item!)) as UpsellItem[];
 
   return { addOn, crossSell, bundle, displayOffers };
 }

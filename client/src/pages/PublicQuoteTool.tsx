@@ -345,28 +345,39 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     id: "driveway_crosssell",
     title: "Add Driveway Cleaning",
     description: "Most customers add driveway cleaning while we're on site — one trip, sharper pricing, noticeably cleaner curb.",
+    // price is the pre-computed same-visit rate: typical driveway base ($140) × 0.85 same-visit discount
     price: 119,
     appliesTo: ["house_washing"],
     requiresAnyServices: ["house_washing"],
     excludeIfServicesSelected: ["driveway_cleaning"],
     badge: "Recommended",
     category: "cross_sell",
-    pricingMode: "flat",
-    priceConfig: { amount: 119 },
+    // service_multiplier: uses real driveway_cleaning price when available, otherwise falls back to basePrice
+    pricingMode: "service_multiplier",
+    priceConfig: {
+      baseService: "driveway_cleaning",
+      multiplier: 0.85,
+      basePrice: 140, // admin-editable: typical standalone driveway price
+    },
     priority: 85,
   },
   {
     id: "gutter_cleaning_crosssell",
     title: "Add Gutter Cleaning",
     description: "Roof wash loosens debris that settles straight into your gutters. Cleaning them in the same visit prevents the mess from re-entering.",
-    price: 129,
+    // price: typical gutter base ($145) × 0.90 same-visit discount
+    price: 130,
     appliesTo: ["roof_cleaning"],
     requiresAnyServices: ["roof_cleaning"],
     excludeIfServicesSelected: ["gutter_cleaning"],
     badge: "Recommended",
     category: "cross_sell",
-    pricingMode: "flat",
-    priceConfig: { amount: 129 },
+    pricingMode: "service_multiplier",
+    priceConfig: {
+      baseService: "gutter_cleaning",
+      multiplier: 0.90,
+      basePrice: 145, // admin-editable: typical standalone gutter price
+    },
     priority: 85,
   },
   {
@@ -379,6 +390,7 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     excludeIfServicesSelected: ["interior_window_cleaning"],
     badge: "Recommended",
     category: "cross_sell",
+    // Flat: interior window add-on is a fixed per-visit charge, not scaled by window count here
     pricingMode: "flat",
     priceConfig: { amount: 99 },
     priority: 80,
@@ -389,14 +401,19 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     id: "house_washing_crosssell",
     title: "Add House Washing",
     description: "Since we're already treating your roof, add a full soft-wash house exterior — same crew, same visit, cleaner result overall.",
-    price: 199,
+    // price: typical house wash base ($235) × 0.90 same-visit discount
+    price: 212,
     appliesTo: ["roof_cleaning"],
     requiresAnyServices: ["roof_cleaning"],
     excludeIfServicesSelected: ["house_washing"],
     badge: "Recommended",
     category: "cross_sell",
-    pricingMode: "flat",
-    priceConfig: { amount: 199 },
+    pricingMode: "service_multiplier",
+    priceConfig: {
+      baseService: "house_washing",
+      multiplier: 0.90,
+      basePrice: 235, // admin-editable: typical standalone house wash price
+    },
     priority: 78,
   },
 
@@ -726,15 +743,40 @@ export default function QuoteTool() {
     const totalPrice = Math.max(0, rawQuoteSummary.totalPrice - bundleChoiceSavings);
     return { ...rawQuoteSummary, subtotal, totalPrice, bundleChoiceSavings };
   }, [bundleChoiceSavings, rawQuoteSummary]);
+  // Build real per-service prices from live pricing results.
+  // Used by service_multiplier pricing mode to compute cross-sell prices dynamically.
+  const servicePrices = useMemo(
+    () => Object.fromEntries(pricingResults.map(r => [r.serviceType, r.finalPrice])),
+    [pricingResults]
+  );
+
+  // Build service input quantities for per_unit pricing mode.
+  const serviceInputQuantities = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(serviceInputs).map(([svcId, inputs]) => [
+          svcId,
+          {
+            sqft: Number((inputs as any).sqft ?? 0),
+            windowCount: Number((inputs as any).windowCount ?? 0),
+            linearFeet: Number((inputs as any).linearFeet ?? 0),
+          },
+        ])
+      ),
+    [serviceInputs]
+  );
+
   const { displayOffers: displayUpsells, addOn: _addOnOffer } = useMemo(() =>
-    evaluateUpsells(upsellCatalog, {
+    evaluateUpsells(upsellCatalog as UpsellItem[], {
       selectedServices,
       sqft: propertyIntel?.livingAreaSqft ?? undefined,
       stories: propertyIntel?.stories ?? undefined,
       subtotal: quoteSummary?.subtotal ?? 0,
       coveredFeatures: buildCoveredFeatures(selectedServices, serviceInputs),
+      servicePrices,
+      serviceInputQuantities,
     }),
-    [upsellCatalog, selectedServices, serviceInputs, propertyIntel, quoteSummary?.subtotal]
+    [upsellCatalog, selectedServices, serviceInputs, propertyIntel, quoteSummary?.subtotal, servicePrices, serviceInputQuantities]
   );
 
   // eligibleUpsells kept for any legacy checks (e.g. empty-state messaging)

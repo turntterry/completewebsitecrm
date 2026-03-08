@@ -347,6 +347,21 @@ export const quoteToolSettingsRouter = router({
         active: z.boolean().optional(),
         sortOrder: z.number().int().min(0).optional(),
         rules: z.record(z.string(), z.unknown()).optional(),
+        // ── Offer type & pricing model ───────────────────────────────────────
+        category: z.string().optional(),
+        pricingMode: z.string().optional(),
+        priceConfig: z.record(z.string(), z.unknown()).optional(),
+        manualPriceOverride: z.number().optional(),
+        displaySavingsText: z.string().max(120).optional(),
+        // ── Eligibility & suppression ────────────────────────────────────────
+        requiresAnyServices: z.array(z.string()).optional(),
+        excludeIfServicesSelected: z.array(z.string()).optional(),
+        includesServices: z.array(z.string()).optional(),
+        includesFeatures: z.array(z.string()).optional(),
+        suppressIfFeatureCovered: z.array(z.string()).optional(),
+        // ── Ranking ──────────────────────────────────────────────────────────
+        priority: z.number().int().optional(),
+        exclusiveGroup: z.string().max(60).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -369,6 +384,7 @@ export const quoteToolSettingsRouter = router({
       );
 
       const idx = current.findIndex(item => item.id === input.id);
+      const prev = idx >= 0 ? current[idx] : undefined;
       const nextItem = {
         id: input.id,
         title: input.title,
@@ -377,10 +393,23 @@ export const quoteToolSettingsRouter = router({
         appliesTo: input.appliesTo,
         badge: input.badge,
         active: input.active ?? true,
-        sortOrder:
-          input.sortOrder ??
-          (idx >= 0 ? current[idx].sortOrder : current.length),
-        rules: input.rules ?? (idx >= 0 ? current[idx].rules : undefined),
+        sortOrder: input.sortOrder ?? (prev?.sortOrder ?? current.length),
+        rules: input.rules ?? prev?.rules,
+        // Pricing model fields — persisted so admin edits take effect in public quote
+        category: input.category ?? prev?.category,
+        pricingMode: input.pricingMode ?? prev?.pricingMode,
+        priceConfig: input.priceConfig ?? prev?.priceConfig,
+        manualPriceOverride: input.manualPriceOverride ?? prev?.manualPriceOverride,
+        displaySavingsText: input.displaySavingsText ?? prev?.displaySavingsText,
+        // Eligibility & suppression
+        requiresAnyServices: input.requiresAnyServices ?? prev?.requiresAnyServices,
+        excludeIfServicesSelected: input.excludeIfServicesSelected ?? prev?.excludeIfServicesSelected,
+        includesServices: input.includesServices ?? prev?.includesServices,
+        includesFeatures: input.includesFeatures ?? prev?.includesFeatures,
+        suppressIfFeatureCovered: input.suppressIfFeatureCovered ?? prev?.suppressIfFeatureCovered,
+        // Ranking
+        priority: input.priority ?? prev?.priority,
+        exclusiveGroup: input.exclusiveGroup ?? prev?.exclusiveGroup,
       };
 
       if (idx >= 0) current[idx] = nextItem;

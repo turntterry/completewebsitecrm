@@ -676,11 +676,32 @@ export const quoteToolSettings = pgTable("quote_tool_settings", {
       id: string;
       title: string;
       description: string;
+      /** Resolved display price. Kept in sync with pricingMode + priceConfig for flat offers. */
       price: number;
+      /** Legacy: services that make this item eligible. Prefer requiresAnyServices. */
       appliesTo: string[];
       badge?: string;
       active?: boolean;
       sortOrder?: number;
+      // ── Offer type ──────────────────────────────────────────────────────────
+      /** add_on | cross_sell | bundle */
+      category?: string;
+      // ── Pricing model ────────────────────────────────────────────────────────
+      /** flat | per_unit | service_multiplier | package_delta | bundle_discount */
+      pricingMode?: string;
+      /** Admin-editable pricing parameters for the selected pricingMode. */
+      priceConfig?: Record<string, unknown>;
+      manualPriceOverride?: number;
+      displaySavingsText?: string;
+      // ── Eligibility & suppression ────────────────────────────────────────────
+      requiresAnyServices?: string[];
+      excludeIfServicesSelected?: string[];
+      includesServices?: string[];
+      includesFeatures?: string[];
+      suppressIfFeatureCovered?: string[];
+      // ── Ranking ──────────────────────────────────────────────────────────────
+      priority?: number;
+      exclusiveGroup?: string;
       rules?: Record<string, unknown>;
     }[]
   >(),
