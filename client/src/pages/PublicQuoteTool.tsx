@@ -1694,16 +1694,16 @@ function StepPropertyIntel({
   return (
     <div>
       <h2 className="font-heading font-bold text-xl mb-1">
-        We found these details
+        HomeScan found these details
       </h2>
       <p className="text-sm text-muted-foreground mb-4">
         {propertyIntel?.source === "mock"
           ? "These are estimates based on typical homes in this area. Adjust anything that looks off."
-          : "Pulled from public data to speed up your quote. Adjust anything that looks off."}
+          : "HomeScan pulled these from public property records. Adjust anything that looks off."}
       </p>
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
         <Badge variant="outline" className="text-xs">
-          {propertyIntel?.source === "mock" ? "Estimated" : "Auto lookup"}
+          {propertyIntel?.source === "mock" ? "Estimated" : "HomeScan"}
         </Badge>
         {propertyIntel?.fetchedAt ? (
           <span>
@@ -1715,7 +1715,7 @@ function StepPropertyIntel({
       {lookupStatus === "loading" && (
         <div className="flex items-center gap-3 mb-4 text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin text-primary" />
-          <span>Scanning {address}…</span>
+          <span>HomeScan is scanning {address}…</span>
         </div>
       )}
 

@@ -934,27 +934,34 @@ async function fetchPropertyIntel({
   state: string;
   zip: string;
 }) {
-  const url = process.env.PROPERTY_INTEL_URL;
-  const apiKey = process.env.PROPERTY_INTEL_KEY;
-  if (!url || !apiKey) return null;
+  const apiKey = process.env.RENTCAST_API_KEY;
+  if (!apiKey) return null;
 
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ address, city, state, zip }),
+  const params = new URLSearchParams({ address, city, state, zipCode: zip });
+  const resp = await fetch(`https://api.rentcast.io/v1/properties?${params}`, {
+    headers: { "X-Api-Key": apiKey },
   });
-  if (!resp.ok) throw new Error(`Property provider ${resp.status}`);
+  if (!resp.ok) throw new Error(`RentCast ${resp.status}`);
+
   const data = await resp.json();
+
+  // RentCast returns an array; take first match
+  const record = Array.isArray(data) ? data[0] : data;
+  if (!record) return null;
+
+  const sqft: number | null = record.squareFootage ?? null;
+  // RentCast doesn't provide stories — estimate from sqft
+  const stories: number = sqft && sqft > 2500 ? 2 : 1;
+  // Roof area estimated at 118% of living area (accounts for overhangs/pitch)
+  const roofAreaSqft: number | null = sqft ? Math.round(sqft * 1.18) : null;
+
   return {
-    livingAreaSqft: data.livingAreaSqft ?? data.squareFeet ?? null,
-    stories: data.stories ?? null,
-    yearBuilt: data.yearBuilt ?? null,
-    roofAreaSqft: data.roofAreaSqft ?? null,
-    drivewaySqft: data.drivewaySqft ?? null,
-    source: data.source ?? "provider",
+    livingAreaSqft: sqft,
+    stories,
+    yearBuilt: record.yearBuilt ?? null,
+    roofAreaSqft,
+    drivewaySqft: null, // not in RentCast — user can adjust
+    source: "rentcast",
     fetchedAt: new Date().toISOString(),
   };
 }
