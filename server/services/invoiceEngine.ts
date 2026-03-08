@@ -143,16 +143,37 @@ export async function autoCreateInvoiceFromJob(
 
     const invoiceId = (invoiceResult as any)[0].insertId as number;
 
-    // Step 6: Add line item from job title (simple version)
+    // Step 6: Add line items from job costs (or fallback to job title)
     try {
-      await db.execute(sql`
-        INSERT INTO invoice_line_items (
-          invoiceId, sortOrder, description, unitPrice, quantity, total
-        )
-        VALUES (
-          ${invoiceId}, 0, ${job.title || "Job Services"}, ${total}, '1', ${total}
-        )
-      `);
+      const jobCostData = await db
+        .select()
+        .from(jobCosts)
+        .where(eq(jobCosts.jobId, input.jobId));
+
+      if (jobCostData.length > 0) {
+        // Use job costs as line items
+        for (let i = 0; i < jobCostData.length; i++) {
+          const cost = jobCostData[i];
+          await db.execute(sql`
+            INSERT INTO invoice_line_items (
+              invoiceId, sortOrder, description, unitPrice, quantity, total
+            )
+            VALUES (
+              ${invoiceId}, ${i}, ${cost.description}, ${cost.amount}, '1', ${cost.amount}
+            )
+          `);
+        }
+      } else {
+        // Fallback: use job title as single line item
+        await db.execute(sql`
+          INSERT INTO invoice_line_items (
+            invoiceId, sortOrder, description, unitPrice, quantity, total
+          )
+          VALUES (
+            ${invoiceId}, 0, ${job.title || "Job Services"}, ${total}, '1', ${total}
+          )
+        `);
+      }
     } catch (err) {
       errors.push(`Line item creation failed: ${String(err)}`);
       logger.warn("invoice.lineItemFailed", { invoiceId, error: String(err) });
