@@ -831,45 +831,47 @@ export default function QuoteTool() {
   ]);
 
   // Step view analytics
-  useEffect(() => {
-    if (!sessionToken) return;
-    if (seenStepsRef.current.has(step)) return;
-    seenStepsRef.current.add(step);
-    trackEventMutation.mutate({
-      sessionToken,
-      eventName: "step_view" as any,
-      payload: {
-        step,
-        label: STEPS[step],
-        progress: Number(((step / (STEPS.length - 1)) * 100).toFixed(1)),
-      },
-    });
-  }, [sessionToken, step, trackEventMutation]);
+  // TODO: Add "step_view" to trackEvent enum when analytics schema is updated
+  // useEffect(() => {
+  //   if (!sessionToken) return;
+  //   if (seenStepsRef.current.has(step)) return;
+  //   seenStepsRef.current.add(step);
+  //   trackEventMutation.mutate({
+  //     sessionToken,
+  //     eventName: "step_view" as any,
+  //     payload: {
+  //       step,
+  //       label: STEPS[step],
+  //       progress: Number(((step / (STEPS.length - 1)) * 100).toFixed(1)),
+  //     },
+  //   });
+  // }, [sessionToken, step, trackEventMutation]);
 
   // Abandonment tracking (visibility)
-  useEffect(() => {
-    const handler = () => {
-      if (abandonTrackedRef.current) return;
-      if (submitted || !sessionToken) return;
-      abandonTrackedRef.current = true;
-      trackEventMutation.mutate({
-        sessionToken,
-        eventName: "quote_abandoned" as any,
-        payload: {
-          step,
-          label: STEPS[step],
-          reason: "visibility_hidden",
-        },
-      });
-    };
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") handler();
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [sessionToken, step, submitted, trackEventMutation]);
+  // TODO: Add "quote_abandoned" to trackEvent enum when analytics schema is updated
+  // useEffect(() => {
+  //   const handler = () => {
+  //     if (abandonTrackedRef.current) return;
+  //     if (submitted || !sessionToken) return;
+  //     abandonTrackedRef.current = true;
+  //     trackEventMutation.mutate({
+  //       sessionToken,
+  //       eventName: "quote_abandoned" as any,
+  //       payload: {
+  //         step,
+  //         label: STEPS[step],
+  //         reason: "visibility_hidden",
+  //       },
+  //     });
+  //   };
+  //   const onVisibilityChange = () => {
+  //     if (document.visibilityState === "hidden") handler();
+  //   };
+  //   document.addEventListener("visibilitychange", onVisibilityChange);
+  //   return () => {
+  //     document.removeEventListener("visibilitychange", onVisibilityChange);
+  //   };
+  // }, [sessionToken, step, submitted, trackEventMutation]);
 
   // Address-first auto lookup (MapMeasure/Zillow-style)
   useEffect(() => {
@@ -994,7 +996,7 @@ export default function QuoteTool() {
     });
   };
 
-  const handleScheduleHandoffComplete = () => {
+  const handleScheduleHandoffComplete = async () => {
     if (!sessionToken || !quoteResult?.schedulingEligible) return;
 
     if (selectedSlotId) {
@@ -1013,6 +1015,10 @@ export default function QuoteTool() {
       },
     });
     toast.success("Great — we marked your scheduling handoff as completed.");
+
+    // Submit the quote with the scheduled slot to trigger the workflow
+    // This will auto-create the customer and draft quote
+    await handleSubmit();
   };
 
   useEffect(() => {
@@ -1194,25 +1200,31 @@ export default function QuoteTool() {
               </div>
             )}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a
-                href={`tel:${BUSINESS.phoneRaw}`}
-                onClick={handleScheduleHandoffStart}
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-navy-light text-white font-bold"
+                onClick={handleSubmit}
+                disabled={submitMutation.isPending}
               >
+                <Phone className="w-4 h-4 mr-2" />
+                Submit My Quote
+              </Button>
+              {quoteResult.schedulingEligible && !scheduleHandoffStarted && (
                 <Button
                   size="lg"
-                  className="bg-primary hover:bg-navy-light text-white font-bold"
+                  variant="outline"
+                  onClick={handleScheduleHandoffStart}
                 >
-                  <Phone className="w-4 h-4 mr-2" />
-                  {quoteResult.schedulingEligible
-                    ? `Start Scheduling: ${BUSINESS.phone}`
-                    : `Call Now: ${BUSINESS.phone}`}
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Schedule Service
                 </Button>
-              </a>
+              )}
               {quoteResult.schedulingEligible && scheduleHandoffStarted && (
                 <Button
                   size="lg"
                   variant="outline"
                   onClick={handleScheduleHandoffComplete}
+                  disabled={!selectedSlotId}
                 >
                   I Picked a Time
                 </Button>
@@ -1412,13 +1424,14 @@ export default function QuoteTool() {
                       variant="outline"
                       onClick={() => {
                         handleSubmit();
-                        if (sessionToken) {
-                          trackEventMutation.mutate({
-                            sessionToken,
-                            eventName: "quote_text_me" as any,
-                            payload: { channel: "sms" },
-                          });
-                        }
+                        // TODO: Add "quote_text_me" to trackEvent enum when analytics schema is updated
+                        // if (sessionToken) {
+                        //   trackEventMutation.mutate({
+                        //     sessionToken,
+                        //     eventName: "quote_text_me" as any,
+                        //     payload: { channel: "sms" },
+                        //   });
+                        // }
                       }}
                       disabled={submitMutation.isPending}
                     >

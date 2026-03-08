@@ -54,9 +54,13 @@ interface WorkflowResult {
  * All errors are logged but don't block the entire workflow.
  */
 export async function initiateQuoteWorkflow(
-  input: InitiateQuoteWorkflowInput
+  input: InitiateQuoteWorkflowInput,
+  dbOverride?: any
 ): Promise<WorkflowResult> {
-  const db = await getDb();
+  let db = dbOverride;
+  if (!db) {
+    db = await getDb();
+  }
   if (!db) {
     throw new TRPCError({
       code: "SERVICE_UNAVAILABLE",
