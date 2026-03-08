@@ -51,6 +51,25 @@ Routes:
    pnpm start     # Run dist/index.js
    ```
 
+## Deployment
+
+1. **Build:**
+   ```bash
+   pnpm build
+   ```
+   Outputs to `dist/` folder (backend) + `client/dist/` (frontend).
+
+2. **Run:**
+   ```bash
+   NODE_ENV=production node dist/index.js
+   ```
+   Make sure `DATABASE_URL` is set to your PostgreSQL server.
+
+3. **Environment:**
+   - Set `NODE_ENV=production`
+   - Set `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_*` (required)
+   - Set optional vars: `TWILIO_*`, `ANTHROPIC_API_KEY`, `AWS_*`
+
 ## Database
 
 **Schema changes:**
