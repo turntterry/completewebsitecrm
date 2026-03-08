@@ -817,16 +817,15 @@ export default function NewQuote() {
               ) : (
                 <p className="text-sm text-muted-foreground">Switch to Preview to see the client-facing layout.</p>
               )}
-              <div className="flex gap-2 mt-6">
+              <div className="flex flex-col gap-2 mt-6">
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
                   onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
                 >
                   {mode === "edit" ? "Preview" : "Back to Edit"}
                 </Button>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending || saveOptionSetMutation.isPending}>
+                <Button type="submit" disabled={createMutation.isPending || saveOptionSetMutation.isPending}>
                   {createMutation.isPending ? "Creating..." : "Create Quote"}
                 </Button>
               </div>
