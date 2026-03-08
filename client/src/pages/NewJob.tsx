@@ -199,21 +199,31 @@ export default function NewJob() {
           <CardHeader><CardTitle className="text-base">Job Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Job Title</Label>
-              <Select value={title} onValueChange={setTitle}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a service type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {SERVICES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input
-                className="mt-2"
-                placeholder="Or type a custom title..."
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
+              <Label>Job Title {quoteLineItems.length === 0 && "*"}</Label>
+              {quoteLineItems.length === 0 ? (
+                <>
+                  <Select value={title} onValueChange={setTitle}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a service type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SERVICES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    className="mt-2"
+                    placeholder="Or type a custom title..."
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </>
+              ) : (
+                <Input
+                  placeholder="Edit the job title..."
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Client Instructions</Label>
