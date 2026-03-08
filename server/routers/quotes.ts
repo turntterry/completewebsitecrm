@@ -201,8 +201,8 @@ export const quotesRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       let setId = input.id;
       if (!setId) {
-        const [result] = await db.insert(quoteOptionSets).values({ quoteId: input.quoteId, title: input.title });
-        setId = (result as any).insertId;
+        const result = await db.insert(quoteOptionSets).values({ quoteId: input.quoteId, title: input.title }).returning({ id: quoteOptionSets.id });
+        setId = result[0]?.id as number;
       } else {
         await db.update(quoteOptionSets).set({ title: input.title }).where(and(eq(quoteOptionSets.id, setId), eq(quoteOptionSets.quoteId, input.quoteId)));
         // Delete old items for this set

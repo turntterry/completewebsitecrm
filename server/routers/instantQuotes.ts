@@ -84,7 +84,7 @@ export const instantQuotesRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
 
-      const [result] = await db.insert(instantQuotes).values([{
+      const result = await db.insert(instantQuotes).values([{
         firstName: input.firstName,
         lastName: input.lastName,
         email: input.email || null,
@@ -107,7 +107,7 @@ export const instantQuotesRouter = router({
         discountAmount: String(input.discountAmount.toFixed(2)),
         total: String(input.total.toFixed(2)),
         status: "pending",
-      }]);
+      }]).returning({ id: instantQuotes.id });
 
       // Notify owner (non-blocking)
       const serviceList = input.services.map((s) => s.serviceName).join(", ");
@@ -116,7 +116,7 @@ export const instantQuotesRouter = router({
         content: `**Address:** ${input.address}\n**Services:** ${serviceList || "None"}\n**Total:** $${input.total.toFixed(2)}\n**Contact:** ${input.email || ""} ${input.phone || ""}`,
       }).catch(() => {});
 
-      return { success: true, id: (result as { insertId: number }).insertId };
+      return { success: true, id: result[0]?.id };
     }),
 
   // Protected: owner/staff list all instant quotes
@@ -176,7 +176,7 @@ export const instantQuotesRouter = router({
         const firstName = nameParts[0] ?? quote.firstName;
         const lastName = nameParts.slice(1).join(" ") || quote.lastName || "";
 
-        const [leadResult] = await db.insert(leads).values({
+        const leadResult = await db.insert(leads).values({
           companyId,
           firstName,
           lastName,
@@ -193,9 +193,9 @@ export const instantQuotesRouter = router({
             (quote.services as any)?.map((s: any) => s.serviceName).join(", ") ||
             "N/A"
           }`,
-        });
+        }).returning({ id: leads.id });
 
-        convertedLeadId = (leadResult as any).insertId as number;
+        convertedLeadId = leadResult[0]?.id as number;
 
         // Update the instant quote to track the conversion
         await db

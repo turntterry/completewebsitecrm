@@ -66,7 +66,7 @@ const quoteRouter = router({
 
       const sessionToken = nanoid(24);
       const companyId = input.companyId ?? getActiveCompanyId(ctx.user);
-      const [result] = await db.insert(quoteSessions).values({
+      const result = await db.insert(quoteSessions).values({
         companyId,
         sessionToken,
         source: input.source ?? null,
@@ -74,10 +74,10 @@ const quoteRouter = router({
         utmSource: input.utmSource ?? null,
         utmMedium: input.utmMedium ?? null,
         utmCampaign: input.utmCampaign ?? null,
-      });
+      }).returning({ id: quoteSessions.id });
 
       return {
-        sessionId: (result as any).insertId as number,
+        sessionId: result[0]?.id ?? 0,
         sessionToken,
       };
     }),
@@ -553,7 +553,7 @@ const quoteRouter = router({
         schedulingBlockedReasons.length === 0 &&
         finalConfidenceMode !== "manual_review";
 
-      const [result] = await db.insert(instantQuotes).values([
+      const result = await db.insert(instantQuotes).values([
         {
           firstName,
           lastName,
@@ -587,9 +587,9 @@ const quoteRouter = router({
           preferredSlot: (input as any).preferredSlot ?? null,
           preferredSlotLabel: (input as any).preferredSlotLabel ?? null,
         },
-      ]);
+      ]).returning({ id: instantQuotes.id });
 
-      const quoteId = (result as any).insertId as number;
+      const quoteId = result[0]?.id as number;
 
       if (sessionRow) {
         // Update session with raw SQL to avoid datetime formatting issues
@@ -661,7 +661,7 @@ const quoteRouter = router({
 
       let manualReviewLeadId: number | null = null;
       if (finalConfidenceMode === "manual_review") {
-        const [leadResult] = await db.insert(leads).values({
+        const leadResult = await db.insert(leads).values({
           companyId: sessionCompanyId,
           firstName,
           lastName,
@@ -675,8 +675,8 @@ const quoteRouter = router({
           source: "instant_quote_manual_review",
           status: "follow_up",
           notes: `Manual review required for instant quote #${quoteId}. Reasons: ${lowConfidenceReasons.join(", ") || "n/a"}`,
-        });
-        manualReviewLeadId = (leadResult as any).insertId as number;
+        }).returning({ id: leads.id });
+        manualReviewLeadId = leadResult[0]?.id as number;
 
         notifyOwner({
           title: "Manual Review Quote Needs Follow-up",
@@ -816,7 +816,7 @@ const quoteRouter = router({
 
       const bundleDiscount = input.bundleDiscount ?? 0;
 
-      const [result] = await db.insert(instantQuotes).values([
+      const result = await db.insert(instantQuotes).values([
         {
           firstName,
           lastName,
@@ -850,9 +850,9 @@ const quoteRouter = router({
           preferredSlot: (input as any).preferredSlot ?? null,
           preferredSlotLabel: (input as any).preferredSlotLabel ?? null,
         },
-      ]);
+      ]).returning({ id: instantQuotes.id });
 
-      const quoteId = (result as any).insertId as number;
+      const quoteId = result[0]?.id as number;
 
       if (input.sessionToken) {
         const [session] = await db
@@ -1129,7 +1129,7 @@ const contactRouter = router({
       const firstName = nameParts[0] ?? input.name;
       const lastName = nameParts.slice(1).join(" ") || "";
 
-      const [result] = await db.insert(leads).values({
+      const result = await db.insert(leads).values({
         companyId: input.companyId,
         firstName,
         lastName,
@@ -1140,9 +1140,9 @@ const contactRouter = router({
         notes: input.message ?? null,
         source: "widget_request",
         status: "new",
-      });
+      }).returning({ id: leads.id });
 
-      return { success: true, leadId: (result as any).insertId as number };
+      return { success: true, leadId: result[0]?.id as number };
     }),
 });
 

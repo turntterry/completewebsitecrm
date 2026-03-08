@@ -139,9 +139,16 @@ export async function autoCreateInvoiceFromJob(
         ${input.companyId}, ${job.customerId}, ${input.jobId},
         ${nextInvoiceNumber}, 'draft', ${total}, '0.00', '0.00', '0.00', ${total}
       )
+      RETURNING id
     `);
 
-    const invoiceId = (invoiceResult as any)[0].insertId as number;
+    const invoiceId = (invoiceResult as any)[0]?.id as number;
+    if (!invoiceId) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to create invoice",
+      });
+    }
 
     // Step 6: Add line items from job costs (or fallback to job title)
     try {

@@ -243,7 +243,7 @@ export const quoteToolSettingsRouter = router({
         .from(quoteToolServices)
         .where(eq(quoteToolServices.companyId, companyId));
 
-      const [result] = await db.insert(quoteToolServices).values({
+      const result = await db.insert(quoteToolServices).values({
         companyId,
         name: input.name,
         icon: input.icon ?? "Droplets",
@@ -265,8 +265,8 @@ export const quoteToolSettingsRouter = router({
         enabled: true,
         isActive: true,
         sortOrder: existingServices.length,
-      });
-      return { success: true, id: (result as any).insertId };
+      }).returning({ id: quoteToolServices.id });
+      return { success: true, id: result[0]?.id };
     }),
 
   // Delete a service
@@ -519,7 +519,7 @@ export const quoteToolSettingsRouter = router({
         .where(eq(quoteToolServices.companyId, companyId))
         .orderBy(asc(quoteToolServices.sortOrder));
 
-      const [result] = await db.insert(quoteConfigVersions).values({
+      const result = await db.insert(quoteConfigVersions).values({
         companyId,
         versionLabel: input.versionLabel,
         status: "draft",
@@ -528,9 +528,9 @@ export const quoteToolSettingsRouter = router({
           services,
         },
         createdByUserId: ctx.user.id,
-      });
+      }).returning({ id: quoteConfigVersions.id });
 
-      return { success: true, id: (result as any).insertId as number };
+      return { success: true, id: result[0]?.id as number };
     }),
 
   publishExperienceVersion: protectedProcedure

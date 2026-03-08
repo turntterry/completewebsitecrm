@@ -157,7 +157,7 @@ export const marketingRouter = router({
       // Mark as sent
       if (request) {
         await updateReviewRequestStatus(
-          (request as any).insertId ?? (request as any).id,
+          request,
           companyId,
           "sent",
           { sentAt: new Date() }

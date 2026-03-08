@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import {
   InsertCustomer,
   InsertJob,
@@ -51,14 +52,17 @@ import {
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _client: ReturnType<typeof postgres> | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _client = postgres(process.env.DATABASE_URL);
+      _db = drizzle(_client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
+      _client = null;
     }
   }
   return _db;
@@ -77,15 +81,15 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const role = user.role ?? (openId === ENV.ownerOpenId ? "admin" : "user");
   const lastSignedIn = user.lastSignedIn ?? new Date();
 
-  // Use raw SQL for MySQL INSERT ... ON DUPLICATE KEY UPDATE
+  // PostgreSQL upsert: ON CONFLICT ... DO UPDATE
   await db.execute(sql`
     INSERT INTO users (openId, name, email, loginMethod, role, lastSignedIn)
     VALUES (${openId}, ${name}, ${email}, ${loginMethod}, ${role}, ${lastSignedIn})
-    ON DUPLICATE KEY UPDATE
-      name = VALUES(name),
-      email = VALUES(email),
-      loginMethod = VALUES(loginMethod),
-      lastSignedIn = VALUES(lastSignedIn)
+    ON CONFLICT (openId) DO UPDATE SET
+      name = EXCLUDED.name,
+      email = EXCLUDED.email,
+      loginMethod = EXCLUDED.loginMethod,
+      lastSignedIn = EXCLUDED.lastSignedIn
   `);
 }
 
@@ -109,12 +113,13 @@ export async function getOrCreateCompany(userId: number, ownerName: string) {
   }
 
   // Create default company
-  const [result] = await db.insert(companies).values({
+  const result = await db.insert(companies).values({
     name: ownerName || "My Company",
     invoiceTerms: "due_on_receipt",
     quoteExpiryDays: 30,
-  });
-  const companyId = (result as any).insertId as number;
+  }).returning({ id: companies.id });
+  const companyId = result[0]?.id;
+  if (!companyId) return null;
   await db.update(users).set({ companyId }).where(eq(users.id, userId));
   const company = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1);
   return company[0] ?? null;
@@ -161,8 +166,8 @@ export async function getCustomer(id: number, companyId: number) {
 export async function createCustomer(data: InsertCustomer) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(customers).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(customers).values(data).returning({ id: customers.id });
+  return result[0]?.id ?? null;
 }
 
 export async function updateCustomer(id: number, companyId: number, data: Partial<InsertCustomer>) {
@@ -187,8 +192,8 @@ export async function listProperties(customerId: number, companyId: number) {
 export async function createProperty(data: InsertProperty) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(properties).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(properties).values(data).returning({ id: properties.id });
+  return result[0]?.id ?? null;
 }
 
 export async function updateProperty(id: number, companyId: number, data: Partial<InsertProperty>) {
@@ -222,8 +227,8 @@ export async function getLead(id: number, companyId: number) {
 export async function createLead(data: InsertLead) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(leads).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(leads).values(data).returning({ id: leads.id });
+  return result[0]?.id ?? null;
 }
 
 export async function updateLead(id: number, companyId: number, data: Partial<InsertLead>) {
@@ -311,8 +316,9 @@ export async function createQuote(data: InsertQuote, lineItems: InsertQuoteLineI
   const db = await getDb();
   if (!db) return null;
   const token = `qt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-  const [result] = await db.insert(quotes).values({ ...data, publicToken: token });
-  const quoteId = (result as any).insertId as number;
+  const result = await db.insert(quotes).values({ ...data, publicToken: token }).returning({ id: quotes.id });
+  const quoteId = result[0]?.id;
+  if (!quoteId) return null;
   if (lineItems.length > 0) {
     await db.insert(quoteLineItems).values(lineItems.map((li, i) => ({ ...li, quoteId, sortOrder: i })));
   }
@@ -341,8 +347,8 @@ export async function listQuoteTemplates(companyId: number) {
 export async function createQuoteTemplate(data: typeof quoteTemplates.$inferInsert) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(quoteTemplates).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(quoteTemplates).values(data).returning({ id: quoteTemplates.id });
+  return result[0]?.id ?? null;
 }
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
@@ -381,8 +387,8 @@ export async function getNextJobNumber(companyId: number) {
 export async function createJob(data: InsertJob) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(jobs).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(jobs).values(data).returning({ id: jobs.id });
+  return result[0]?.id ?? null;
 }
 
 export async function updateJob(id: number, companyId: number, data: Partial<InsertJob>) {
@@ -451,8 +457,8 @@ export async function getVisitsByJob(jobId: number) {
 export async function createVisit(data: typeof visits.$inferInsert) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(visits).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(visits).values(data).returning({ id: visits.id });
+  return result[0]?.id ?? null;
 }
 
 export async function updateVisit(id: number, companyId: number, data: Partial<typeof visits.$inferInsert>) {
@@ -523,8 +529,9 @@ export async function getNextInvoiceNumber(companyId: number) {
 export async function createInvoice(data: typeof invoices.$inferInsert, lineItemsData: typeof invoiceLineItems.$inferInsert[]) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(invoices).values(data);
-  const invoiceId = (result as any).insertId as number;
+  const result = await db.insert(invoices).values(data).returning({ id: invoices.id });
+  const invoiceId = result[0]?.id;
+  if (!invoiceId) return null;
   if (lineItemsData.length > 0) {
     await db.insert(invoiceLineItems).values(lineItemsData.map((li, i) => ({ ...li, invoiceId, sortOrder: i })));
   }
@@ -547,8 +554,9 @@ export async function updateInvoice(id: number, companyId: number, data: Partial
 export async function createPayment(data: InsertPayment) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(payments).values(data);
-  const paymentId = (result as any).insertId as number;
+  const result = await db.insert(payments).values(data).returning({ id: payments.id });
+  const paymentId = result[0]?.id;
+  if (!paymentId) return null;
   // Update invoice balance
   const invoice = await getInvoice(data.invoiceId, data.companyId);
   if (invoice) {
@@ -581,8 +589,8 @@ export async function listAttachments(attachableType: string, attachableId: numb
 export async function createAttachment(data: typeof attachments.$inferInsert) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(attachments).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(attachments).values(data).returning({ id: attachments.id });
+  return result[0]?.id ?? null;
 }
 
 export async function deleteAttachment(id: number, companyId: number) {
@@ -682,8 +690,8 @@ export async function listCampaigns(companyId: number) {
 export async function createCampaign(data: typeof campaigns.$inferInsert) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(campaigns).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(campaigns).values(data).returning({ id: campaigns.id });
+  return result[0]?.id ?? null;
 }
 
 export async function updateCampaign(id: number, companyId: number, data: Partial<typeof campaigns.$inferInsert>) {
@@ -702,8 +710,8 @@ export async function listReferrals(companyId: number) {
 export async function createReferral(data: typeof referrals.$inferInsert) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(referrals).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(referrals).values(data).returning({ id: referrals.id });
+  return result[0]?.id ?? null;
 }
 
 // ─── Review Requests ──────────────────────────────────────────────────────────
@@ -716,8 +724,8 @@ export async function listReviewRequests(companyId: number) {
 export async function createReviewRequest(data: typeof reviewRequests.$inferInsert) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(reviewRequests).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(reviewRequests).values(data).returning({ id: reviewRequests.id });
+  return result[0]?.id ?? null;
 }
 
 // ─── Quote Tool Settings (Phase 2) ───────────────────────────────────────────
@@ -749,8 +757,8 @@ export async function getQuoteToolServices(companyId: number) {
 export async function createQuoteToolService(data: any) {
   const db = await getDb();
   if (!db) return null;
-  const r = await db.insert(quoteToolServices).values(data);
-  return { id: (r[0] as any).insertId };
+  const r = await db.insert(quoteToolServices).values(data).returning({ id: quoteToolServices.id });
+  return { id: r[0]?.id };
 }
 
 export async function updateQuoteToolService(id: number, data: any) {
@@ -775,8 +783,8 @@ export async function listInstantQuotes() {
 export async function createInstantQuote(data: any) {
   const db = await getDb();
   if (!db) return null;
-  const r = await db.insert(instantQuotes).values(data);
-  return { id: (r[0] as any).insertId };
+  const r = await db.insert(instantQuotes).values(data).returning({ id: instantQuotes.id });
+  return { id: r[0]?.id };
 }
 
 export async function updateInstantQuote(id: number, data: any) {
@@ -862,8 +870,8 @@ export async function listJobCosts(jobId: number, companyId: number) {
 export async function createJobCost(data: InsertJobCost) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [result] = await db.insert(jobCosts).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(jobCosts).values(data).returning({ id: jobCosts.id });
+  return result[0]?.id ?? null;
 }
 
 export async function updateJobCost(id: number, companyId: number, data: Partial<InsertJobCost>) {
@@ -954,18 +962,13 @@ export async function findOrCreateConversation(
     .where(and(eq(smsConversations.companyId, companyId), eq(smsConversations.customerPhone, phone)))
     .limit(1);
   if (existing[0]) return existing[0];
-  const [result] = await db.insert(smsConversations).values({
+  const rows = await db.insert(smsConversations).values({
     companyId,
     customerPhone: phone,
     customerId: customerId ?? null,
     customerName: customerName ?? null,
-  });
-  const rows = await db
-    .select()
-    .from(smsConversations)
-    .where(eq(smsConversations.id, (result as any).insertId))
-    .limit(1);
-  return rows[0];
+  }).returning();
+  return rows[0] ?? null;
 }
 
 export async function getSmsMessages(conversationId: number, companyId: number) {
@@ -1047,10 +1050,8 @@ export async function getAutomationRule(id: number, companyId: number) {
 export async function createAutomationRule(data: InsertAutomationRule) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [result] = await db.insert(automationRules).values(data);
-  const insertId = (result as any).insertId;
-  const rows = await db.select().from(automationRules).where(eq(automationRules.id, insertId)).limit(1);
-  return rows[0];
+  const rows = await db.insert(automationRules).values(data).returning();
+  return rows[0] ?? null;
 }
 
 export async function updateAutomationRule(id: number, companyId: number, data: Partial<InsertAutomationRule>) {
@@ -1246,8 +1247,8 @@ export async function listMediaTags(companyId: number) {
 export async function createMediaTag(companyId: number, name: string, color?: string) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(mediaTags).values({ companyId, name, color: color ?? "blue" });
-  return (result as any).insertId as number;
+  const result = await db.insert(mediaTags).values({ companyId, name, color: color ?? "blue" }).returning({ id: mediaTags.id });
+  return result[0]?.id ?? null;
 }
 
 export async function deleteMediaTag(id: number, companyId: number) {
@@ -1260,8 +1261,8 @@ export async function deleteMediaTag(id: number, companyId: number) {
 export async function assignPhotoTag(attachmentId: number, tagId: number) {
   const db = await getDb();
   if (!db) return;
-  // Ignore if already assigned
-  await db.insert(photoTagAssignments).values({ attachmentId, tagId }).onDuplicateKeyUpdate({ set: { tagId } });
+  // Ignore if already assigned - PostgreSQL upsert
+  await db.insert(photoTagAssignments).values({ attachmentId, tagId }).onConflictDoNothing();
 }
 
 export async function removePhotoTag(attachmentId: number, tagId: number) {
@@ -1285,8 +1286,8 @@ export async function getTagsForPhoto(attachmentId: number) {
 export async function createShareLink(data: typeof shareLinks.$inferInsert) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(shareLinks).values(data);
-  return (result as any).insertId as number;
+  const result = await db.insert(shareLinks).values(data).returning({ id: shareLinks.id });
+  return result[0]?.id ?? null;
 }
 
 export async function getShareLink(token: string) {

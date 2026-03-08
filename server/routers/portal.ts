@@ -507,7 +507,7 @@ export const portalRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Customer not found" });
       }
 
-      const [leadResult] = await db.insert(leads).values({
+      const leadResult = await db.insert(leads).values({
         companyId: input.companyId,
         customerId: input.customerId,
         firstName: customer.firstName,
@@ -519,9 +519,9 @@ export const portalRouter = router({
         notes: input.message ?? undefined,
         status: "new",
         source: "portal_request",
-      });
+      }).returning({ id: leads.id });
 
-      const leadId = (leadResult as any).insertId as number;
+      const leadId = leadResult[0]?.id as number;
 
       let jobId: number | null = null;
       if (input.autoCreateJob ?? portalSettings.autoCreateJobOnRequest ?? true) {

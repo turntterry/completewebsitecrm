@@ -86,7 +86,7 @@ export const productCatalogRouter = router({
       const maxSort =
         existing.length > 0 ? (existing[existing.length - 1].sortOrder ?? 0) + 1 : 0;
 
-      const [result] = await db.insert(productCatalog).values({
+      const result = await db.insert(productCatalog).values({
         companyId,
         name: input.name,
         description: input.description ?? null,
@@ -95,8 +95,8 @@ export const productCatalogRouter = router({
         taxable: input.taxable,
         active: true,
         sortOrder: maxSort,
-      });
-      const newId = (result as any).insertId as number;
+      }).returning({ id: productCatalog.id });
+      const newId = result[0]?.id as number;
 
       const [created] = await db
         .select()
