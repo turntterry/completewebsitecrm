@@ -238,7 +238,17 @@ export async function listQuotes(companyId: number, status?: string) {
   if (!db) return [];
   const conditions = [eq(quotes.companyId, companyId)];
   if (status) conditions.push(eq(quotes.status, status as any));
-  return db.select().from(quotes).where(and(...conditions)).orderBy(desc(quotes.createdAt));
+  const quotesList = await db.select().from(quotes).where(and(...conditions)).orderBy(desc(quotes.createdAt));
+
+  // Fetch customer data for each quote
+  const withCustomers = await Promise.all(
+    quotesList.map(async (q) => {
+      const customer = await getCustomer(q.customerId, companyId);
+      return { ...q, customer };
+    })
+  );
+
+  return withCustomers;
 }
 
 export async function getQuote(id: number, companyId: number) {
@@ -341,7 +351,17 @@ export async function listJobs(companyId: number, status?: string) {
   if (!db) return [];
   const conditions = [eq(jobs.companyId, companyId)];
   if (status) conditions.push(eq(jobs.status, status as any));
-  return db.select().from(jobs).where(and(...conditions)).orderBy(desc(jobs.createdAt));
+  const jobsList = await db.select().from(jobs).where(and(...conditions)).orderBy(desc(jobs.createdAt));
+
+  // Fetch customer data for each job
+  const withCustomers = await Promise.all(
+    jobsList.map(async (j) => {
+      const customer = await getCustomer(j.customerId, companyId);
+      return { ...j, customer };
+    })
+  );
+
+  return withCustomers;
 }
 
 export async function getJob(id: number, companyId: number) {
@@ -463,7 +483,17 @@ export async function listInvoices(companyId: number, status?: string) {
   if (!db) return [];
   const conditions = [eq(invoices.companyId, companyId)];
   if (status) conditions.push(eq(invoices.status, status as any));
-  return db.select().from(invoices).where(and(...conditions)).orderBy(desc(invoices.createdAt));
+  const invoicesList = await db.select().from(invoices).where(and(...conditions)).orderBy(desc(invoices.createdAt));
+
+  // Fetch customer data for each invoice
+  const withCustomers = await Promise.all(
+    invoicesList.map(async (inv) => {
+      const customer = await getCustomer(inv.customerId, companyId);
+      return { ...inv, customer };
+    })
+  );
+
+  return withCustomers;
 }
 
 export async function getInvoice(id: number, companyId: number) {
