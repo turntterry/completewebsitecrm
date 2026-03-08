@@ -113,16 +113,6 @@ export const jobsRouter = router({
       if (data.status) {
         const event = data.status === "completed" ? "job_completed" : "job_status_changed";
         fireAutomation(event, { companyId, entityType: "job", entityId: id, data: { status: data.status } }).catch(() => {});
-
-        // Auto-create draft invoice when job is marked completed
-        if (data.status === "completed") {
-          try {
-            await autoCreateInvoiceFromJob({ companyId, jobId: id });
-          } catch (err) {
-            console.error("Failed to auto-create invoice:", err);
-            // Don't block job completion if invoice creation fails
-          }
-        }
       }
       return true;
     }),
@@ -336,5 +326,19 @@ export const jobsRouter = router({
     .query(async ({ ctx, input }) => {
       const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
       return getJobProfitability(input.jobId, companyId);
+    }),
+
+  createInvoice: protectedProcedure
+    .input(z.object({ jobId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
+      const result = await autoCreateInvoiceFromJob({ companyId, jobId: input.jobId });
+      if (result.errors.length > 0) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: result.errors[0],
+        });
+      }
+      return result;
     }),
 });

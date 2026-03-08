@@ -37,6 +37,13 @@ export default function JobDetail() {
   const checkOutMutation = trpc.jobs.checkOut.useMutation({
     onSuccess: () => { utils.jobs.get.invalidate({ id }); toast.success("Checked out!"); },
   });
+  const createInvoiceMutation = trpc.jobs.createInvoice.useMutation({
+    onSuccess: (result) => {
+      utils.jobs.get.invalidate({ id });
+      toast.success(`Invoice #${result.invoiceNumber} created`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   if (isLoading) return <div className="p-6"><div className="h-8 w-48 bg-muted animate-pulse rounded" /></div>;
   if (!job) return <div className="p-6"><p className="text-muted-foreground">Job not found.</p></div>;
@@ -75,6 +82,11 @@ export default function JobDetail() {
           {j.status === "in_progress" && visits.length > 0 && (
             <Button size="sm" onClick={() => checkOutMutation.mutate({ visitId: visits[0].id, jobId: id })}>
               <CheckCircle className="h-4 w-4 mr-1.5" /> Complete Job
+            </Button>
+          )}
+          {(j.status === "completed" || j.status === "requires_invoicing") && (
+            <Button size="sm" variant="outline" onClick={() => createInvoiceMutation.mutate({ jobId: id })} disabled={createInvoiceMutation.isPending}>
+              {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
             </Button>
           )}
         </div>
