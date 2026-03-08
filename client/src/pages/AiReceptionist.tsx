@@ -265,6 +265,7 @@ export default function AiReceptionist() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Bot className="h-6 w-6 text-primary" /> AI Receptionist
+            <Badge variant="secondary" className="text-xs font-medium">Internal</Badge>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Can reply to inbound customer SMS messages using Claude AI. Review live behavior before enabling broadly.
