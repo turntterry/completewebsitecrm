@@ -186,8 +186,8 @@ export async function fireAutomation(event: TriggerEvent, ctx: TriggerContext) {
               break;
             }
             case "add_note": {
-              // Could insert into activityEvents table here
-              actionsRun.push({ type: "add_note", success: true, detail: action.config?.note ?? "" });
+              // Note text is stored in the automation log below; no separate note record is created yet.
+              actionsRun.push({ type: "add_note", success: true, detail: `(log only) ${action.config?.note ?? ""}` });
               break;
             }
             default:

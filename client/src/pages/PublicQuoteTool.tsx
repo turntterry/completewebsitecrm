@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { BUSINESS, SERVICES } from "@shared/data";
+import { WINDOW_PACKAGE_FEATURES } from "@shared/windowFeatures";
 import { trpc } from "@/lib/trpc";
 import {
   calculateServicePrice,
@@ -130,43 +131,6 @@ const QUOTABLE_SERVICES = [
   },
 ];
 
-type BundleCard = { id: string; title: string; price: number; desc: string; badge?: string };
-
-// Easy-to-edit bundle cards (shared defaults)
-const DEFAULT_BUNDLES: BundleCard[] = [
-  {
-    id: "combo",
-    title: "House Wash Combo",
-    price: 505,
-    desc: "Pair this service with a full exterior house wash in one visit.",
-    badge: "Bundle",
-  },
-  {
-    id: "curb_appeal",
-    title: "Curb Appeal Upgrade",
-    price: 695,
-    desc: "House wash + exterior windows + this service for a total refresh.",
-  },
-];
-
-// Per-service bundle overrides (edit here to customize)
-const SERVICE_BUNDLE_MAP: Record<string, BundleCard[] | undefined> = {
-  // driveway_cleaning: [
-  //   { id: "wash_seal", title: "Wash + Seal", price: 825, desc: "Clean and seal your driveway in one visit.", badge: "Most Popular" },
-  // ],
-};
-
-type BundleAwarePricingInput = PricingInput & { bundleChoice?: string };
-
-function getBundleChoiceSavings(serviceInputs: Record<string, BundleAwarePricingInput>) {
-  const selections = Object.values(serviceInputs).filter(
-    (v: any) => v?.bundleChoice
-  );
-  // Flat, easy-to-understand savings per bundle selection.
-  const savingsPerBundle = 75;
-  return selections.length * savingsPerBundle;
-}
-
 // Slider configs per service (defaults, overridden by DB config)
 const SLIDER_DEFAULTS: Record<
   string,
@@ -204,37 +168,7 @@ const SLIDER_DEFAULTS: Record<
   },
 };
 
-/**
- * Machine-readable source of truth for window package tier inclusions.
- * Feature keys here must exactly match suppressIfFeatureCovered values on
- * catalog items. Keep in sync with WindowPackageSelector display copy.
- *
- * good   = Expert Essential
- * better = Signature Sparkle
- * best   = Platinum Perfection
- */
-const WINDOW_PACKAGE_FEATURES: Record<string, string[]> = {
-  good: [
-    "exterior_glass",
-    "screen_removal_replacement",
-  ],
-  better: [
-    "exterior_glass",
-    "interior_glass",
-    "frames_wiped",
-    "interior_ledges_wiped",
-  ],
-  best: [
-    "exterior_glass",
-    "interior_glass",
-    "frames_wiped",
-    "interior_ledges_wiped",
-    "sills",
-    "ledges",
-    "deep_screen_washing",
-    "deep_track_detailing",
-  ],
-};
+// WINDOW_PACKAGE_FEATURES is imported from @shared/windowFeatures
 
 /**
  * Derive the set of features already covered by the user's current selections.
@@ -243,7 +177,7 @@ const WINDOW_PACKAGE_FEATURES: Record<string, string[]> = {
  */
 function buildCoveredFeatures(
   selectedServices: Set<string>,
-  serviceInputs: Record<string, BundleAwarePricingInput>
+  serviceInputs: Record<string, PricingInput>
 ): Set<string> {
   const covered = new Set<string>();
 
@@ -381,19 +315,23 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     priority: 85,
   },
   {
-    id: "interior_windows_crosssell",
+    id: "interior_windows_addon",
     title: "Add Interior Windows",
     description: "While we clean the outside, add interior glass for a complete clear view — no second appointment needed.",
-    price: 99,
+    price: 75,
     appliesTo: ["window_cleaning"],
     requiresAnyServices: ["window_cleaning"],
     excludeIfServicesSelected: ["interior_window_cleaning"],
-    badge: "Recommended",
-    category: "cross_sell",
-    // Flat: interior window add-on is a fixed per-visit charge, not scaled by window count here
-    pricingMode: "flat",
-    priceConfig: { amount: 99 },
-    priority: 80,
+    category: "add_on",
+    pricingMode: "per_unit",
+    priceConfig: {
+      ratePerUnit: 5,
+      unitKey: "windowCount",
+      minimumCharge: 49,
+      maximumCharge: 199,
+    },
+    priority: 60,
+    exclusiveGroup: "window-addon",
     // Suppress for Signature Sparkle and Platinum Perfection — both include interior_glass
     suppressIfFeatureCovered: ["interior_glass"],
   },
@@ -427,6 +365,7 @@ const DEFAULT_UPSELL_CATALOG: UpsellItem[] = [
     appliesTo: ["house_washing"],
     requiresAnyServices: ["house_washing"],
     excludeIfServicesSelected: ["driveway_cleaning", "walkway_cleaning"],
+    includesServices: ["walkway_cleaning"],
     badge: "Bundle",
     category: "bundle",
     pricingMode: "bundle_discount",
@@ -495,9 +434,7 @@ export default function QuoteTool() {
   const [phone, setPhone] = useState("");
 
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
-  const [serviceInputs, setServiceInputs] = useState<
-    Record<string, BundleAwarePricingInput>
-  >({});
+  const [serviceInputs, setServiceInputs] = useState<Record<string, PricingInput>>({});
   const [propertyIntel, setPropertyIntel] = useState<PropertyIntel | null>(
     null
   );
@@ -733,16 +670,7 @@ export default function QuoteTool() {
     return calculateQuoteTotal(pricingResults, distanceMiles, globalConfig);
   }, [pricingResults, distanceMiles, globalConfig]);
 
-  const bundleChoiceSavings = useMemo(
-    () => getBundleChoiceSavings(serviceInputs),
-    [serviceInputs]
-  );
-
-  const quoteSummary = useMemo(() => {
-    const subtotal = Math.max(0, rawQuoteSummary.subtotal - bundleChoiceSavings);
-    const totalPrice = Math.max(0, rawQuoteSummary.totalPrice - bundleChoiceSavings);
-    return { ...rawQuoteSummary, subtotal, totalPrice, bundleChoiceSavings };
-  }, [bundleChoiceSavings, rawQuoteSummary]);
+  const quoteSummary = rawQuoteSummary;
   // Build real per-service prices from live pricing results.
   // Used by service_multiplier pricing mode to compute cross-sell prices dynamically.
   const servicePrices = useMemo(
@@ -839,26 +767,16 @@ export default function QuoteTool() {
   const quotePreviewSummary = useMemo(() => {
     if (!previewData?.breakdown) return finalQuoteSummary;
 
-    const previewSubtotal = Math.max(
-      0,
-      previewData.breakdown.servicesSubtotal - bundleChoiceSavings
-    );
-    const previewTotal = Math.max(
-      0,
-      previewData.breakdown.total - bundleChoiceSavings + upsellTotal
-    );
-
     return {
       ...finalQuoteSummary,
-      subtotal: previewSubtotal,
+      subtotal: Math.max(0, previewData.breakdown.servicesSubtotal),
       bundleDiscountPercent: previewData.breakdown.bundleDiscountPercent,
       bundleDiscount: previewData.breakdown.bundleDiscountAmount,
-      bundleChoiceSavings,
       travelFee: previewData.breakdown.travelFee,
       jobMinimumApplied: previewData.breakdown.jobMinimumApplied,
-      totalPrice: previewTotal,
+      totalPrice: Math.max(0, previewData.breakdown.total + upsellTotal),
     };
-  }, [previewData?.breakdown, finalQuoteSummary, bundleChoiceSavings, upsellTotal]);
+  }, [previewData?.breakdown, finalQuoteSummary, upsellTotal]);
 
   const toggleService = (id: string) => {
     setSelectedServices(prev => {
@@ -2301,7 +2219,7 @@ function ServiceDetailForm({
   price,
 }: {
   serviceId: string;
-  inputs: BundleAwarePricingInput;
+  inputs: PricingInput;
   updateInput: (key: string, val: unknown) => void;
   config: ServiceConfig;
   tierLabels: { good: string; better: string; best: string };
@@ -2311,10 +2229,6 @@ function ServiceDetailForm({
   if (!svc) return null;
 
   const sliderDef = SLIDER_DEFAULTS[serviceId];
-
-  const showBundleCards =
-    serviceId !== "window_cleaning" && serviceId !== "house_washing";
-  const bundles = SERVICE_BUNDLE_MAP[serviceId] ?? DEFAULT_BUNDLES;
 
   return (
     <Card className="border-2 overflow-hidden">
@@ -2555,54 +2469,6 @@ function ServiceDetailForm({
             />
           )}
 
-          {/* Bundled upsell cards (for non-window/house wash services) */}
-          {showBundleCards && (
-            <div className="space-y-3">
-              <Label className="block">Popular Bundles</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {bundles.map(bundle => {
-                  const selected = inputs.bundleChoice === bundle.id;
-                  return (
-                    <button
-                      key={bundle.id}
-                      type="button"
-                      onClick={() => updateInput("bundleChoice", bundle.id)}
-                      className={`text-left rounded-xl border-2 p-4 transition-all ${
-                        selected
-                          ? "border-primary bg-primary/5 shadow-sm"
-                          : "border-border hover:border-primary/30"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-heading font-bold text-sm mb-1">
-                            {bundle.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            {bundle.desc}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-heading font-bold text-primary text-lg">
-                            ${bundle.price.toFixed(0)}
-                          </p>
-                          {selected && (
-                            <span className="text-[10px] text-primary font-semibold">
-                              Added
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Bundle pricing is quoted on-site. Selecting a bundle flags our team to apply
-                the combo rate (no separate visit needed).
-              </p>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
@@ -2993,13 +2859,6 @@ function StepReview({
             <span>-${quoteSummary.bundleDiscount.toFixed(2)}</span>
           </div>
         )}
-        {quoteSummary.bundleChoiceSavings > 0 && (
-          <div className="flex justify-between text-sm text-green-600">
-            <span>Bundle Choice Savings</span>
-            <span>-${quoteSummary.bundleChoiceSavings.toFixed(2)}</span>
-          </div>
-        )}
-
         {quoteSummary.jobMinimumApplied && (
           <div className="flex justify-between text-sm text-amber-600">
             <span>Job Minimum Applied</span>

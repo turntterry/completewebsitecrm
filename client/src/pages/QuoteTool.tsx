@@ -48,6 +48,354 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { WINDOW_FEATURE_LIST } from "@shared/windowFeatures";
+
+// ── Upsell editor helpers ──────────────────────────────────────────────────
+
+function ServiceChips({
+  value,
+  onChange,
+  services,
+  single = false,
+  placeholder = "Add service…",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  services: Array<{ serviceKey: string | null; name: string }>;
+  single?: boolean;
+  placeholder?: string;
+}) {
+  const selected = strToArr(value);
+  const available = services.filter(s => s.serviceKey && !selected.includes(s.serviceKey));
+  const remove = (key: string) => onChange(selected.filter(k => k !== key).join(", "));
+  const add = (key: string) => {
+    if (!key) return;
+    if (single) { onChange(key); return; }
+    if (!selected.includes(key)) onChange([...selected, key].join(", "));
+  };
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5 min-h-[26px]">
+        {selected.map(key => {
+          const svc = services.find(s => s.serviceKey === key);
+          return (
+            <span key={key} className="inline-flex items-center gap-1 rounded-full bg-slate-100 border px-2 py-0.5 text-xs font-medium text-slate-700">
+              {svc?.name ?? key}
+              <button type="button" onClick={() => remove(key)} className="hover:text-red-500 leading-none ml-0.5">×</button>
+            </span>
+          );
+        })}
+      </div>
+      {(!single || selected.length === 0) && (
+        <select
+          className="border rounded-md px-2 py-1.5 text-xs bg-background w-full"
+          value=""
+          onChange={e => add(e.target.value)}
+        >
+          <option value="">+ {placeholder}</option>
+          {(single ? services : available).filter(s => s.serviceKey).map(s => (
+            <option key={s.serviceKey!} value={s.serviceKey!}>{s.name}</option>
+          ))}
+        </select>
+      )}
+      {single && selected.length > 0 && (
+        <select
+          className="border rounded-md px-2 py-1.5 text-xs bg-background w-full"
+          value={selected[0] ?? ""}
+          onChange={e => onChange(e.target.value)}
+        >
+          <option value="">— none —</option>
+          {services.filter(s => s.serviceKey).map(s => (
+            <option key={s.serviceKey!} value={s.serviceKey!}>{s.name}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+function FeatureChips({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const selected = strToArr(value);
+  const available = WINDOW_FEATURE_LIST.filter(f => !selected.includes(f.key));
+  const remove = (key: string) => onChange(selected.filter(k => k !== key).join(", "));
+  const add = (key: string) => {
+    if (!key || selected.includes(key)) return;
+    onChange([...selected, key].join(", "));
+  };
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5 min-h-[26px]">
+        {selected.map(key => {
+          const feat = WINDOW_FEATURE_LIST.find(f => f.key === key);
+          return (
+            <span key={key} className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800">
+              {feat?.label ?? key}
+              <button type="button" onClick={() => remove(key)} className="hover:text-red-500 leading-none ml-0.5">×</button>
+            </span>
+          );
+        })}
+      </div>
+      <select
+        className="border rounded-md px-2 py-1.5 text-xs bg-background w-full"
+        value=""
+        onChange={e => add(e.target.value)}
+      >
+        <option value="">+ Add feature…</option>
+        {available.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+      </select>
+    </div>
+  );
+}
+
+type UpsellDraft = {
+  id: string;
+  title: string;
+  description: string;
+  appliesTo: string;
+  badge: string;
+  active: boolean;
+  sortOrder: number;
+  category: string;
+  pricingMode: string;
+  displaySavingsText: string;
+  // Flat
+  flatAmount: string;
+  // Per unit
+  puRate: string;
+  puSource: string;
+  puMin: string;
+  puMax: string;
+  // Service multiplier
+  smBaseService: string;
+  smMultiplier: string;
+  smBasePrice: string;
+  smMin: string;
+  smMax: string;
+  // Package delta
+  pdFromPackage: string;
+  pdToPackage: string;
+  pdAmount: string;
+  // Bundle discount
+  bdPrice: string;
+  bdDiscount: string;
+  bdIncluded: string;
+  // Eligibility
+  requiresServices: string;
+  excludeServices: string;
+  suppressIfCovered: string;
+  priority: string;
+  exclusiveGroup: string;
+  // Thresholds (go into rules)
+  minSqft: string;
+  maxSqft: string;
+  minWindows: string;
+  maxWindows: string;
+  minSubtotal: string;
+  maxSubtotal: string;
+  // Advanced fallback
+  showAdvanced: boolean;
+  // Inline price preview test input
+  previewQty: string;
+};
+
+function fromDbUpsell(upsell: any, idx: number): UpsellDraft {
+  const pc = upsell.priceConfig ?? {};
+  const rules = upsell.rules ?? {};
+  const mode: string = upsell.pricingMode ?? "flat";
+  return {
+    id: upsell.id ?? "",
+    title: upsell.title ?? "",
+    description: upsell.description ?? "",
+    appliesTo: (upsell.appliesTo ?? []).join(", "),
+    badge: upsell.badge ?? "",
+    active: upsell.active !== false,
+    sortOrder: Number(upsell.sortOrder ?? idx),
+    category: upsell.category ?? "add_on",
+    pricingMode: mode,
+    displaySavingsText: upsell.displaySavingsText ?? "",
+    // Flat
+    flatAmount: mode === "flat" ? String(pc.amount ?? upsell.price ?? "") : "",
+    // Per unit — accept both legacy (rate/unitSource) and canonical (ratePerUnit/unitKey)
+    puRate: String(pc.ratePerUnit ?? pc.rate ?? ""),
+    puSource: UNIT_KEY_TO_SOURCE[pc.unitKey] ?? pc.unitSource ?? pc.unitKey ?? "window_count",
+    puMin: String(pc.minimumCharge ?? ""),
+    puMax: String(pc.maximumCharge ?? ""),
+    // Service multiplier
+    smBaseService: pc.baseService ?? "",
+    smMultiplier: String(pc.multiplier ?? ""),
+    smBasePrice: String(pc.basePrice ?? ""),
+    smMin: String(pc.minimumCharge ?? ""),
+    smMax: String(pc.maximumCharge ?? ""),
+    // Package delta
+    pdFromPackage: pc.fromPackage ?? "",
+    pdToPackage: pc.toPackage ?? "",
+    pdAmount: String(pc.amount ?? ""),
+    // Bundle discount
+    bdPrice: String(pc.bundlePrice ?? pc.explicitBundlePrice ?? ""),
+    bdDiscount: String(pc.discountAmount ?? ""),
+    bdIncluded: (upsell.includesServices ?? []).join(", "),
+    // Eligibility
+    requiresServices: (upsell.requiresAnyServices ?? []).join(", "),
+    excludeServices: (upsell.excludeIfServicesSelected ?? []).join(", "),
+    suppressIfCovered: (upsell.suppressIfFeatureCovered ?? []).join(", "),
+    priority: String(upsell.priority ?? ""),
+    exclusiveGroup: upsell.exclusiveGroup ?? "",
+    // Thresholds
+    minSqft: String(rules.minSqft ?? ""),
+    maxSqft: String(rules.maxSqft ?? ""),
+    minWindows: String(rules.minWindows ?? ""),
+    maxWindows: String(rules.maxWindows ?? ""),
+    minSubtotal: String(rules.minSubtotal ?? ""),
+    maxSubtotal: String(rules.maxSubtotal ?? ""),
+    // Advanced
+    showAdvanced: false,
+    previewQty: "",
+  };
+}
+
+function strToArr(s: string): string[] {
+  return s.split(",").map(x => x.trim()).filter(Boolean);
+}
+
+// Map admin UI unit source labels to canonical engine keys
+const UNIT_SOURCE_TO_KEY: Record<string, string> = {
+  window_count: "windowCount",
+  affected_window_count: "windowCount",
+  square_feet: "sqft",
+  linear_feet: "linearFeet",
+};
+const UNIT_KEY_TO_SOURCE: Record<string, string> = {
+  windowCount: "window_count",
+  sqft: "square_feet",
+  linearFeet: "linear_feet",
+};
+
+function toUpsertInput(item: UpsellDraft, idx: number) {
+  let priceConfig: Record<string, unknown> = {};
+  let price = 0;
+  switch (item.pricingMode) {
+    case "flat":
+      price = Number(item.flatAmount) || 0;
+      priceConfig = { amount: price };
+      break;
+    case "per_unit": {
+      const rate = Number(item.puRate) || 0;
+      price = rate;
+      const unitKey = UNIT_SOURCE_TO_KEY[item.puSource] ?? item.puSource ?? "windowCount";
+      priceConfig = {
+        ratePerUnit: rate,
+        unitKey,
+        ...(item.puMin ? { minimumCharge: Number(item.puMin) } : {}),
+        ...(item.puMax ? { maximumCharge: Number(item.puMax) } : {}),
+      };
+      break;
+    }
+    case "service_multiplier":
+      price = Number(item.smBasePrice) || 0;
+      priceConfig = {
+        baseService: item.smBaseService,
+        multiplier: Number(item.smMultiplier) || 1,
+        ...(item.smBasePrice ? { basePrice: Number(item.smBasePrice) } : {}),
+        ...(item.smMin ? { minimumCharge: Number(item.smMin) } : {}),
+        ...(item.smMax ? { maximumCharge: Number(item.smMax) } : {}),
+      };
+      break;
+    case "package_delta":
+      price = Number(item.pdAmount) || 0;
+      priceConfig = {
+        fromPackage: item.pdFromPackage,
+        toPackage: item.pdToPackage,
+        amount: price,
+      };
+      break;
+    case "bundle_discount":
+      price = Number(item.bdPrice) || Number(item.bdDiscount) || 0;
+      priceConfig = {
+        ...(item.bdPrice ? { bundlePrice: Number(item.bdPrice) } : {}),
+        ...(item.bdDiscount ? { discountAmount: Number(item.bdDiscount) } : {}),
+      };
+      break;
+  }
+  const rules: Record<string, unknown> = {};
+  if (item.minSqft) rules.minSqft = Number(item.minSqft);
+  if (item.maxSqft) rules.maxSqft = Number(item.maxSqft);
+  if (item.minWindows) rules.minWindows = Number(item.minWindows);
+  if (item.maxWindows) rules.maxWindows = Number(item.maxWindows);
+  if (item.minSubtotal) rules.minSubtotal = Number(item.minSubtotal);
+  if (item.maxSubtotal) rules.maxSubtotal = Number(item.maxSubtotal);
+  const bdIncluded = strToArr(item.bdIncluded);
+  return {
+    id: item.id.trim(),
+    title: item.title.trim(),
+    description: item.description.trim(),
+    price,
+    appliesTo: strToArr(item.appliesTo),
+    badge: item.badge?.trim() || undefined,
+    active: item.active,
+    sortOrder: idx,
+    rules: Object.keys(rules).length ? rules : undefined,
+    category: item.category || undefined,
+    pricingMode: item.pricingMode || undefined,
+    priceConfig: Object.keys(priceConfig).length ? priceConfig : undefined,
+    displaySavingsText: item.displaySavingsText?.trim() || undefined,
+    requiresAnyServices: strToArr(item.requiresServices).length ? strToArr(item.requiresServices) : undefined,
+    excludeIfServicesSelected: strToArr(item.excludeServices).length ? strToArr(item.excludeServices) : undefined,
+    includesServices: bdIncluded.length ? bdIncluded : undefined,
+    suppressIfFeatureCovered: strToArr(item.suppressIfCovered).length ? strToArr(item.suppressIfCovered) : undefined,
+    priority: item.priority ? Number(item.priority) : undefined,
+    exclusiveGroup: item.exclusiveGroup?.trim() || undefined,
+  };
+}
+
+function upsellPreview(item: UpsellDraft): string {
+  const mode = item.pricingMode;
+  const fmt = (v: string | number) => {
+    const n = Number(v);
+    return isNaN(n) ? "?" : `$${n.toFixed(2)}`;
+  };
+  let pricing = "";
+  switch (mode) {
+    case "flat":
+      pricing = item.flatAmount ? `Flat fee of ${fmt(item.flatAmount)}` : "Flat fee (amount not set)";
+      break;
+    case "per_unit": {
+      const src = item.puSource.replace(/_/g, " ");
+      pricing = `${fmt(item.puRate)} per ${src}`;
+      if (item.puMin) pricing += `, min ${fmt(item.puMin)}`;
+      if (item.puMax) pricing += `, max ${fmt(item.puMax)}`;
+      break;
+    }
+    case "service_multiplier": {
+      const pct = item.smMultiplier ? `${(Number(item.smMultiplier) * 100).toFixed(0)}%` : "?%";
+      pricing = `${pct} of ${item.smBaseService || "base service"} price`;
+      if (item.smBasePrice) pricing += `. Fallback: ${fmt(item.smBasePrice)}`;
+      if (item.smMin) pricing += `, min ${fmt(item.smMin)}`;
+      if (item.smMax) pricing += `, max ${fmt(item.smMax)}`;
+      break;
+    }
+    case "package_delta":
+      pricing = `Upgrade from ${item.pdFromPackage || "?"} → ${item.pdToPackage || "?"}: ${fmt(item.pdAmount)}`;
+      break;
+    case "bundle_discount":
+      if (item.bdPrice) pricing = `Bundle price: ${fmt(item.bdPrice)}`;
+      else if (item.bdDiscount) pricing = `Discount: ${fmt(item.bdDiscount)} off`;
+      else pricing = "Bundle (price not set)";
+      if (item.bdIncluded) pricing += `. Includes: ${item.bdIncluded}`;
+      break;
+    default:
+      pricing = "Unknown pricing mode";
+  }
+  const parts: string[] = [pricing];
+  if (item.requiresServices) parts.push(`Shows when: ${item.requiresServices}`);
+  if (item.excludeServices) parts.push(`Hidden if: ${item.excludeServices}`);
+  if (item.minSubtotal) parts.push(`Min subtotal: ${fmt(item.minSubtotal)}`);
+  if (item.maxSubtotal) parts.push(`Max subtotal: ${fmt(item.maxSubtotal)}`);
+  if (item.minWindows) parts.push(`Min windows: ${item.minWindows}`);
+  if (item.maxWindows) parts.push(`Max windows: ${item.maxWindows}`);
+  if (item.minSqft) parts.push(`Min sqft: ${item.minSqft}`);
+  if (item.maxSqft) parts.push(`Max sqft: ${item.maxSqft}`);
+  return parts.join(" · ");
+}
 
 const SERVICE_ICONS: Record<string, React.ReactNode> = {
   Home: <Home className="w-5 h-5" />,
@@ -173,24 +521,7 @@ export default function QuoteTool() {
   const [svcMinCharge, setSvcMinCharge] = useState<string>("0");
   const [svcManualReview, setSvcManualReview] = useState(false);
   // ── Upsell state ─────────────────────────────────────────────────────────
-  const [upsellCatalog, setUpsellCatalog] = useState<
-    {
-      id: string;
-      title: string;
-      description: string;
-      price: string;
-      appliesTo: string;
-      badge?: string;
-      active: boolean;
-      sortOrder: number;
-      rulesText: string;
-      // Pricing model fields
-      category: string;
-      pricingMode: string;
-      priceConfigText: string;
-      displaySavingsText: string;
-    }[]
-  >([]);
+  const [upsellCatalog, setUpsellCatalog] = useState<UpsellDraft[]>([]);
 
   // Sync state from loaded settings (once)
   const [synced, setSynced] = useState(false);
@@ -252,51 +583,11 @@ export default function QuoteTool() {
     setMaxStoriesAuto(Number(settings.maxStoriesAuto ?? 3));
     setMaxWindowsAuto(Number(settings.maxWindowsAuto ?? 120));
     if (Array.isArray(upsells) && upsells.length > 0) {
-      setUpsellCatalog(
-        upsells.map((upsell: any, idx: number) => ({
-          ...upsell,
-          price: String(upsell.price ?? 0),
-          appliesTo: (upsell.appliesTo ?? []).join(", "),
-          active: upsell.active !== false,
-          sortOrder: Number(upsell.sortOrder ?? idx),
-          rulesText: JSON.stringify(upsell.rules ?? {}, null, 2),
-          category: upsell.category ?? "add_on",
-          pricingMode: upsell.pricingMode ?? "flat",
-          priceConfigText: JSON.stringify(upsell.priceConfig ?? {}, null, 2),
-          displaySavingsText: upsell.displaySavingsText ?? "",
-        }))
-      );
+      setUpsellCatalog(upsells.map((u: any, idx: number) => fromDbUpsell(u, idx)));
     } else {
       setUpsellCatalog([
-        {
-          id: "window_screen_deep_clean",
-          title: "Screen Deep Clean",
-          description: "Full screen scrub and rinse for better clarity and airflow.",
-          price: "89",
-          appliesTo: "window_cleaning",
-          badge: "Popular",
-          active: true,
-          sortOrder: 0,
-          rulesText: "{}",
-          category: "add_on",
-          pricingMode: "flat",
-          priceConfigText: JSON.stringify({ amount: 89 }, null, 2),
-          displaySavingsText: "",
-        },
-        {
-          id: "window_track_sill_detail",
-          title: "Track + Sill Detailing",
-          description: "Premium detailing for tracks, sills, and frame edges.",
-          price: "129",
-          appliesTo: "window_cleaning",
-          active: true,
-          sortOrder: 1,
-          rulesText: "{}",
-          category: "add_on",
-          pricingMode: "flat",
-          priceConfigText: JSON.stringify({ amount: 129 }, null, 2),
-          displaySavingsText: "",
-        },
+        fromDbUpsell({ id: "window_screen_deep_clean", title: "Screen Deep Clean", description: "Full screen scrub and rinse for better clarity and airflow.", price: 89, appliesTo: ["window_cleaning"], badge: "Popular", active: true, sortOrder: 0, pricingMode: "flat", priceConfig: { amount: 89 }, category: "add_on" }, 0),
+        fromDbUpsell({ id: "window_track_sill_detail", title: "Track + Sill Detailing", description: "Premium detailing for tracks, sills, and frame edges.", price: 129, appliesTo: ["window_cleaning"], active: true, sortOrder: 1, pricingMode: "flat", priceConfig: { amount: 129 }, category: "add_on" }, 1),
       ]);
     }
 
@@ -1278,357 +1569,390 @@ export default function QuoteTool() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Upsell Catalog</CardTitle>
               <CardDescription>
-                Edit in-flow upsells shown on the public quote Enhance step. Use
-                comma-separated service keys in "Applies To".
+                Add-ons, cross-sells, and bundles shown on the public quote Enhance step.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {upsellCatalog.map((upsell, idx) => (
-                <div
-                  key={upsell.id || idx}
-                  className="rounded-lg border p-3 space-y-3"
-                >
+              {upsellCatalog.map((upsell, idx) => {
+                const patch = (fields: Partial<UpsellDraft>) =>
+                  setUpsellCatalog(prev =>
+                    prev.map((u, i) => (i === idx ? { ...u, ...fields } : u))
+                  );
+                const svcList = services ?? [];
+
+                // Inline price preview calculation
+                const qty = Number(upsell.previewQty) || 0;
+                let previewLine = "";
+                if (upsell.pricingMode === "flat" && upsell.flatAmount) {
+                  previewLine = `Public price: $${Number(upsell.flatAmount).toFixed(2)}`;
+                } else if (upsell.pricingMode === "per_unit" && upsell.puRate && upsell.previewQty) {
+                  const raw = qty * Number(upsell.puRate);
+                  const clamped = upsell.puMin ? Math.max(raw, Number(upsell.puMin)) : raw;
+                  const final = upsell.puMax ? Math.min(clamped, Number(upsell.puMax)) : clamped;
+                  const unitLabel = upsell.puSource.replace(/_/g, " ");
+                  previewLine = `${qty} ${unitLabel} × $${upsell.puRate} = $${final.toFixed(2)}`;
+                } else if (upsell.pricingMode === "service_multiplier" && upsell.smMultiplier && upsell.previewQty) {
+                  const base = qty;
+                  const result = base * Number(upsell.smMultiplier);
+                  previewLine = `$${base.toFixed(2)} base × ${upsell.smMultiplier} = $${result.toFixed(2)}`;
+                } else if (upsell.pricingMode === "package_delta" && upsell.pdAmount) {
+                  previewLine = `Upgrade price: $${Number(upsell.pdAmount).toFixed(2)}`;
+                } else if (upsell.pricingMode === "bundle_discount") {
+                  if (upsell.bdPrice) previewLine = `Bundle price: $${Number(upsell.bdPrice).toFixed(2)}`;
+                  else if (upsell.bdDiscount) previewLine = `Discount: $${Number(upsell.bdDiscount).toFixed(2)} off`;
+                }
+
+                return (
+                <div key={upsell.id || idx} className="rounded-lg border p-4 space-y-4">
+
+                  {/* ── Card header row ── */}
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      Display order: {idx + 1}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={upsell.active} onCheckedChange={v => patch({ active: v })} />
+                      <span className="text-sm font-medium">{upsell.title || "New Upsell"}</span>
+                      {upsell.badge && <Badge variant="secondary" className="text-xs">{upsell.badge}</Badge>}
+                    </div>
                     <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        disabled={idx === 0}
-                        onClick={() =>
-                          setUpsellCatalog(prev => {
-                            if (idx === 0) return prev;
-                            const next = [...prev];
-                            [next[idx - 1], next[idx]] = [
-                              next[idx],
-                              next[idx - 1],
-                            ];
-                            return next.map((item, orderIdx) => ({
-                              ...item,
-                              sortOrder: orderIdx,
-                            }));
-                          })
-                        }
-                      >
-                        <ArrowUp className="w-4 h-4" />
+                      <Button size="icon" variant="ghost" className="h-7 w-7" disabled={idx === 0}
+                        onClick={() => setUpsellCatalog(prev => {
+                          if (idx === 0) return prev;
+                          const next = [...prev];
+                          [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                          return next.map((item, i) => ({ ...item, sortOrder: i }));
+                        })}>
+                        <ArrowUp className="w-3.5 h-3.5" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        disabled={idx === upsellCatalog.length - 1}
-                        onClick={() =>
-                          setUpsellCatalog(prev => {
-                            if (idx >= prev.length - 1) return prev;
-                            const next = [...prev];
-                            [next[idx + 1], next[idx]] = [
-                              next[idx],
-                              next[idx + 1],
-                            ];
-                            return next.map((item, orderIdx) => ({
-                              ...item,
-                              sortOrder: orderIdx,
-                            }));
-                          })
-                        }
-                      >
-                        <ArrowDown className="w-4 h-4" />
+                      <Button size="icon" variant="ghost" className="h-7 w-7" disabled={idx === upsellCatalog.length - 1}
+                        onClick={() => setUpsellCatalog(prev => {
+                          if (idx >= prev.length - 1) return prev;
+                          const next = [...prev];
+                          [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+                          return next.map((item, i) => ({ ...item, sortOrder: i }));
+                        })}>
+                        <ArrowDown className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </div>
+
+                  {/* ── Basic info ── */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        ID
-                      </Label>
-                      <Input
-                        value={upsell.id}
-                        onChange={e =>
-                          setUpsellCatalog(prev =>
-                            prev.map((u, i) =>
-                              i === idx ? { ...u, id: e.target.value } : u
-                            )
-                          )
-                        }
-                      />
+                      <Label className="text-xs text-muted-foreground mb-1 block">Title</Label>
+                      <Input value={upsell.title} onChange={e => patch({ title: e.target.value })} />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        Badge
-                      </Label>
-                      <Input
-                        value={upsell.badge ?? ""}
-                        onChange={e =>
-                          setUpsellCatalog(prev =>
-                            prev.map((u, i) =>
-                              i === idx ? { ...u, badge: e.target.value } : u
-                            )
-                          )
-                        }
-                        placeholder="Popular"
-                      />
+                      <Label className="text-xs text-muted-foreground mb-1 block">Badge (optional)</Label>
+                      <Input value={upsell.badge} onChange={e => patch({ badge: e.target.value })} placeholder="Popular" />
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">
-                      Title
-                    </Label>
-                    <Input
-                      value={upsell.title}
-                      onChange={e =>
-                        setUpsellCatalog(prev =>
-                          prev.map((u, i) =>
-                            i === idx ? { ...u, title: e.target.value } : u
-                          )
-                        )
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">
-                      Description
-                    </Label>
-                    <Input
-                      value={upsell.description}
-                      onChange={e =>
-                        setUpsellCatalog(prev =>
-                          prev.map((u, i) =>
-                            i === idx
-                              ? { ...u, description: e.target.value }
-                              : u
-                          )
-                        )
-                      }
-                    />
+                    <Label className="text-xs text-muted-foreground mb-1 block">Description</Label>
+                    <Input value={upsell.description} onChange={e => patch({ description: e.target.value })} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        Price
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={upsell.price}
-                        onChange={e =>
-                          setUpsellCatalog(prev =>
-                            prev.map((u, i) =>
-                              i === idx ? { ...u, price: e.target.value } : u
-                            )
-                          )
-                        }
-                      />
+                      <Label className="text-xs text-muted-foreground mb-1 block">Show for these services</Label>
+                      <ServiceChips value={upsell.appliesTo} onChange={v => patch({ appliesTo: v })} services={svcList} placeholder="Add service…" />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        Applies To (service keys)
-                      </Label>
-                      <Input
-                        value={upsell.appliesTo}
-                        onChange={e =>
-                          setUpsellCatalog(prev =>
-                            prev.map((u, i) =>
-                              i === idx
-                                ? { ...u, appliesTo: e.target.value }
-                                : u
-                            )
-                          )
-                        }
-                        placeholder="window_cleaning, house_washing"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        Offer Type
-                      </Label>
-                      <select
-                        className="w-full border rounded-md px-3 py-2 text-sm bg-background"
-                        value={upsell.category ?? "add_on"}
-                        onChange={e =>
-                          setUpsellCatalog(prev =>
-                            prev.map((u, i) =>
-                              i === idx ? { ...u, category: e.target.value } : u
-                            )
-                          )
-                        }
-                      >
+                      <Label className="text-xs text-muted-foreground mb-1 block">Offer type</Label>
+                      <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={upsell.category} onChange={e => patch({ category: e.target.value })}>
                         <option value="add_on">Add-on</option>
                         <option value="cross_sell">Cross-sell</option>
                         <option value="bundle">Bundle</option>
                       </select>
                     </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        Pricing Mode
-                      </Label>
-                      <select
-                        className="w-full border rounded-md px-3 py-2 text-sm bg-background"
-                        value={upsell.pricingMode ?? "flat"}
-                        onChange={e =>
-                          setUpsellCatalog(prev =>
-                            prev.map((u, i) =>
-                              i === idx ? { ...u, pricingMode: e.target.value } : u
-                            )
-                          )
-                        }
-                      >
-                        <option value="flat">Flat</option>
-                        <option value="per_unit">Per Unit</option>
-                        <option value="service_multiplier">Service Multiplier</option>
-                        <option value="package_delta">Package Delta</option>
-                        <option value="bundle_discount">Bundle Discount</option>
+                  </div>
+
+                  {/* ── Pricing section ── */}
+                  <div className="rounded-md bg-muted/40 border p-3 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground w-20 shrink-0">Pricing</Label>
+                      <select className="border rounded-md px-2 py-1.5 text-sm bg-background" value={upsell.pricingMode} onChange={e => patch({ pricingMode: e.target.value })}>
+                        <option value="flat">Flat fee</option>
+                        <option value="per_unit">Per unit (windows, sqft…)</option>
+                        <option value="service_multiplier">Based on another service's price</option>
+                        <option value="package_delta">Upgrade price difference</option>
+                        <option value="bundle_discount">Bundle discount</option>
                       </select>
                     </div>
+
+                    {/* Flat */}
+                    {upsell.pricingMode === "flat" && (
+                      <div className="flex items-end gap-3">
+                        <div className="w-40">
+                          <Label className="text-xs text-muted-foreground mb-1 block">Flat price ($)</Label>
+                          <Input type="number" min="0" step="0.01" value={upsell.flatAmount} onChange={e => patch({ flatAmount: e.target.value })} placeholder="89" />
+                        </div>
+                        {previewLine && <p className="text-xs text-emerald-700 font-medium pb-2">{previewLine}</p>}
+                      </div>
+                    )}
+
+                    {/* Per unit */}
+                    {upsell.pricingMode === "per_unit" && (
+                      <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">Use this when price depends on quantity, like number of windows or square footage.</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Rate per unit ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.puRate} onChange={e => patch({ puRate: e.target.value })} placeholder="5" />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Unit type</Label>
+                            <select className="w-full border rounded-md px-2 py-1.5 text-sm bg-background" value={upsell.puSource} onChange={e => patch({ puSource: e.target.value })}>
+                              <option value="window_count">Window count</option>
+                              <option value="affected_window_count">Affected window count</option>
+                              <option value="square_feet">Square feet</option>
+                              <option value="linear_feet">Linear feet</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Min charge ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.puMin} onChange={e => patch({ puMin: e.target.value })} placeholder="—" />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Max charge ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.puMax} onChange={e => patch({ puMax: e.target.value })} placeholder="—" />
+                          </div>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <div className="w-36">
+                            <Label className="text-xs text-muted-foreground mb-1 block">Test: example quantity</Label>
+                            <Input type="number" min="0" value={upsell.previewQty} onChange={e => patch({ previewQty: e.target.value })} placeholder="15" />
+                          </div>
+                          {previewLine && <p className="text-xs text-emerald-700 font-medium pb-2">{previewLine}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Service multiplier */}
+                    {upsell.pricingMode === "service_multiplier" && (
+                      <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">Use this when the price should be a percentage of another service already in the quote.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Use price from this service</Label>
+                            <ServiceChips value={upsell.smBaseService} onChange={v => patch({ smBaseService: v })} services={svcList} single placeholder="Choose service…" />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Multiplier (e.g. 0.85 = 85%)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.smMultiplier} onChange={e => patch({ smMultiplier: e.target.value })} placeholder="0.85" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Fallback price if service not in cart ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.smBasePrice} onChange={e => patch({ smBasePrice: e.target.value })} placeholder="140" />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Min charge ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.smMin} onChange={e => patch({ smMin: e.target.value })} placeholder="—" />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Max charge ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.smMax} onChange={e => patch({ smMax: e.target.value })} placeholder="—" />
+                          </div>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <div className="w-40">
+                            <Label className="text-xs text-muted-foreground mb-1 block">Test: example base price ($)</Label>
+                            <Input type="number" min="0" value={upsell.previewQty} onChange={e => patch({ previewQty: e.target.value })} placeholder="140" />
+                          </div>
+                          {previewLine && <p className="text-xs text-emerald-700 font-medium pb-2">{previewLine}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Package delta */}
+                    {upsell.pricingMode === "package_delta" && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">The extra price a customer pays to upgrade from one package tier to another.</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">From package</Label>
+                            <select className="w-full border rounded-md px-2 py-1.5 text-sm bg-background" value={upsell.pdFromPackage} onChange={e => patch({ pdFromPackage: e.target.value })}>
+                              <option value="">— select —</option>
+                              <option value="good">Good</option>
+                              <option value="better">Better</option>
+                              <option value="best">Best</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">To package</Label>
+                            <select className="w-full border rounded-md px-2 py-1.5 text-sm bg-background" value={upsell.pdToPackage} onChange={e => patch({ pdToPackage: e.target.value })}>
+                              <option value="">— select —</option>
+                              <option value="good">Good</option>
+                              <option value="better">Better</option>
+                              <option value="best">Best</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Upgrade amount ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.pdAmount} onChange={e => patch({ pdAmount: e.target.value })} placeholder="49" />
+                          </div>
+                        </div>
+                        {previewLine && <p className="text-xs text-emerald-700 font-medium">{previewLine}</p>}
+                      </div>
+                    )}
+
+                    {/* Bundle discount */}
+                    {upsell.pricingMode === "bundle_discount" && (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Bundle price ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.bdPrice} onChange={e => patch({ bdPrice: e.target.value })} placeholder="249" />
+                            <p className="text-[10px] text-muted-foreground mt-0.5">Set a fixed bundle price, or set a discount amount below</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Discount amount ($)</Label>
+                            <Input type="number" min="0" step="0.01" value={upsell.bdDiscount} onChange={e => patch({ bdDiscount: e.target.value })} placeholder="50" />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Services included in this bundle</Label>
+                          <ServiceChips value={upsell.bdIncluded} onChange={v => patch({ bdIncluded: v })} services={svcList} placeholder="Add included service…" />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Savings text (shown in green on the quote)</Label>
+                          <Input value={upsell.displaySavingsText} onChange={e => patch({ displaySavingsText: e.target.value })} placeholder="Save ~$50 vs booking separately" />
+                        </div>
+                        {previewLine && <p className="text-xs text-emerald-700 font-medium">{previewLine}</p>}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">
-                      Price Config (JSON) — parameters for the selected pricing mode
-                    </Label>
-                    <Textarea
-                      value={upsell.priceConfigText ?? "{}"}
-                      rows={4}
-                      onChange={e =>
-                        setUpsellCatalog(prev =>
-                          prev.map((u, i) =>
-                            i === idx ? { ...u, priceConfigText: e.target.value } : u
-                          )
-                        )
-                      }
-                      placeholder='{"amount": 89} or {"baseService": "driveway_cleaning", "multiplier": 0.85, "basePrice": 140}'
-                      className="font-mono text-xs"
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      flat: {"{ amount }"}  ·  per_unit: {"{ ratePerUnit, unitKey }"}  ·  service_multiplier: {"{ baseService, multiplier, basePrice }"}  ·  bundle_discount: {"{ bundlePrice, discountAmount }"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">
-                      Savings Text (shown green on bundle cards, optional)
-                    </Label>
-                    <Input
-                      value={upsell.displaySavingsText ?? ""}
-                      onChange={e =>
-                        setUpsellCatalog(prev =>
-                          prev.map((u, i) =>
-                            i === idx ? { ...u, displaySavingsText: e.target.value } : u
-                          )
-                        )
-                      }
-                      placeholder="Save ~$50 vs booking separately"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">
-                      Rules (JSON)
-                    </Label>
-                    <Textarea
-                      value={upsell.rulesText}
-                      rows={3}
-                      onChange={e =>
-                        setUpsellCatalog(prev =>
-                          prev.map((u, i) =>
-                            i === idx ? { ...u, rulesText: e.target.value } : u
-                          )
-                        )
-                      }
-                      placeholder='{"minSubtotal": 250}'
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={upsell.active}
-                        onCheckedChange={checked =>
-                          setUpsellCatalog(prev =>
-                            prev.map((u, i) =>
-                              i === idx ? { ...u, active: checked } : u
-                            )
-                          )
-                        }
-                      />
-                      <span className="text-sm">Active</span>
+
+                  {/* ── Eligibility section ── */}
+                  <div className="rounded-md bg-muted/40 border p-3 space-y-3">
+                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block">When to show this offer</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Only show when customer has selected</Label>
+                        <ServiceChips value={upsell.requiresServices} onChange={v => patch({ requiresServices: v })} services={svcList} placeholder="Add required service…" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Hide if customer has already selected</Label>
+                        <ServiceChips value={upsell.excludeServices} onChange={v => patch({ excludeServices: v })} services={svcList} placeholder="Add excluded service…" />
+                      </div>
                     </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">Hide when already included in their package</Label>
+                      <FeatureChips value={upsell.suppressIfCovered} onChange={v => patch({ suppressIfCovered: v })} />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Min quote subtotal ($)</Label>
+                        <Input type="number" min="0" value={upsell.minSubtotal} onChange={e => patch({ minSubtotal: e.target.value })} placeholder="—" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Max quote subtotal ($)</Label>
+                        <Input type="number" min="0" value={upsell.maxSubtotal} onChange={e => patch({ maxSubtotal: e.target.value })} placeholder="—" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Min windows</Label>
+                        <Input type="number" min="0" value={upsell.minWindows} onChange={e => patch({ minWindows: e.target.value })} placeholder="—" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Max windows</Label>
+                        <Input type="number" min="0" value={upsell.maxWindows} onChange={e => patch({ maxWindows: e.target.value })} placeholder="—" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Min sqft</Label>
+                        <Input type="number" min="0" value={upsell.minSqft} onChange={e => patch({ minSqft: e.target.value })} placeholder="—" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Max sqft</Label>
+                        <Input type="number" min="0" value={upsell.maxSqft} onChange={e => patch({ maxSqft: e.target.value })} placeholder="—" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Priority (higher = shown first)</Label>
+                        <Input type="number" value={upsell.priority} onChange={e => patch({ priority: e.target.value })} placeholder="0" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Exclusive group (only one from group shown)</Label>
+                        <Input value={upsell.exclusiveGroup} onChange={e => patch({ exclusiveGroup: e.target.value })} placeholder="interior_windows" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Plain-English preview ── */}
+                  <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                    <span className="font-medium">Summary: </span>{upsellPreview(upsell)}
+                  </div>
+
+                  {/* ── Advanced section (collapsed) ── */}
+                  <div>
+                    <button type="button" className="text-xs text-muted-foreground underline" onClick={() => patch({ showAdvanced: !upsell.showAdvanced })}>
+                      {upsell.showAdvanced ? "Hide" : "Show"} Advanced
+                    </button>
+                    {upsell.showAdvanced && (() => {
+                      const liveInput = toUpsertInput(upsell, idx);
+                      return (
+                        <div className="mt-2 space-y-2">
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Internal ID</Label>
+                            <Input value={upsell.id} onChange={e => patch({ id: e.target.value })} className="font-mono text-xs" />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Price config that will be saved (live)</Label>
+                            <Textarea rows={4} value={JSON.stringify(liveInput.priceConfig ?? {}, null, 2)} readOnly className="font-mono text-xs bg-muted" />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Rules that will be saved (live)</Label>
+                            <Textarea rows={3} value={JSON.stringify(liveInput.rules ?? {}, null, 2)} readOnly className="font-mono text-xs bg-muted" />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Full payload preview</Label>
+                            <Textarea rows={8} value={JSON.stringify(liveInput, null, 2)} readOnly className="font-mono text-xs bg-muted" />
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* ── Row actions ── */}
+                  <div className="flex items-center justify-between pt-1 border-t">
+                    <span className="text-xs text-muted-foreground">#{idx + 1}</span>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={async () => {
-                          try {
-                            const parsedRules = upsell.rulesText.trim()
-                              ? JSON.parse(upsell.rulesText)
-                              : {};
-                            const parsedPriceConfig = (upsell.priceConfigText ?? "{}").trim()
-                              ? JSON.parse(upsell.priceConfigText ?? "{}")
-                              : {};
-                            await upsertUpsell.mutateAsync({
-                              id: upsell.id.trim(),
-                              title: upsell.title.trim(),
-                              description: upsell.description.trim(),
-                              price: Number(upsell.price || 0),
-                              appliesTo: upsell.appliesTo
-                                .split(",")
-                                .map(svc => svc.trim())
-                                .filter(Boolean),
-                              badge: upsell.badge?.trim() || undefined,
-                              active: upsell.active,
-                              sortOrder: idx,
-                              rules: parsedRules,
-                              category: upsell.category || undefined,
-                              pricingMode: upsell.pricingMode || undefined,
-                              priceConfig: Object.keys(parsedPriceConfig).length
-                                ? parsedPriceConfig
-                                : undefined,
-                              displaySavingsText: upsell.displaySavingsText?.trim() || undefined,
-                            });
-                            toast.success(`Saved ${upsell.title || upsell.id}`);
-                          } catch (error: any) {
-                            toast.error(error?.message || "Invalid JSON in price config or rules");
-                          }
-                        }}
-                        disabled={upsertUpsell.isPending}
+                        onClick={() => setUpsellCatalog(prev => {
+                          const copy = { ...upsell, id: `${upsell.id}_copy_${Date.now()}`, title: `${upsell.title} (Copy)`, sortOrder: prev.length };
+                          return [...prev, copy];
+                        })}
                       >
-                        Save Row
+                        Duplicate
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={async () => {
+                          const input = toUpsertInput(upsell, idx);
+                          if (!input.appliesTo.length) { toast.error("Choose at least one service in 'Show for these services'"); return; }
                           try {
-                            const parsedRules = upsell.rulesText.trim()
-                              ? JSON.parse(upsell.rulesText)
-                              : {};
-                            await setUpsellRules.mutateAsync({
-                              id: upsell.id.trim(),
-                              rules: parsedRules,
-                            });
-                          } catch {
-                            toast.error("Invalid rules JSON");
+                            await upsertUpsell.mutateAsync(input);
+                            toast.success(`Saved: ${upsell.title || upsell.id}`);
+                          } catch (error: any) {
+                            toast.error(error?.message || "Save failed");
                           }
                         }}
-                        disabled={setUpsellRules.isPending}
+                        disabled={upsertUpsell.isPending}
                       >
-                        Save Rules
+                        Save
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-destructive"
                         onClick={async () => {
-                          if (!confirm(`Remove upsell "${upsell.title}"?`))
-                            return;
+                          if (!confirm(`Remove upsell "${upsell.title}"?`)) return;
                           if (upsells?.some(item => item.id === upsell.id)) {
                             await deleteUpsell.mutateAsync({ id: upsell.id });
                           }
-                          setUpsellCatalog(prev =>
-                            prev.filter((_, i) => i !== idx)
-                          );
+                          setUpsellCatalog(prev => prev.filter((_, i) => i !== idx));
                         }}
                       >
                         Remove
@@ -1636,7 +1960,8 @@ export default function QuoteTool() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               <div className="flex gap-2">
                 <Button
@@ -1644,21 +1969,19 @@ export default function QuoteTool() {
                   onClick={() =>
                     setUpsellCatalog(prev => [
                       ...prev,
-                      {
+                      fromDbUpsell({
                         id: `upsell_${Date.now()}`,
                         title: "New Upsell",
                         description: "Describe the value of this add-on.",
-                        price: "0",
-                        appliesTo: "house_washing",
+                        price: 0,
+                        appliesTo: [],
                         badge: "",
                         active: true,
                         sortOrder: prev.length,
-                        rulesText: "{}",
-                        category: "add_on",
                         pricingMode: "flat",
-                        priceConfigText: "{}",
-                        displaySavingsText: "",
-                      },
+                        priceConfig: { amount: 0 },
+                        category: "add_on",
+                      }, prev.length),
                     ])
                   }
                 >
@@ -1670,46 +1993,12 @@ export default function QuoteTool() {
                     try {
                       const normalized = upsellCatalog
                         .filter(item => item.id.trim() && item.title.trim())
-                        .map((item, orderIdx) => {
-                          const parsedRules = item.rulesText.trim()
-                            ? JSON.parse(item.rulesText)
-                            : {};
-                          const parsedPriceConfig = (item.priceConfigText ?? "{}").trim()
-                            ? JSON.parse(item.priceConfigText ?? "{}")
-                            : {};
-                          return {
-                            id: item.id.trim(),
-                            title: item.title.trim(),
-                            description: item.description.trim(),
-                            price: Number(item.price || 0),
-                            appliesTo: item.appliesTo
-                              .split(",")
-                              .map(svc => svc.trim())
-                              .filter(Boolean),
-                            badge: item.badge?.trim() || undefined,
-                            active: item.active,
-                            sortOrder: orderIdx,
-                            rules: parsedRules,
-                            category: item.category || undefined,
-                            pricingMode: item.pricingMode || undefined,
-                            priceConfig: Object.keys(parsedPriceConfig).length
-                              ? parsedPriceConfig
-                              : undefined,
-                            displaySavingsText: item.displaySavingsText?.trim() || undefined,
-                          };
-                        })
+                        .map((item, orderIdx) => toUpsertInput(item, orderIdx))
                         .filter(item => item.appliesTo.length > 0);
 
-                      await Promise.all(
-                        normalized.map(item => upsertUpsell.mutateAsync(item))
-                      );
-                      await reorderUpsells.mutateAsync(
-                        normalized.map(item => ({
-                          id: item.id,
-                          sortOrder: item.sortOrder,
-                        }))
-                      );
-                      toast.success("Upsells saved");
+                      await Promise.all(normalized.map(item => upsertUpsell.mutateAsync(item)));
+                      await reorderUpsells.mutateAsync(normalized.map(item => ({ id: item.id, sortOrder: item.sortOrder! })));
+                      toast.success("All upsells saved");
                     } catch (error: any) {
                       toast.error(error?.message || "Unable to save upsells");
                     }

@@ -111,7 +111,7 @@ const allNavGroups: NavGroup[] = [
       { label: "Booking Controls", href: "/admin/booking-controls", icon: Globe },
       { label: "Standalone Link", href: "/admin/standalone-link", icon: Share2 },
       { label: "Automations", href: "/admin/automations", icon: Zap, badge: "Beta" },
-      { label: "AI Receptionist", href: "/admin/ai-receptionist", icon: Bot },
+      { label: "AI Receptionist", href: "/admin/ai-receptionist", icon: Bot, badge: "Beta" },
     ],
   },
   {

@@ -48,7 +48,7 @@ export interface PriceConfig {
   ratePerUnit?: number;
   /**
    * per_unit: which quantity from UpsellContext to multiply against.
-   * Supported keys: "windowCount", "sqft", "linearFeet"
+   * Canonical keys: "windowCount", "sqft", "linearFeet"
    */
   unitKey?: "windowCount" | "sqft" | "linearFeet";
   /** service_multiplier: service key whose resolved price is the base */
@@ -66,6 +66,10 @@ export interface PriceConfig {
    * Example: driveway_cleaning basePrice = 140 → 140 × 0.85 = $119 cross-sell price.
    */
   basePrice?: number;
+  /** per_unit / service_multiplier: floor on computed price */
+  minimumCharge?: number;
+  /** per_unit / service_multiplier: ceiling on computed price */
+  maximumCharge?: number;
 }
 
 // ── Data model ────────────────────────────────────────────────────────────────
@@ -168,50 +172,91 @@ export interface UpsellContext {
 // ── Pricing engine ────────────────────────────────────────────────────────────
 
 /**
+ * Clamp a computed price between optional min/max bounds.
+ */
+function clamp(value: number, min?: number, max?: number): number {
+  let v = value;
+  if (min != null && v < min) v = min;
+  if (max != null && v > max) v = max;
+  return v;
+}
+
+/**
  * Compute the display price for an offer given the current quote context.
  *
  * flat              → priceConfig.amount ?? item.price
  * bundle_discount   → priceConfig.bundlePrice ?? priceConfig.amount ?? item.price
- * service_multiplier → ctx.servicePrices[baseService] × multiplier (falls back to item.price)
- * per_unit          → ratePerUnit × ctx.serviceInputQuantities[unitKey] (falls back to item.price)
+ * service_multiplier → ctx.servicePrices[baseService] × multiplier, clamped to min/max
+ * per_unit          → ratePerUnit × quantity from context, clamped to min/max
  * package_delta     → priceConfig.amount ?? item.price
+ *
+ * The engine accepts both canonical PriceConfig field names and legacy admin
+ * field names (rate/unitSource/explicitBundlePrice) so existing DB data works.
  */
 export function computePrice(item: UpsellItem, ctx: UpsellContext): number {
   if (item.manualPriceOverride != null) return item.manualPriceOverride;
 
   const mode = item.pricingMode ?? "flat";
-  const cfg = item.priceConfig ?? {};
+  // Use a loose type so we accept both canonical field names and legacy admin field names
+  const cfg = (item.priceConfig ?? {}) as Record<string, unknown>;
 
   switch (mode) {
     case "flat":
     case "package_delta":
-      return cfg.amount ?? item.price;
+      return (cfg.amount as number) ?? item.price;
 
     case "bundle_discount":
-      return cfg.bundlePrice ?? cfg.amount ?? item.price;
+      // Accept both bundlePrice (canonical) and explicitBundlePrice (legacy admin)
+      return (cfg.bundlePrice as number)
+        ?? (cfg.explicitBundlePrice as number)
+        ?? (cfg.amount as number)
+        ?? item.price;
 
     case "service_multiplier": {
+      const baseService = cfg.baseService as string | undefined;
+      const multiplier = (cfg.multiplier as number) ?? 1;
+      const fallbackBase = (cfg.basePrice as number) ?? 0;
       // Use real service price from quote context if available (service already in cart).
       // Fall back to admin-set basePrice (typical standalone price) when service is not yet selected.
-      const livePrice = cfg.baseService
-        ? (ctx.servicePrices?.[cfg.baseService] ?? 0)
+      const livePrice = baseService
+        ? (ctx.servicePrices?.[baseService] ?? 0)
         : 0;
-      const base = livePrice > 0 ? livePrice : (cfg.basePrice ?? 0);
-      return base > 0
-        ? Math.round(base * (cfg.multiplier ?? 1))
-        : item.price;
+      const base = livePrice > 0 ? livePrice : fallbackBase;
+      if (base <= 0) return item.price;
+      const raw = Math.round(base * multiplier);
+      return clamp(raw, cfg.minimumCharge as number, cfg.maximumCharge as number);
     }
 
     case "per_unit": {
-      if (!cfg.unitKey || !cfg.ratePerUnit) return item.price;
+      // Accept both canonical (ratePerUnit/unitKey) and legacy admin (rate/unitSource)
+      const rate = (cfg.ratePerUnit as number) ?? (cfg.rate as number) ?? 0;
+      const rawKey = (cfg.unitKey as string) ?? (cfg.unitSource as string) ?? "";
+      if (!rate || !rawKey) return item.price;
+
+      // Map legacy admin values (window_count, square_feet, linear_feet) to
+      // canonical serviceInputQuantities keys (windowCount, sqft, linearFeet)
+      const UNIT_KEY_MAP: Record<string, string> = {
+        window_count: "windowCount",
+        affected_window_count: "windowCount",
+        square_feet: "sqft",
+        linear_feet: "linearFeet",
+        // canonical keys map to themselves
+        windowCount: "windowCount",
+        sqft: "sqft",
+        linearFeet: "linearFeet",
+      };
+      const resolvedKey = UNIT_KEY_MAP[rawKey] ?? rawKey;
+
       // Flatten serviceInputQuantities to find the right quantity
       const allInputs = ctx.serviceInputQuantities ?? {};
       let quantity = 0;
       for (const inputs of Object.values(allInputs)) {
-        const v = inputs[cfg.unitKey];
-        if (v != null) { quantity = v; break; }
+        const v = inputs[resolvedKey];
+        if (v != null && v > 0) { quantity = v; break; }
       }
-      return quantity > 0 ? Math.round(cfg.ratePerUnit * quantity) : item.price;
+      if (quantity <= 0) return item.price;
+      const raw = Math.round(rate * quantity);
+      return clamp(raw, cfg.minimumCharge as number, cfg.maximumCharge as number);
     }
 
     default:

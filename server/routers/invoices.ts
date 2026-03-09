@@ -143,7 +143,7 @@ export const invoicesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
-      return createPayment({
+      await createPayment({
         invoiceId: input.invoiceId,
         companyId,
         amount: input.amount as any,
@@ -151,6 +151,17 @@ export const invoicesRouter = router({
         notes: input.notes,
         paidAt: new Date(),
       });
+      const invoice = await getInvoice(input.invoiceId, companyId);
+      if (invoice) {
+        const paid = (parseFloat(String(invoice.amountPaid ?? "0")) + parseFloat(input.amount)) || 0;
+        const balance = Math.max(0, parseFloat(String(invoice.total ?? "0")) - paid);
+        await updateInvoice(input.invoiceId, companyId, {
+          amountPaid: String(paid.toFixed(2)) as any,
+          balance: String(balance.toFixed(2)) as any,
+          ...(balance <= 0 ? { status: "paid" } : {}),
+        } as any);
+      }
+      return { success: true };
     }),
 
   listPayments: protectedProcedure.query(async ({ ctx }) => {
