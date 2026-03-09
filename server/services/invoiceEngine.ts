@@ -133,11 +133,11 @@ export async function autoCreateInvoiceFromJob(
     const invoiceResult = await db.execute(sql`
       INSERT INTO invoices (
         "companyId", "customerId", "jobId", "invoiceNumber", status,
-        subtotal, "taxRate", "taxAmount", "tipAmount", total
+        subtotal, "taxRate", "taxAmount", "tipAmount", total, balance
       )
       VALUES (
         ${input.companyId}, ${job.customerId}, ${input.jobId},
-        ${nextInvoiceNumber}, 'draft', ${total}, '0.00', '0.00', '0.00', ${total}
+        ${nextInvoiceNumber}, 'draft', ${total}, '0.00', '0.00', '0.00', ${total}, ${total}
       )
       RETURNING id
     `);

@@ -333,10 +333,12 @@ export const jobsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
       const result = await autoCreateInvoiceFromJob({ companyId, jobId: input.jobId });
-      if (result.errors.length > 0) {
+      // "Invoice already exists" is idempotent success — return it, don't throw
+      const fatalErrors = result.errors.filter(e => !e.includes("already exists"));
+      if (fatalErrors.length > 0) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: result.errors[0],
+          message: fatalErrors[0],
         });
       }
       return result;
