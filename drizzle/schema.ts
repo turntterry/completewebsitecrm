@@ -366,6 +366,25 @@ export const payments = pgTable("payments", {
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = typeof payments.$inferInsert;
 
+// ─── Webhook Events (idempotency / dedup) ─────────────────────────────────────
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: serial("id").primaryKey(),
+    providerEventId: varchar("providerEventId", { length: 256 }).notNull(),
+    provider: varchar("provider", { length: 64 }).notNull(),
+    eventType: varchar("eventType", { length: 128 }),
+    status: varchar("status", { length: 32 }).notNull().default("processed"),
+    payload: json("payload"),
+    invoiceId: integer("invoiceId"),
+    paymentId: integer("paymentId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("webhook_events_provider_event_idx").on(table.provider, table.providerEventId)]
+);
+
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+
 // ─── Activity Events ──────────────────────────────────────────────────────────
 export const activityEvents = pgTable("activity_events", {
   id: serial("id").primaryKey(),

@@ -1001,8 +1001,8 @@ export async function insertSmsMessage(data: {
       lastMessageBody: data.body.slice(0, 255),
       unreadCount:
         data.direction === "inbound"
-          ? sql`unreadCount + 1`
-          : sql`unreadCount`,
+          ? sql`${smsConversations.unreadCount} + 1`
+          : sql`${smsConversations.unreadCount}`,
     })
     .where(eq(smsConversations.id, data.conversationId));
 }
@@ -1020,7 +1020,7 @@ export async function getTotalUnreadSms(companyId: number) {
   const db = await getDb();
   if (!db) return 0;
   const result = await db
-    .select({ total: sql<number>`COALESCE(SUM(unreadCount), 0)` })
+    .select({ total: sql<number>`COALESCE(SUM(${smsConversations.unreadCount}), 0)` })
     .from(smsConversations)
     .where(eq(smsConversations.companyId, companyId));
   return result[0]?.total ?? 0;

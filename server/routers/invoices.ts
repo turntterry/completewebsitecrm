@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   createInvoice,
   createPayment,
+  getDb,
   getInvoice,
   getInvoiceWithLineItems,
   getNextInvoiceNumber,
@@ -11,6 +12,8 @@ import {
   listPayments,
   updateInvoice,
 } from "../db";
+import { payments } from "../../drizzle/schema";
+import { eq, sum } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 
 const lineItemSchema = z.object({
@@ -100,14 +103,28 @@ export const invoicesRouter = router({
       const { id, lineItems, dueDate, ...rest } = input;
       let extra: Record<string, any> = {};
       if (lineItems !== undefined) {
-        const subtotal = lineItems.reduce((sum, li) => sum + parseFloat(li.total || "0"), 0);
+        const subtotal = lineItems.reduce((s, li) => s + parseFloat(li.total || "0"), 0);
         const taxRate = parseFloat(rest.taxRate || "0");
         const taxAmount = subtotal * (taxRate / 100);
+        const newTotal = subtotal + taxAmount;
+
+        // Load actual paid amount from payments table instead of blindly resetting balance
+        const db = await getDb();
+        let amountPaid = 0;
+        if (db) {
+          const [paymentSum] = await db
+            .select({ total: sum(payments.amount) })
+            .from(payments)
+            .where(eq(payments.invoiceId, id));
+          amountPaid = parseFloat(String(paymentSum?.total ?? "0")) || 0;
+        }
+
         extra = {
           subtotal: String(subtotal.toFixed(2)),
           taxAmount: String(taxAmount.toFixed(2)),
-          total: String((subtotal + taxAmount).toFixed(2)),
-          balance: String((subtotal + taxAmount).toFixed(2)),
+          total: String(newTotal.toFixed(2)),
+          amountPaid: String(amountPaid.toFixed(2)),
+          balance: String(Math.max(0, newTotal - amountPaid).toFixed(2)),
         };
       }
       await updateInvoice(

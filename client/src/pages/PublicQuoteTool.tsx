@@ -774,9 +774,10 @@ export default function QuoteTool() {
       bundleDiscount: previewData.breakdown.bundleDiscountAmount,
       travelFee: previewData.breakdown.travelFee,
       jobMinimumApplied: previewData.breakdown.jobMinimumApplied,
-      totalPrice: Math.max(0, previewData.breakdown.total + upsellTotal),
+      // Server total already includes upsells — do NOT add upsellTotal again
+      totalPrice: Math.max(0, previewData.breakdown.total),
     };
-  }, [previewData?.breakdown, finalQuoteSummary, upsellTotal]);
+  }, [previewData?.breakdown, finalQuoteSummary]);
 
   const toggleService = (id: string) => {
     setSelectedServices(prev => {
@@ -1576,14 +1577,7 @@ export default function QuoteTool() {
                   <p className="text-muted-foreground mb-4">
                     Your estimated total is{" "}
                     <span className="font-bold text-foreground text-lg">
-                      {complexityFlagged ? (
-                        <>
-                          ${Math.max(finalQuoteSummary.totalPrice - 75, 0).toFixed(2)} – $
-                          {(finalQuoteSummary.totalPrice + 125).toFixed(2)}
-                        </>
-                      ) : (
-                        <>${finalQuoteSummary.totalPrice.toFixed(2)}</>
-                      )}
+                      ${quotePreviewSummary.totalPrice.toFixed(2)}
                     </span>
                   </p>
                   {complexityFlagged && (
@@ -2811,14 +2805,7 @@ function StepReview({
                 )}
               </div>
               <span className="font-heading font-bold">
-                {complexityFlagged ? (
-                  <span className="text-amber-700">
-                    ${Math.max(r.finalPrice - 50, 0).toFixed(2)} – $
-                    {(r.finalPrice + 75).toFixed(2)}
-                  </span>
-                ) : (
-                  `$${r.finalPrice.toFixed(2)}`
-                )}
+                ${r.finalPrice.toFixed(2)}
               </span>
             </div>
           );
@@ -2869,7 +2856,7 @@ function StepReview({
         <div className="flex justify-between font-heading font-bold text-xl">
           <span>Total</span>
           <span className="text-primary">
-            ${finalQuoteSummary.totalPrice.toFixed(2)}
+            ${quoteSummary.totalPrice.toFixed(2)}
           </span>
         </div>
       </div>
