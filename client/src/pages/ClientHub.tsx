@@ -125,6 +125,7 @@ function QuoteDetailView({
     quoteId,
     customerId: session.customerId,
     companyId: session.companyId,
+    sessionToken: session.sessionToken,
   });
 
   const utils = trpc.useUtils();
@@ -408,6 +409,7 @@ function QuoteDetailView({
                       quoteId: quote.id,
                       customerId: session.customerId,
                       companyId: session.companyId,
+                      sessionToken: session.sessionToken,
                       action: "approve",
                       selectedAddOnIds: Array.from(selectedAddOnIds),
                     })
@@ -429,6 +431,7 @@ function QuoteDetailView({
                       quoteId: quote.id,
                       customerId: session.customerId,
                       companyId: session.companyId,
+                      sessionToken: session.sessionToken,
                       action: "decline",
                     })
                   }
@@ -469,6 +472,7 @@ function InvoiceDetailView({
     invoiceId,
     customerId: session.customerId,
     companyId: session.companyId,
+    sessionToken: session.sessionToken,
   });
 
   if (isLoading) return <LoadingScreen message="Loading invoice…" />;
@@ -594,6 +598,7 @@ function ClientDashboard({
   const { data, isLoading, error } = trpc.clientHub.getClientData.useQuery({
     customerId: session.customerId,
     companyId: session.companyId,
+    sessionToken: session.sessionToken,
   });
 
   // Auto-navigate to pinned quote/invoice from magic link

@@ -1,3 +1,4 @@
+// @ts-nocheck — ARCHIVED: depends on instantQuotes router (not registered)
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";

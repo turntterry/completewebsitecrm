@@ -59,45 +59,6 @@ export function LocalBusinessSchema() {
       },
     ],
     priceRange: "$$",
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "5.0",
-      reviewCount: "5",
-      bestRating: "5",
-      worstRating: "1",
-    },
-    review: [
-      {
-        "@type": "Review",
-        author: { "@type": "Person", name: "David Weatherly" },
-        reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-        reviewBody: "Answered phone when I called, good communication via text, showed up on time and did a good job. Personable and reasonably priced. Will use again.",
-      },
-      {
-        "@type": "Review",
-        author: { "@type": "Person", name: "Ken Novander" },
-        reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-        reviewBody: "Exterior Experts did a fantastic job! I used Exterior Experts to install Christmas lights on my home, and I couldn't be happier with the results. They outlined all the roof lines beautifully, and the pricing felt very competitive. Randell was great to work with. Highly recommend!",
-      },
-      {
-        "@type": "Review",
-        author: { "@type": "Person", name: "Ann-Marie Elkins" },
-        reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-        reviewBody: "Veni. Vidi. Vici. He came. He saw. He conquered.",
-      },
-      {
-        "@type": "Review",
-        author: { "@type": "Person", name: "Jimmy Dickinson" },
-        reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-        reviewBody: "Randy did a great job, he arrived when he said he would and performed the job as quoted. You will not be disappointed.",
-      },
-      {
-        "@type": "Review",
-        author: { "@type": "Person", name: "Doug Roe" },
-        reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-        reviewBody: "What an overwhelming great experience. Thank you for a job well done!",
-      },
-    ],
     hasOfferCatalog: {
       "@type": "OfferCatalog",
       name: "Exterior Cleaning Services",
@@ -157,7 +118,7 @@ export function ServiceSchema({
       },
     },
     serviceType: service.name,
-    url: `${origin}/${service.slug}-${location.slug}`,
+    url: `${origin}/services/${service.slug}`,
   };
 
   const breadcrumbSchema = {
@@ -174,13 +135,13 @@ export function ServiceSchema({
         "@type": "ListItem",
         position: 2,
         name: "Services",
-        item: `${origin}/service-areas`,
+        item: `${origin}/services`,
       },
       {
         "@type": "ListItem",
         position: 3,
         name: `${service.name} in ${locationName}`,
-        item: `${origin}/${service.slug}-${location.slug}`,
+        item: `${origin}/services/${service.slug}`,
       },
     ],
   };
@@ -243,7 +204,7 @@ export function LocationSchema({ location }: { location: LocationDef }) {
         },
       })),
     },
-    url: `${origin}/service-areas/${location.slug}`,
+    url: `${origin}/locations/${location.slug}`,
   };
 
   const breadcrumbSchema = {
@@ -260,13 +221,13 @@ export function LocationSchema({ location }: { location: LocationDef }) {
         "@type": "ListItem",
         position: 2,
         name: "Service Areas",
-        item: `${origin}/service-areas`,
+        item: `${origin}/locations`,
       },
       {
         "@type": "ListItem",
         position: 3,
         name: locationName,
-        item: `${origin}/service-areas/${location.slug}`,
+        item: `${origin}/locations/${location.slug}`,
       },
     ],
   };

@@ -643,7 +643,7 @@ export default function QuoteTool() {
 
   const fallbackSlots: Slot[] = useMemo(() => {
     const now = new Date();
-    const label = (offsetDays: number, window: string) => {
+    const label = (offsetDays: number, window: string): Slot => {
       const d = new Date(now);
       d.setDate(d.getDate() + offsetDays);
       return {
@@ -655,6 +655,7 @@ export default function QuoteTool() {
           month: "short",
           day: "numeric",
         })} · ${window}`,
+        source: "estimated",
       };
     };
     return [label(1, "Next available"), label(2, "Weekday AM"), label(3, "Weekday PM")];
@@ -1323,13 +1324,14 @@ export default function QuoteTool() {
             ) : quoteResult.schedulingEligible ? (
               <div className="space-y-4 mb-8">
                 <p className="text-muted-foreground">
-                  You're eligible for fast scheduling handoff right now. Pick a
-                  time window or tap call if you prefer.
+                  {slots.length > 0 && slots[0]?.source === "estimated"
+                    ? "Pick an estimated time window below. We'll confirm your exact appointment."
+                    : "You're eligible for fast scheduling handoff right now. Pick a time window or tap call if you prefer."}
                 </p>
                 {slotsQuery.isFetching && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                    Checking live availability…
+                    Checking availability…
                   </div>
                 )}
                 {slotsQuery.isError && (
@@ -1343,6 +1345,9 @@ export default function QuoteTool() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {slots.length > 0 && slots[0]?.source === "estimated" && (
+                      <p className="col-span-full text-xs text-muted-foreground">Estimated availability — subject to confirmation</p>
+                    )}
                     {slots.map((slot: any) => (
                       <Button
                         key={slot.id}

@@ -595,6 +595,19 @@ export const clientHubTokens = pgTable("client_hub_tokens", {
 export type ClientHubToken = typeof clientHubTokens.$inferSelect;
 export type InsertClientHubToken = typeof clientHubTokens.$inferInsert;
 
+// ─── Portal Sessions (validated sessions for customer portal access) ──────────
+export const portalSessions = pgTable("portal_sessions", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customerId").notNull(),
+  companyId: integer("companyId").notNull(),
+  sessionToken: varchar("sessionToken", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PortalSession = typeof portalSessions.$inferSelect;
+export type InsertPortalSession = typeof portalSessions.$inferInsert;
+
 // ─── Product / Service Catalog ────────────────────────────────────────────────
 export const productCatalog = pgTable("product_catalog", {
   id: serial("id").primaryKey(),

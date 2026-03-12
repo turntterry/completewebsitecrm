@@ -6,6 +6,7 @@ import {
   clientHubTokens,
   customers,
   instantQuotes,
+  portalSessions,
   properties,
   quotes,
   invoices,
@@ -35,6 +36,38 @@ async function requireDb() {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
   return db;
+}
+
+/** Verify a portal session token matches the given customerId + companyId. */
+async function verifyPortalSession(opts: {
+  sessionToken: string;
+  customerId: number;
+  companyId: number;
+}) {
+  // In development, allow bypassing session validation with empty token
+  if (process.env.NODE_ENV !== "production" && !opts.sessionToken) return;
+
+  const db = await requireDb();
+  const now = new Date();
+  const [session] = await db
+    .select()
+    .from(portalSessions)
+    .where(
+      and(
+        eq(portalSessions.sessionToken, opts.sessionToken),
+        eq(portalSessions.customerId, opts.customerId),
+        eq(portalSessions.companyId, opts.companyId),
+        gt(portalSessions.expiresAt, now)
+      )
+    )
+    .limit(1);
+
+  if (!session) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid or expired session. Please use your magic link again.",
+    });
+  }
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -162,14 +195,24 @@ export const clientHubRouter = router({
         .set({ usedAt: now })
         .where(eq(clientHubTokens.id, row.id));
 
+      // Create a persistent portal session
+      const sessionToken = generateToken();
+      const sessionExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await db.insert(portalSessions).values({
+        customerId: row.customerId,
+        companyId: row.companyId,
+        sessionToken,
+        expiresAt: sessionExpires,
+      });
+
       // Return the session payload (stored in localStorage by the client)
       return {
         customerId: row.customerId,
         companyId: row.companyId,
         quoteId: row.quoteId ?? null,
         invoiceId: row.invoiceId ?? null,
-        sessionToken: generateToken(),
-        sessionExpires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        sessionToken,
+        sessionExpires: sessionExpires.toISOString(),
       };
     }),
 
@@ -181,9 +224,11 @@ export const clientHubRouter = router({
       z.object({
         customerId: z.number(),
         companyId: z.number(),
+        sessionToken: z.string().default(""),
       })
     )
     .query(async ({ input }) => {
+      await verifyPortalSession(input);
       const db = await requireDb();
 
       // Fetch customer info
@@ -251,9 +296,11 @@ export const clientHubRouter = router({
         quoteId: z.number(),
         customerId: z.number(),
         companyId: z.number(),
+        sessionToken: z.string().default(""),
       })
     )
     .query(async ({ input }) => {
+      await verifyPortalSession(input);
       const db = await requireDb();
 
       const [quote] = await db
@@ -329,12 +376,14 @@ export const clientHubRouter = router({
         quoteId: z.number(),
         customerId: z.number(),
         companyId: z.number(),
+        sessionToken: z.string().default(""),
         action: z.enum(["approve", "decline"]),
         message: z.string().optional(),
         selectedAddOnIds: z.array(z.number()).optional(),
       })
     )
     .mutation(async ({ input }) => {
+      await verifyPortalSession(input);
       const db = await requireDb();
 
       const [quote] = await db
@@ -382,9 +431,11 @@ export const clientHubRouter = router({
         invoiceId: z.number(),
         customerId: z.number(),
         companyId: z.number(),
+        sessionToken: z.string().default(""),
       })
     )
     .query(async ({ input }) => {
+      await verifyPortalSession(input);
       const db = await requireDb();
 
       const [invoice] = await db

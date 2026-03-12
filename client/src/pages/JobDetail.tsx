@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, MapPin, Calendar, Clock, CheckCircle, PlayCircle, Camera, X } from "lucide-react";
 import { toast } from "sonner";
 import JobCostingPanel from "@/components/JobCostingPanel";
-import JobPhotosTab from "@/components/JobPhotosTab";
+// ARCHIVED: JobPhotosTab depends on ExpertCam
+// import JobPhotosTab from "@/components/JobPhotosTab";
 import { useState } from "react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -136,10 +137,10 @@ export default function JobDetail() {
         </button>
       </div>
 
-      {/* Photos tab */}
-      {activeTab === "photos" && (
+      {/* ARCHIVED: Photos tab depends on ExpertCam */}
+      {/* {activeTab === "photos" && (
         <JobPhotosTab jobId={id} jobTitle={j.title ?? `Job #${j.jobNumber}`} />
-      )}
+      )} */}
 
       {activeTab === "details" && (
         <>

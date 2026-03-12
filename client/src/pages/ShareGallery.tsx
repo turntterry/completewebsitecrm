@@ -1,3 +1,4 @@
+// @ts-nocheck — ARCHIVED: depends on ExpertCam router (not registered)
 import { useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";

@@ -6,7 +6,7 @@
  * incomplete functionality.
  */
 
-export type FeatureMaturity = "production" | "beta" | "internal" | "stubbed";
+export type FeatureMaturity = "production" | "beta" | "internal" | "stubbed" | "archived";
 
 export interface FeatureStatus {
   name: string;
@@ -95,9 +95,9 @@ export const FEATURE_MATURITY_REGISTRY: Record<string, FeatureStatus> = {
   },
   expertCam: {
     name: "Expert Cam",
-    maturity: "stubbed",
+    maturity: "archived",
     description: "Photo documentation module for field crew",
-    notes: "Groundwork exists but feature is not production-ready",
+    notes: "Groundwork exists (schema, router, UI pages) but disconnected from active routes. Not maintained.",
   },
   reviewAutomation: {
     name: "Review Automation",
@@ -133,7 +133,8 @@ export function isSafeToUse(featureKey: string): boolean {
  * Check if a feature is disabled (stubbed)
  */
 export function isDisabled(featureKey: string): boolean {
-  return getFeatureStatus(featureKey)?.maturity === "stubbed";
+  const maturity = getFeatureStatus(featureKey)?.maturity;
+  return maturity === "stubbed" || maturity === "archived";
 }
 
 /**
@@ -141,7 +142,7 @@ export function isDisabled(featureKey: string): boolean {
  */
 export function getStubbedFeatures(): FeatureStatus[] {
   return Object.values(FEATURE_MATURITY_REGISTRY).filter(
-    (f) => f.maturity === "stubbed"
+    (f) => f.maturity === "stubbed" || f.maturity === "archived"
   );
 }
 

@@ -10,7 +10,8 @@ import { jobsRouter } from "./routers/jobs";
 import { invoicesRouter } from "./routers/invoices";
 import { dashboardRouter } from "./routers/dashboard";
 import { attachmentsRouter } from "./routers/attachments";
-import { instantQuotesRouter } from "./routers/instantQuotes";
+// ARCHIVED: instantQuotes — duplicate intake path, use publicSite.quote.submitV2 instead
+// import { instantQuotesRouter } from "./routers/instantQuotes";
 import { clientHubRouter } from "./routers/clientHub";
 import { productCatalogRouter } from "./routers/productCatalog";
 import { quoteToolSettingsRouter } from "./routers/quoteToolSettings";
@@ -23,7 +24,8 @@ import { aiReceptionistRouter } from "./routers/aiReceptionist";
 import { publicSiteRouter } from "./routers/publicSite";
 import { quoteAnalyticsRouter } from "./routers/quoteAnalytics";
 import { portalRouter } from "./routers/portal";
-import { expertCamRouter } from "./routers/expertCam";
+// ARCHIVED: ExpertCam — not production-ready
+// import { expertCamRouter } from "./routers/expertCam";
 
 export const appRouter = router({
   publicSite: publicSiteRouter,
@@ -45,7 +47,8 @@ export const appRouter = router({
   invoices: invoicesRouter,
   dashboard: dashboardRouter,
   attachments: attachmentsRouter,
-  instantQuotes: instantQuotesRouter,
+  // ARCHIVED: instantQuotes — duplicate intake path, use publicSite.quote.submitV2 instead
+  // instantQuotes: instantQuotesRouter,
   clientHub: clientHubRouter,
   productCatalog: productCatalogRouter,
   quoteToolSettings: quoteToolSettingsRouter,
@@ -56,7 +59,8 @@ export const appRouter = router({
   sms: smsRouter,
   aiReceptionist: aiReceptionistRouter,
   portal: portalRouter,
-  expertCam: expertCamRouter,
+  // ARCHIVED: ExpertCam — not production-ready
+  // expertCam: expertCamRouter,
 });
 
 export type AppRouter = typeof appRouter;

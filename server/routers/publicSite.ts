@@ -18,7 +18,8 @@ import { notifyOwner } from "../_core/notification";
 import { SEED_GALLERY } from "@shared/data";
 import { nanoid } from "nanoid";
 import { mockAvailabilityProvider } from "@shared/availability";
-import { initiateQuoteWorkflow } from "../services/workflowEngine";
+// ARCHIVED: workflowEngine not production-ready
+// import { initiateQuoteWorkflow } from "../services/workflowEngine";
 
 // ─── Public Quote Router ──────────────────────────────────────────────────────
 const quoteRouter = router({
@@ -209,9 +210,13 @@ const quoteRouter = router({
           logger.warn("quote.getSlots.fallback", { message: String(err) });
           return null;
         });
-        if (external?.length) return external;
+        if (external?.length) {
+          // Tag external slots so the client can distinguish real from estimated
+          return external.map(s => ({ ...s, source: "external" as const }));
+        }
       }
 
+      // FALLBACK: returns estimated slots when no real scheduler is configured
       return mockAvailabilityProvider.getSlots({
         durationMinutes: input.durationMinutes,
         daysAhead: input.daysAhead,
@@ -696,39 +701,9 @@ const quoteRouter = router({
         schedulingBlockedReasons,
       });
 
-      // Trigger automation workflow: customer → draft quote → SMS
-      let autoWorkflowResult: any = null;
-      let workflowErrors: string[] = [];
-      try {
-        // Only auto-create on high-confidence submissions (not manual review)
-        if (finalConfidenceMode !== "manual_review") {
-          autoWorkflowResult = await initiateQuoteWorkflow({
-            companyId: sessionCompanyId,
-            customerName: input.customerName,
-            customerEmail: input.customerEmail,
-            customerPhone: input.customerPhone,
-            address: input.address,
-            city: input.city,
-            state: input.state,
-            zip: input.zip,
-            instantQuoteId: quoteId,
-            subtotal: input.subtotal,
-            total: input.totalPrice,
-            services: input.items.map(item => ({
-              serviceId: item.serviceType,
-              serviceName: item.serviceType.replace(/_/g, " "),
-              price: item.finalPrice,
-            })),
-          });
-          workflowErrors = autoWorkflowResult.errors;
-        }
-      } catch (workflowErr) {
-        workflowErrors.push(`Workflow initialization failed: ${String(workflowErr)}`);
-        logger.warn("quote.submitV2.workflowError", {
-          quoteId,
-          error: String(workflowErr),
-        });
-      }
+      // TODO: rebuild honest orchestration layer
+      const autoWorkflowResult: any = null;
+      const workflowErrors: string[] = [];
 
       return {
         quoteId,
@@ -745,158 +720,8 @@ const quoteRouter = router({
       };
     }),
 
-  // Accept the website QuoteTool's submission format and store in instant_quotes.
-  submit: publicProcedure
-    .input(
-      z.object({
-        customerName: z.string().min(1),
-        customerEmail: z.string().email(),
-        customerPhone: z.string().min(1),
-        address: z.string().min(1),
-        city: z.string().optional(),
-        state: z.string().optional(),
-        zip: z.string().optional(),
-        lat: z.number().optional(),
-        lng: z.number().optional(),
-        distanceMiles: z.number().optional(),
-        subtotal: z.number(),
-        bundleDiscount: z.number().optional(),
-        travelFee: z.number().optional(),
-        totalPrice: z.number(),
-        preferredDate: z.string().optional(),
-        preferredTime: z.string().optional(),
-        referralSource: z.string().optional(),
-        customerPhotos: z.array(z.string()).optional(),
-        propertyIntel: z
-          .object({
-            livingAreaSqft: z.number().optional(),
-            stories: z.number().optional(),
-            yearBuilt: z.number().optional(),
-            roofAreaSqft: z.number().optional(),
-            drivewaySqft: z.number().optional(),
-            source: z.string().optional(),
-            fetchedAt: z.string().optional(),
-          })
-          .optional(),
-        items: z.array(
-          z.object({
-            serviceType: z.string(),
-            packageTier: z.enum(["good", "better", "best"]).optional(),
-            inputs: z.record(z.string(), z.unknown()).optional(),
-            basePrice: z.number(),
-            finalPrice: z.number(),
-            description: z.string().optional(),
-          })
-        ),
-        sessionToken: z.string().max(64).optional(),
-      })
-    )
-    .mutation(async ({ input }) => {
-      const db = await getDb();
-      if (!db) { logger.warn("publicSite.noDb"); throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database unavailable" }); }
-
-      // Split name into first/last for the instant_quotes schema
-      const nameParts = input.customerName.trim().split(/\s+/);
-      const firstName = nameParts[0] ?? input.customerName;
-      const lastName = nameParts.slice(1).join(" ") || "";
-
-      // Convert items to the services array format the CRM uses
-      const services = input.items.map(item => ({
-        serviceId: item.serviceType,
-        serviceName: item.serviceType
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, c => c.toUpperCase()),
-        sizeLabel: item.description ?? item.serviceType,
-        sizeValue:
-          (item.inputs?.sqft as number) ??
-          (item.inputs?.linearFeet as number) ??
-          0,
-        options: (item.inputs ?? {}) as Record<string, string>,
-        price: item.finalPrice,
-      }));
-
-      const bundleDiscount = input.bundleDiscount ?? 0;
-
-      const result = await db.insert(instantQuotes).values([
-        {
-          firstName,
-          lastName,
-          email: input.customerEmail,
-          phone: input.customerPhone,
-          emailConsent: false,
-          smsConsent: false,
-          address: input.address,
-          city: input.city ?? null,
-          state: input.state ?? null,
-          zip: input.zip ?? null,
-          lat: input.lat !== undefined ? String(input.lat) : null,
-          lng: input.lng !== undefined ? String(input.lng) : null,
-          squareFootage:
-            input.propertyIntel?.livingAreaSqft !== undefined
-              ? Number(input.propertyIntel.livingAreaSqft)
-              : null,
-          stories:
-            input.propertyIntel?.stories !== undefined
-              ? Number(input.propertyIntel.stories)
-              : null,
-          exteriorMaterial: null,
-          propertyType: null,
-          propertyIntel: input.propertyIntel ?? null,
-          services: services as any,
-          subtotal: String(input.subtotal.toFixed(2)),
-          discountPercent: "0",
-          discountAmount: String(bundleDiscount.toFixed(2)),
-          total: String(input.totalPrice.toFixed(2)),
-          status: "pending",
-          preferredSlot: (input as any).preferredSlot ?? null,
-          preferredSlotLabel: (input as any).preferredSlotLabel ?? null,
-        },
-      ]).returning({ id: instantQuotes.id });
-
-      const quoteId = result[0]?.id as number;
-
-      if (input.sessionToken) {
-        const [session] = await db
-          .select()
-          .from(quoteSessions)
-          .where(eq(quoteSessions.sessionToken, input.sessionToken))
-          .limit(1);
-
-        if (session) {
-          await db
-            .update(quoteSessions)
-            .set({ submittedAt: new Date() })
-            .where(eq(quoteSessions.id, session.id));
-
-          await db.insert(quoteSessionEvents).values({
-            sessionId: session.id,
-            eventName: "quote_submitted",
-            payload: {
-              quoteId,
-              totalPrice: input.totalPrice,
-              services: input.items.length,
-            },
-          });
-        }
-      }
-
-      const serviceList = input.items
-        .map(i => i.serviceType.replace(/_/g, " "))
-        .join(", ");
-
-      notifyOwner({
-        title: `New Quote: $${input.totalPrice.toFixed(2)} from ${input.customerName}`,
-        content: `Name: ${input.customerName}\nPhone: ${input.customerPhone}\nEmail: ${input.customerEmail}\nAddress: ${input.address}\nServices: ${serviceList}\nTotal: $${input.totalPrice.toFixed(2)}${input.preferredDate ? `\nPreferred date: ${input.preferredDate}` : ""}${(input as any).preferredSlotLabel ? `\nPreferred slot: ${(input as any).preferredSlotLabel}` : ""}${
-          (input as any).confidenceMode === "range" ? `\nPresented as range: yes` : ""
-        }${
-          input.propertyIntel
-            ? `\nProperty intel: ${JSON.stringify(input.propertyIntel)}`
-            : ""
-        }`,
-      }).catch(() => {});
-
-      return { quoteId, totalPrice: input.totalPrice };
-    }),
+  // ARCHIVED: old quote.submit — replaced by submitV2
+  // submit: publicProcedure (see git history for full implementation)
 
   // Photo upload for quote tool (requires S3 env vars — gracefully fails without them)
   uploadPhoto: publicProcedure
@@ -967,6 +792,8 @@ async function fetchPropertyIntel({
   };
 }
 
+// FALLBACK: returns estimated property data when no RentCast API key is configured.
+// Values are deterministic but synthetic — not from real property records.
 function mockPropertyIntel({
   address,
   city,

@@ -3,6 +3,7 @@ export type Slot = {
   date: string; // YYYY-MM-DD
   window: string; // e.g., "09:00-11:00"
   display: string; // human readable
+  source?: "external" | "estimated"; // where this slot came from
 };
 
 export interface AvailabilityProviderOptions {
@@ -17,7 +18,8 @@ export interface AvailabilityProvider {
   getSlots(opts: AvailabilityProviderOptions): Slot[];
 }
 
-// Mock provider: duration-aware windows generated locally.
+// FALLBACK: returns estimated slots when no real scheduler is configured.
+// These are synthetic time windows — not backed by a real calendar.
 export const mockAvailabilityProvider: AvailabilityProvider = {
   getSlots({
     durationMinutes,
@@ -68,6 +70,7 @@ export const mockAvailabilityProvider: AvailabilityProvider = {
           date: dateStr,
           window: w,
           display: `${label} · ${w}`,
+          source: "estimated",
         });
       });
     }

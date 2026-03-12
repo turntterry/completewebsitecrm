@@ -103,6 +103,7 @@ export default function Portal() {
     {
       customerId: (session?.customerId ?? debugCustomerId) || 0,
       companyId: (session?.companyId ?? debugCompanyId) || 0,
+      sessionToken: session?.sessionToken ?? "",
       limit: 50,
     },
     {
@@ -435,6 +436,7 @@ export default function Portal() {
                               quoteId: q.id,
                               customerId: resolvedCustomerId,
                               companyId: resolvedCompanyId,
+                              sessionToken: session?.sessionToken ?? "",
                               note: approveNotes[q.id] ?? undefined,
                             })
                           }
@@ -456,6 +458,7 @@ export default function Portal() {
                               quoteId: q.id,
                               customerId: resolvedCustomerId,
                               companyId: resolvedCompanyId,
+                              sessionToken: session?.sessionToken ?? "",
                               action: "decline",
                               note: declineReasons[q.id] ?? undefined,
                             } as any)
@@ -661,6 +664,7 @@ export default function Portal() {
                               invoiceId: inv.id,
                               customerId: resolvedCustomerId,
                               companyId: resolvedCompanyId,
+                              sessionToken: session?.sessionToken ?? "",
                               amount: amt + tip,
                             });
                           }}
@@ -850,6 +854,7 @@ export default function Portal() {
                 requestWork.mutate({
                   customerId: resolvedCustomerId,
                   companyId: resolvedCompanyId,
+                  sessionToken: session?.sessionToken ?? "",
                   message: requestMessage || undefined,
                   services: requestServices
                     ? requestServices.split(",").map(s => s.trim()).filter(Boolean)

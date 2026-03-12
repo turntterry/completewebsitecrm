@@ -50,8 +50,6 @@ import FieldTimer from "./pages/FieldTimer";
 import AiReceptionist from "./pages/AiReceptionist";
 import Messages from "./pages/Messages";
 import Portal from "./pages/Portal";
-import ExpertCam from "./pages/ExpertCam";
-import ShareGallery from "./pages/ShareGallery";
 import PublicQuote from "./pages/PublicQuote";
 import LeadDetail from "./pages/LeadDetail";
 
@@ -72,8 +70,8 @@ function Router() {
       <Route path="/cookeville" component={CookevillePage} />
       <Route path="/instant-quote" component={PublicQuoteTool} />
 
-      {/* ── Expert Cam public share ── */}
-      <Route path="/share/:token" component={ShareGallery} />
+      {/* ARCHIVED: ShareGallery depends on ExpertCam */}
+      {/* <Route path="/share/:token" component={ShareGallery} /> */}
 
       {/* ── Public quote client view ── */}
       <Route path="/quote/:token" component={PublicQuote} />

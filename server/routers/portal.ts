@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   customers,
@@ -8,6 +8,7 @@ import {
   invoiceLineItems,
   jobs,
   leads,
+  portalSessions,
   quoteLineItems,
   quotes,
   visits,
@@ -49,6 +50,38 @@ async function getPortalSettings(companyId: number) {
   };
 }
 
+/** Verify a portal session token matches the given customerId + companyId. */
+async function verifyPortalSession(opts: {
+  sessionToken: string;
+  customerId: number;
+  companyId: number;
+}) {
+  // In development, allow bypassing session validation with empty token
+  if (process.env.NODE_ENV !== "production" && !opts.sessionToken) return;
+
+  const db = await requireDb();
+  const now = new Date();
+  const [session] = await db
+    .select()
+    .from(portalSessions)
+    .where(
+      and(
+        eq(portalSessions.sessionToken, opts.sessionToken),
+        eq(portalSessions.customerId, opts.customerId),
+        eq(portalSessions.companyId, opts.companyId),
+        gt(portalSessions.expiresAt, now)
+      )
+    )
+    .limit(1);
+
+  if (!session) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid or expired session. Please use your magic link again.",
+    });
+  }
+}
+
 export const portalRouter = router({
   /**
    * Read-only snapshot for the customer portal (quotes, jobs/visits, invoices).
@@ -59,10 +92,12 @@ export const portalRouter = router({
       z.object({
         customerId: z.number().int().positive(),
         companyId: z.number().int().positive(),
+        sessionToken: z.string().default(""),
         limit: z.number().int().min(1).max(100).default(25),
       })
     )
     .query(async ({ input }) => {
+      await verifyPortalSession(input);
       const db = await requireDb();
 
       const [customer] = await db
@@ -181,11 +216,13 @@ export const portalRouter = router({
         quoteId: z.number().int().positive(),
         customerId: z.number().int().positive(),
         companyId: z.number().int().positive(),
+        sessionToken: z.string().default(""),
         note: z.string().max(2000).optional(),
         autoCreateJob: z.boolean().default(true),
       })
     )
     .mutation(async ({ input }) => {
+      await verifyPortalSession(input);
       const db = await requireDb();
       const portalSettings = await getPortalSettings(input.companyId);
       const company = await getCompany(input.companyId);
@@ -349,12 +386,14 @@ export const portalRouter = router({
         invoiceId: z.number().int().positive(),
         customerId: z.number().int().positive(),
         companyId: z.number().int().positive(),
+        sessionToken: z.string().default(""),
         amount: z.number().positive().optional(), // defaults to balance
         method: z.enum(["card", "ach", "cash", "check", "other"]).default("card"),
         note: z.string().max(2000).optional(),
       })
     )
     .mutation(async ({ input }) => {
+      await verifyPortalSession(input);
       const db = await requireDb();
       const portalSettings = await getPortalSettings(input.companyId);
 
@@ -477,7 +516,8 @@ export const portalRouter = router({
         ).catch(() => {});
       }
 
-      return { success: true, remainingBalance: updatedBalance };
+      // provider: "stub" tells the client no external payment processor was charged
+      return { success: true, remainingBalance: updatedBalance, provider: "stub" as const };
     }),
 
   /**
@@ -488,6 +528,7 @@ export const portalRouter = router({
       z.object({
         customerId: z.number().int().positive(),
         companyId: z.number().int().positive(),
+        sessionToken: z.string().default(""),
         message: z.string().max(2000).optional(),
         services: z.array(z.string()).max(20).optional(),
         preferredDate: z.string().optional(),
@@ -496,6 +537,7 @@ export const portalRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      await verifyPortalSession(input);
       const db = await requireDb();
       const portalSettings = await getPortalSettings(input.companyId);
 

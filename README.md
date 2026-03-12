@@ -1,95 +1,83 @@
 # Exterior Experts CRM
 
-A full-stack business OS: website, instant quotes, CRM, jobs, invoicing, SMS inbox, and customer portal for Exterior Experts (exteriorexperts.co).
+CRM and public marketing website for an exterior cleaning contractor, served from a single Express + Vite application.
 
-## Tech Stack
-- **Frontend**: React 19 + Vite + Wouter (client-side routing)
-- **Backend**: Express + tRPC + TypeScript
-- **Database**: PostgreSQL + Drizzle ORM
-- **Auth**: Google OAuth 2.0 with JWT session cookies
-- **SMS**: Twilio
-- **Communications**: Anthropic (AI receptionist)
-- **File uploads**: AWS S3 (with local fallback)
+## Stack
 
-## Architecture
-Single full-stack app, not a monorepo:
-- `server/_core/index.ts` — Express entry point
-- `server/routers/*.ts` — tRPC router endpoints
-- `client/src/App.tsx` — All Wouter routes (public + admin)
-- `drizzle/schema.ts` — Database schema (single source of truth)
+- **Frontend:** React 19, Vite, Wouter, TanStack Query, Tailwind CSS v4, Radix UI
+- **Backend:** Express, tRPC v11, TypeScript
+- **Database:** PostgreSQL, Drizzle ORM
+- **Auth:** Google OAuth 2.0, JWT session cookies
+- **SMS:** Twilio
+- **File storage:** S3 via Forge proxy, local fallback
+- **LLM:** Gemini 2.5 Flash via Forge proxy
 
-Routes:
-- `/` through `/locations`, `/gallery`, `/contact`, etc. → public marketing site
-- `/admin/*` → CRM pages (protected, requires auth)
-- `/quote/:token` → public quote view (unauthenticated)
-- `/portal` → customer portal
+## Single-tenant
 
-## Quick Start
+The schema has `companyId` columns, but the app is operationally single-tenant. `DEFAULT_COMPANY_ID = 1` is hardcoded. There is no multi-org support, tenant switching, or signup flow.
 
-1. **Start database:**
-   ```bash
-   docker compose up -d
-   ```
-   Starts PostgreSQL on `:5432` (user: `crm_user`, db: `exterior_experts_crm`)
+## Quick start
 
-2. **Setup:**
-   ```bash
-   cp .env.example .env
-   # Edit .env: add Google OAuth credentials, Twilio (optional), Anthropic (optional)
-   ```
+```bash
+# 1. Start PostgreSQL
+docker compose up -d
 
-3. **Install and run dev:**
-   ```bash
-   pnpm install
-   pnpm dev
-   ```
-   Runs Express on `:3000` + Vite HMR. Open http://localhost:3000
+# 2. Configure environment
+cp .env.example .env
+# Edit .env: add DATABASE_URL, JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+# Optional: TWILIO_*, ANTHROPIC_API_KEY, AWS_*
 
-4. **Build for production:**
-   ```bash
-   pnpm build     # Vite + esbuild server
-   pnpm start     # Run dist/index.js
-   ```
+# 3. Install and run
+pnpm install
+pnpm dev
+```
 
-## Deployment
+Dev server runs on http://localhost:3000 (Express + Vite HMR).
 
-1. **Build:**
-   ```bash
-   pnpm build
-   ```
-   Outputs to `dist/` folder (backend) + `client/dist/` (frontend).
+## Production
 
-2. **Run:**
-   ```bash
-   NODE_ENV=production node dist/index.js
-   ```
-   Make sure `DATABASE_URL` is set to your PostgreSQL server.
+```bash
+pnpm build
+NODE_ENV=production node dist/index.js
+```
 
-3. **Environment:**
-   - Set `NODE_ENV=production`
-   - Set `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_*` (required)
-   - Set optional vars: `TWILIO_*`, `ANTHROPIC_API_KEY`, `AWS_*`
+Requires `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
 
 ## Database
 
-**Schema changes:**
 ```bash
-npx drizzle-kit push   # Push schema directly to DB
+npx drizzle-kit push   # Push schema to DB (do NOT use pnpm db:push)
 ```
 
-Do NOT use `pnpm db:push` (it fails on existing tables).
+Schema lives in `drizzle/schema.ts`. For manual changes, use `ALTER TABLE` directly.
 
-See `drizzle/schema.ts` for all tables. For manual schema changes, write SQL migrations in `drizzle/*.sql` or run `ALTER TABLE` directly.
+## Feature maturity
 
-## Key Files
-- `server/_core/index.ts` — HTTP server and middleware setup
-- `server/_core/trpc.ts` — procedure definitions (publicProcedure, protectedProcedure, adminProcedure)
-- `server/routers.ts` — registers all sub-routers
-- `server/db.ts` — database helpers
-- `client/src/App.tsx` — all routes and route definitions
+See `FEATURES.md` for details.
 
-## Conventions
-- All admin routes require `role === 'admin'` (checked in tRPC context)
-- All data mutations require company context (`companyId`); queries filter by company
-- Use `npx drizzle-kit push` for schema changes, not migrations
-- New routers: create `server/routers/featureName.ts`, then register in `server/routers.ts`
+| Level | Features |
+|-------|----------|
+| **Production** | Quote intake (submitV2), CRM pipeline, customers, quotes, jobs, invoicing, SMS inbox, Google reviews, customer portal, auth, file storage |
+| **Beta** | Automations (partial engine), payment processing (no Stripe), campaigns (SMS only), referral program |
+| **Internal** | AI receptionist (optional), scheduler (mock fallback), property intelligence (mock data), analytics |
+| **Stubbed** | Map measurement, email delivery |
+| **Archived** | Expert Cam, workflow engine |
+
+## Key files
+
+| Path | Purpose |
+|------|---------|
+| `server/_core/index.ts` | Express entry point |
+| `server/_core/trpc.ts` | Procedure definitions (public, protected, admin) |
+| `server/routers.ts` | Router registry |
+| `server/db.ts` | Database helpers |
+| `drizzle/schema.ts` | All table definitions |
+| `client/src/App.tsx` | All routes |
+| `client/src/components/CrmLayout.tsx` | Admin sidebar nav |
+
+## Routes
+
+- `/`, `/locations/*`, `/gallery`, `/contact` -- public marketing site
+- `/admin/*` -- CRM (requires auth)
+- `/quote/:token` -- public quote view
+- `/portal` -- customer portal
