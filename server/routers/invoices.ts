@@ -160,6 +160,7 @@ export const invoicesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const companyId = await getCompanyId(ctx.user.id, ctx.user.name ?? "");
+      // createPayment handles invoice balance update internally — do not update again here
       await createPayment({
         invoiceId: input.invoiceId,
         companyId,
@@ -168,16 +169,6 @@ export const invoicesRouter = router({
         notes: input.notes,
         paidAt: new Date(),
       });
-      const invoice = await getInvoice(input.invoiceId, companyId);
-      if (invoice) {
-        const paid = (parseFloat(String(invoice.amountPaid ?? "0")) + parseFloat(input.amount)) || 0;
-        const balance = Math.max(0, parseFloat(String(invoice.total ?? "0")) - paid);
-        await updateInvoice(input.invoiceId, companyId, {
-          amountPaid: String(paid.toFixed(2)) as any,
-          balance: String(balance.toFixed(2)) as any,
-          ...(balance <= 0 ? { status: "paid" } : {}),
-        } as any);
-      }
       return { success: true };
     }),
 

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, MapPin, Calendar, Clock, CheckCircle, PlayCircle, Camera, X } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, CheckCircle, PlayCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import JobCostingPanel from "@/components/JobCostingPanel";
 // ARCHIVED: JobPhotosTab depends on ExpertCam
@@ -24,17 +24,13 @@ const STATUS_COLORS: Record<string, string> = {
 export default function JobDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id ?? "0");
-  const [activeTab, setActiveTab] = useState<"details" | "photos">("details");
+  // ARCHIVED: activeTab/photos tab removed — depends on ExpertCam (not registered)
   const [, navigate] = useLocation();
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
   const [scheduledEndAt, setScheduledEndAt] = useState("");
   const utils = trpc.useUtils();
   const { data: job, isLoading } = trpc.jobs.get.useQuery({ id }, { enabled: !!id && id > 0 });
-  const { data: jobPhotos = [] } = trpc.attachments.list.useQuery(
-    { attachableType: "job", attachableId: id }, { enabled: !!id && id > 0 }
-  );
-  const photoCount = (jobPhotos as any[]).filter(p => !p.mimeType || p.mimeType.startsWith("image/") || p.mimeType.startsWith("video/")).length;
   const updateMutation = trpc.jobs.update.useMutation({
     onSuccess: () => { utils.jobs.get.invalidate({ id }); toast.success("Job updated"); },
   });
@@ -115,35 +111,8 @@ export default function JobDetail() {
         </div>
       </div>
 
-      {/* Tab nav */}
-      <div className="flex items-center gap-1 border-b border-border">
-        <button
-          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === "details" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          onClick={() => setActiveTab("details")}
-        >
-          Details
-        </button>
-        <button
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === "photos" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          onClick={() => setActiveTab("photos")}
-        >
-          <Camera className="h-3.5 w-3.5" />
-          Photos
-          {photoCount > 0 && (
-            <span className="ml-1 text-[10px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
-              {photoCount}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* ARCHIVED: Photos tab depends on ExpertCam */}
-      {/* {activeTab === "photos" && (
-        <JobPhotosTab jobId={id} jobTitle={j.title ?? `Job #${j.jobNumber}`} />
-      )} */}
-
-      {activeTab === "details" && (
-        <>
+      {/* ARCHIVED: Tab nav + Photos tab removed — depends on ExpertCam (not registered) */}
+      <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Client</CardTitle></CardHeader>
@@ -296,7 +265,6 @@ export default function JobDetail() {
             <JobCostingPanel jobId={id} />
           </div>
         </>
-      )}
 
       {/* Schedule Modal */}
       {showScheduleModal && (

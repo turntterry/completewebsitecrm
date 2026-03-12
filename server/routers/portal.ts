@@ -468,14 +468,11 @@ export const portalRouter = router({
         notes: input.note ?? "Portal payment",
         paidAt: new Date(),
       });
+      // createPayment handles amountPaid, balance, and status updates — do not duplicate here
 
-      const updatedBalance = Math.max(0, balance - amount);
-      const newAmountPaid = parseFloat(String(invoice.amountPaid ?? "0")) + amount;
-      await db.update(invoices).set({
-        amountPaid: String(newAmountPaid.toFixed(2)) as any,
-        balance: String(updatedBalance.toFixed(2)) as any,
-        ...(updatedBalance <= 0 ? { status: "paid" } as any : {}),
-      }).where(eq(invoices.id, invoice.id));
+      // Re-read invoice to get updated balance for webhook event type
+      const [updatedInvoice] = await db.select().from(invoices).where(eq(invoices.id, invoice.id));
+      const updatedBalance = parseFloat(String(updatedInvoice?.balance ?? "0"));
 
       const eventType =
         updatedBalance <= 0 ? "payment.paid_in_full" : "payment.deposit_paid";
