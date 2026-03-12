@@ -36,6 +36,23 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  // Trust proxy headers from Render/reverse proxy (needed for secure cookies + HTTPS detection)
+  app.set("trust proxy", 1);
+
+  // Production: redirect HTTP → HTTPS and add security headers
+  if (process.env.NODE_ENV === "production") {
+    app.use((req, res, next) => {
+      if (req.protocol !== "https") {
+        return res.redirect(301, `https://${req.get("host")}${req.originalUrl}`);
+      }
+      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("X-Frame-Options", "DENY");
+      next();
+    });
+  }
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -47,8 +64,8 @@ async function startServer() {
   registerPaymentWebhook(app);
   // robots.txt + sitemap.xml for marketing pages
   registerSeoRoutes(app);
-  // Local-only mock scheduler endpoint for development
-  app.post("/api/mock/scheduler", (req, res) => {
+  // Local-only mock scheduler endpoint (dev only — not exposed in production)
+  if (process.env.NODE_ENV !== "production") app.post("/api/mock/scheduler", (req, res) => {
     try {
       const {
         durationMinutes = 90,
