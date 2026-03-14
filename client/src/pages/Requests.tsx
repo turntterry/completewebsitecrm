@@ -41,11 +41,14 @@ type RequestForm = {
 
 function InstantQuoteCard({ quote }: { quote: any }) {
   const [expanded, setExpanded] = useState(false);
-  // ARCHIVED: instantQuotes router not registered — stub mutation to avoid runtime crash
-  const updateStatus = {
-    mutate: (_input: any) => { toast.error("Instant quote status updates are not available"); },
-    isPending: false,
-  };
+  const utils = trpc.useUtils();
+  const updateStatus = trpc.instantQuotes.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.instantQuotes.list.invalidate();
+      toast.success("Status updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const services: any[] = Array.isArray(quote.services)
     ? quote.services
@@ -197,9 +200,7 @@ export default function Requests() {
   const utils = trpc.useUtils();
 
   const { data: leads = [], isLoading: leadsLoading } = trpc.leads.list.useQuery({});
-  // ARCHIVED: instantQuotes router not registered — use empty stub to avoid runtime crash
-  const instantQuotesList: any[] = [];
-  const iqLoading = false;
+  const { data: instantQuotesList = [], isLoading: iqLoading } = trpc.instantQuotes.list.useQuery({});
 
   const createMutation = trpc.leads.create.useMutation({
     onSuccess: () => {

@@ -10,8 +10,7 @@ import { jobsRouter } from "./routers/jobs";
 import { invoicesRouter } from "./routers/invoices";
 import { dashboardRouter } from "./routers/dashboard";
 import { attachmentsRouter } from "./routers/attachments";
-// ARCHIVED: instantQuotes — duplicate intake path, use publicSite.quote.submitV2 instead
-// import { instantQuotesRouter } from "./routers/instantQuotes";
+import { instantQuotesRouter } from "./routers/instantQuotes";
 import { clientHubRouter } from "./routers/clientHub";
 import { productCatalogRouter } from "./routers/productCatalog";
 import { quoteToolSettingsRouter } from "./routers/quoteToolSettings";
@@ -47,8 +46,7 @@ export const appRouter = router({
   invoices: invoicesRouter,
   dashboard: dashboardRouter,
   attachments: attachmentsRouter,
-  // ARCHIVED: instantQuotes — duplicate intake path, use publicSite.quote.submitV2 instead
-  // instantQuotes: instantQuotesRouter,
+  instantQuotes: instantQuotesRouter,
   clientHub: clientHubRouter,
   productCatalog: productCatalogRouter,
   quoteToolSettings: quoteToolSettingsRouter,
